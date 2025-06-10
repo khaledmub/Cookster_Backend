@@ -1,0 +1,12 @@
+#page-topbar {
+    background: rgb(64,81,137);
+  background: linear-gradient(90deg, rgba(64,81,137,1) 29%, rgba(42,59,113,1) 76%);
+  }
+  .card{
+    border-radius: 1.02rem;
+  }
+  /*.form-check-input{
+    width: 1.8em;
+    height: 1.8em;
+  }*/
+/*# sourceMappingURL=custom.min.css.map */

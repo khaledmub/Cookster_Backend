@@ -1,0 +1,25 @@
+.alert-success p, .alert-danger p{
+  margin-bottom: 0;
+}
+.alert-danger ul{
+  margin-bottom: 0;
+}
+.custom_datatable .dataTables_length{
+  display: inline-block;
+}
+.custom_datatable .dataTables_filter{
+  display: inline-block;
+  float: right;
+}
+.custom_datatable .dataTables_info{
+  display: inline-block;
+}
+.custom_datatable .dataTables_paginate{
+  display: inline-block;
+  float: right;
+}
+.custom_datatable table{
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 1px !important;
+}

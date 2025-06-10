@@ -1,0 +1,43 @@
+<?php
+
+return [
+    'required' => 'حقل :attribute مطلوب.',
+    'email' => 'يجب أن يكون :attribute عنوان بريد إلكتروني صالحًا.',
+    'min' => [
+        'string' => 'يجب أن يكون :attribute على الأقل :min أحرف.',
+    ],
+    'confirmed' => 'تأكيد :attribute غير مطابق.',
+    'unique' => 'قيمة :attribute مستخدمة من قبل.',
+    'in' => ':attribute المحدد غير صالح.',
+    'attributes' => [
+        'name' => 'الاسم',
+        'email' => 'عنوان البريد الإلكتروني',
+        'phone' => 'رقم الهاتف',
+        'password' => 'كلمة المرور',
+        'dob' => 'تاريخ الميلاد',
+        'entity' => 'الجهة',
+        'business_type' => 'نوع النشاط التجاري',
+        'country' => 'الدولة',
+        'state' => 'الولاية',
+        'city' => 'المدينة',
+        'contact_phone' => 'هاتف التواصل',
+        'contact_email' => 'بريد التواصل',
+        'website' => 'الموقع الإلكتروني',
+        'location' => 'الموقع',
+        'latitude' => 'خط العرض',
+        'longitude' => 'خط الطول',
+        'dob_*' => 'تاريخ الميلاد',
+        'gender_*' => 'الجنس',
+        'country_*' => 'الدولة',
+        'state_*' => 'الولاية',
+        'city_*' => 'المدينة',
+        'post_code_*' => 'الرمز البريدي',
+        'title' => 'العنوان',
+        'video_type' => 'نوع الفيديو',
+        'description' => 'الوصف',
+        'menu' => 'القائمة',
+        'publish_type' => 'نوع النشر',
+        'video_id' => 'معرّف الفيديو',
+        'comment' => 'التعليق',
+    ]
+];

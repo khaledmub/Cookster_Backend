@@ -1,0 +1,12 @@
+#back_to_top_btn{
+	left: 30px;
+}
+.footer_body ul {
+	padding-right: 0;
+}
+.footer_nav ul li {
+	padding-left: 30px;
+}
+.th_part_b .btn-primary i{
+	transform: rotate(180deg) !important;
+}

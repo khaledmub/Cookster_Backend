@@ -1,0 +1,2462 @@
+{
+	"info": {
+		"_postman_id": "6858e4fc-8993-434c-ac35-6d39ce28bf45",
+		"name": "Cookster",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24164656",
+		"_collection_link": "https://crimson-zodiac-232961.postman.co/workspace/Abaska-Workspace~a7dda7c6-78a2-4a5e-88c6-403cdd50eb69/collection/4652012-6858e4fc-8993-434c-ac35-6d39ce28bf45?action=share&source=collection_link&creator=24164656"
+	},
+	"item": [
+		{
+			"name": "General",
+			"item": [
+				{
+					"name": "Site Languages",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}site_languages",
+							"host": [
+								"{{base_url}}site_languages"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Site Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}site_settings",
+							"host": [
+								"{{base_url}}site_settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Entities",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}entities",
+							"host": [
+								"{{base_url}}entities"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Countries",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}countries?id=50",
+							"host": [
+								"{{base_url}}countries"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "50",
+									"description": "Optional"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "States",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}states?country_id=233",
+							"host": [
+								"{{base_url}}states"
+							],
+							"query": [
+								{
+									"key": "country_id",
+									"value": "233"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cities",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}cities?country_id=194",
+							"host": [
+								"{{base_url}}cities"
+							],
+							"query": [
+								{
+									"key": "state_id",
+									"value": "1400",
+									"disabled": true
+								},
+								{
+									"key": "country_id",
+									"value": "194"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generic Key Value",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}generic_key_value?key_id=1",
+							"host": [
+								"{{base_url}}generic_key_value"
+							],
+							"query": [
+								{
+									"key": "key_id",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Started Screens",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}started_screens",
+							"host": [
+								"{{base_url}}started_screens"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "type",
+									"value": "4",
+									"description": "1 for General Search, 2 for Business Accounts, 3 for Chef Accounts, 4 for Top Rated",
+									"type": "text"
+								},
+								{
+									"key": "keywords",
+									"value": "pizza",
+									"type": "text"
+								},
+								{
+									"key": "country",
+									"value": "Pakistan",
+									"type": "text"
+								},
+								{
+									"key": "city",
+									"value": "Lahore",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}search",
+							"host": [
+								"{{base_url}}search"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Profile Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}profile_details?id=0ef612c9-07ff-4a6d-984b-7e26b96a1282",
+							"host": [
+								"{{base_url}}profile_details"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "0ef612c9-07ff-4a6d-984b-7e26b96a1282"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Page Content",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}page?type=1",
+							"host": [
+								"{{base_url}}page"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "1",
+									"description": "1 for About Us, 2 for Privacy Policy, 3 for Terms of use"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Nearest Business Accounts",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "latitude",
+									"value": "37.654644",
+									"type": "text"
+								},
+								{
+									"key": "longitude",
+									"value": "70.487987",
+									"type": "text"
+								},
+								{
+									"key": "radius",
+									"value": "2",
+									"description": "in KM",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}business_accounts/nearest",
+							"host": [
+								"{{base_url}}business_accounts"
+							],
+							"path": [
+								"nearest"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Subscription",
+			"item": [
+				{
+					"name": "Subscribe",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "package_id",
+									"value": "6478f1f9-a6d2-47df-a5c3-fd74f92f793b",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}packages/subscribe",
+							"host": [
+								"{{base_url}}packages"
+							],
+							"path": [
+								"subscribe"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Packages List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}packages/list",
+							"host": [
+								"{{base_url}}packages"
+							],
+							"path": [
+								"list"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Forgot Password",
+					"item": [
+						{
+							"name": "Verify Email",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "email",
+											"value": "usman.personal@gmail.com",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}forgot_password/verify_email",
+									"host": [
+										"{{base_url}}forgot_password"
+									],
+									"path": [
+										"verify_email"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Verify Code",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "user_id",
+											"value": "39eec07a-6eed-49dc-9ff1-666d620eb052",
+											"type": "text"
+										},
+										{
+											"key": "code",
+											"value": "jQ8FR",
+											"type": "text"
+										},
+										{
+											"key": "medium",
+											"value": "1",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}forgot_password/verify_code",
+									"host": [
+										"{{base_url}}forgot_password"
+									],
+									"path": [
+										"verify_code"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Password",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "user_id",
+											"value": "f155bc09-cdfc-43f6-b21f-c9ba2e1be958",
+											"type": "text"
+										},
+										{
+											"key": "password",
+											"value": "Welcome!23",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}forgot_password/update_password",
+									"host": [
+										"{{base_url}}forgot_password"
+									],
+									"path": [
+										"update_password"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Registration Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}registration_settings",
+							"host": [
+								"{{base_url}}registration_settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Registration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Usman Khan",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "email",
+									"value": "usman.personal3@gmail.com",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "13256453420",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "welcome123",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "dob",
+									"value": "10-Jan-2025",
+									"description": "Personal/Business",
+									"type": "text"
+								},
+								{
+									"key": "entity",
+									"value": "1",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "business_type",
+									"value": "2",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "country",
+									"value": "194",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "state",
+									"value": "1400",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "2849",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "contact_phone",
+									"value": "03124587459",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "contact_email",
+									"value": "contact@gmail.com",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "website",
+									"value": "test.com",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "location",
+									"value": "test location",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "latitude",
+									"value": "34.1547878",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "longitude",
+									"value": "72.564564",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "uuid",
+									"value": "testtt",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "package_id",
+									"value": "6478f1f9-a6d2-47df-a5c3-fd74f92f793b",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "type_of_account",
+									"value": "1",
+									"description": "Sponsored",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}validate_register",
+							"host": [
+								"{{base_url}}validate_register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Usman Khan",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "email",
+									"value": "usman.personal3@gmail.com",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "13256453420",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "welcome123",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "dob",
+									"value": "10-Jan-2025",
+									"description": "Personal/Business",
+									"type": "text"
+								},
+								{
+									"key": "entity",
+									"value": "1",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "business_type",
+									"value": "2",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "country",
+									"value": "194",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "state",
+									"value": "1400",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "2849",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "contact_phone",
+									"value": "03124587459",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "contact_email",
+									"value": "contact@gmail.com",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "website",
+									"value": "test.com",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "location",
+									"value": "test location",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "latitude",
+									"value": "34.1547878",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "longitude",
+									"value": "72.564564",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "uuid",
+									"value": "testtt",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "package_id",
+									"value": "6478f1f9-a6d2-47df-a5c3-fd74f92f793b",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "type_of_account",
+									"value": "1",
+									"description": "Sponsored",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}register",
+							"host": [
+								"{{base_url}}register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "email",
+									"value": "henry@gmail.com",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "Test11!!",
+									"type": "text"
+								},
+								{
+									"key": "uuid",
+									"value": "test",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}login",
+							"host": [
+								"{{base_url}}login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login With Email",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "email",
+									"value": "danish.personal@gmail.com",
+									"type": "text"
+								},
+								{
+									"key": "",
+									"value": "",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}login_with_email",
+							"host": [
+								"{{base_url}}login_with_email"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}logout",
+							"host": [
+								"{{base_url}}logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "My Account",
+			"item": [
+				{
+					"name": "Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}profile",
+							"host": [
+								"{{base_url}}profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "name",
+									"value": "Usman Khan",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "welcome123",
+									"description": "General",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "dob",
+									"value": "10-Jan-2025",
+									"description": "Personal/Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"type": "file",
+									"src": "/D:/Test Attachments/images (34).jpeg",
+									"disabled": true
+								},
+								{
+									"key": "cover_image",
+									"description": "Business",
+									"type": "file",
+									"src": [],
+									"disabled": true
+								},
+								{
+									"key": "business_type",
+									"value": "2",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "country",
+									"value": "194",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "state",
+									"value": "1400",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "102874",
+									"description": "General",
+									"type": "text"
+								},
+								{
+									"key": "contact_phone",
+									"value": "03124587459",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "contact_email",
+									"value": "contactss@gmail.com",
+									"description": "Business/Chef",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "website",
+									"value": "test.com",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "location",
+									"value": "test location",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "latitude",
+									"value": "34.1547878",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "longitude",
+									"value": "72.564564",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "type_of_account",
+									"value": "1",
+									"description": "Sponsored",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}edit_profile",
+							"host": [
+								"{{base_url}}edit_profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Follow-Unfollow",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "following_id",
+									"value": "9bba0b9f-dd60-4650-a06a-528eb5ccc8f6",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}follow_unfollow",
+							"host": [
+								"{{base_url}}follow_unfollow"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Videos",
+			"item": [
+				{
+					"name": "Comments",
+					"item": [
+						{
+							"name": "Create",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{bearer_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "video_id",
+											"value": "3a2302d1-2885-44cd-9f75-e3385103abde",
+											"type": "text"
+										},
+										{
+											"key": "parent_id",
+											"value": "49b4acf3-22d2-4a18-a134-a236a18af1be",
+											"type": "text"
+										},
+										{
+											"key": "comment",
+											"value": "Comment 1 reply 2",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}videos/comments/create",
+									"host": [
+										"{{base_url}}videos"
+									],
+									"path": [
+										"comments",
+										"create"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Saved",
+					"item": [
+						{
+							"name": "Save-Unsave",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{bearer_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "video_id",
+											"value": "ac1adfd3-42c3-4227-b665-76e093db7e91",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{base_url}}videos/save_unsave",
+									"host": [
+										"{{base_url}}videos"
+									],
+									"path": [
+										"save_unsave"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "{{bearer_token}}",
+											"type": "string"
+										}
+									]
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept-Language",
+										"value": "{{language}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{base_url}}videos/saved_list",
+									"host": [
+										"{{base_url}}videos"
+									],
+									"path": [
+										"saved_list"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Create",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "title",
+									"value": "Video 10",
+									"type": "text"
+								},
+								{
+									"key": "video_type",
+									"value": "7",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "Video complete description",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "#Meal,#Food,#video2",
+									"type": "text"
+								},
+								{
+									"key": "menu",
+									"value": "Chicken,Oil,Salt",
+									"type": "text"
+								},
+								{
+									"key": "publish_type",
+									"value": "2",
+									"description": "1 for followers, 2 for public, 3 for private ",
+									"type": "text"
+								},
+								{
+									"key": "allow_comments",
+									"value": "1",
+									"description": "0 for No, 1 for Yes",
+									"type": "text"
+								},
+								{
+									"key": "take_order",
+									"value": "1",
+									"description": "0 for No, 1 for Yes",
+									"type": "text"
+								},
+								{
+									"key": "location",
+									"value": "test location",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "image",
+									"description": "Thumbnail",
+									"type": "file",
+									"src": "/C:/Users/Dell/Desktop/cookster media/1740737163.png"
+								},
+								{
+									"key": "video",
+									"description": "Video",
+									"type": "file",
+									"src": "/C:/Users/Dell/Desktop/cookster media/17407373531.mp4"
+								},
+								{
+									"key": "country",
+									"value": "167",
+									"type": "text"
+								},
+								{
+									"key": "city",
+									"value": "85572",
+									"type": "text"
+								},
+								{
+									"key": "is_image",
+									"value": "0",
+									"type": "text"
+								},
+								{
+									"key": "cities",
+									"value": "85572,85521",
+									"description": "If user_entity->is_sponsored == 1",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "sponsor_type",
+									"value": "1",
+									"description": "1 for Basic, 2 for Premium (If user_entity->is_sponsored == 1)",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "days",
+									"value": "20",
+									"description": "If user_entity->is_sponsored == 1",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/create",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Edit",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "24e002a5-1cf3-4444-9e23-cce19343e286",
+									"type": "text"
+								},
+								{
+									"key": "title",
+									"value": "Testing ss",
+									"type": "text"
+								},
+								{
+									"key": "video_type",
+									"value": "7",
+									"type": "text"
+								},
+								{
+									"key": "description",
+									"value": "Video complete description ss",
+									"type": "text"
+								},
+								{
+									"key": "tags",
+									"value": "#Meal,#Food,#video2",
+									"type": "text"
+								},
+								{
+									"key": "menu",
+									"value": "Chicken,Oil,Salt",
+									"type": "text"
+								},
+								{
+									"key": "publish_type",
+									"value": "2",
+									"description": "1 for followers, 2 for public, 3 for private ",
+									"type": "text"
+								},
+								{
+									"key": "allow_comments",
+									"value": "1",
+									"description": "0 for No, 1 for Yes",
+									"type": "text"
+								},
+								{
+									"key": "take_order",
+									"value": "1",
+									"description": "0 for No, 1 for Yes",
+									"type": "text"
+								},
+								{
+									"key": "country",
+									"value": "167",
+									"type": "text"
+								},
+								{
+									"key": "city",
+									"value": "85572",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/edit",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"edit"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Settings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}videos/settings",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": []
+						},
+						"url": {
+							"raw": "{{base_url}}videos/delete?id=5d96ba0b-c8c7-4160-a31c-cdbadcd316d0",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"delete"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "5d96ba0b-c8c7-4160-a31c-cdbadcd316d0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "page",
+									"value": "1",
+									"type": "text"
+								},
+								{
+									"key": "country",
+									"value": "Pakistan",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "Lahore",
+									"description": "Optional",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "tags",
+									"value": "burger",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/list",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"list"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}videos/details?id=41163e7d-0553-4f3a-8163-03483127669a",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"details"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "41163e7d-0553-4f3a-8163-03483127669a"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List 2",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}videos/list2",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"list2"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Contact For Order",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "ac1adfd3-42c3-4227-b665-76e093db7e91",
+									"type": "text"
+								},
+								{
+									"key": "name",
+									"value": "Danish Khan",
+									"type": "text"
+								},
+								{
+									"key": "email",
+									"value": "danishkhan@gmail.com",
+									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "02135645644",
+									"type": "text"
+								},
+								{
+									"key": "message",
+									"value": "Test Message details",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/contact_for_order",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"contact_for_order"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Average Rating",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "017d743e-e10a-46a3-8a5e-148db731c867",
+									"type": "text"
+								},
+								{
+									"key": "average_rating",
+									"value": "4.5",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/update_average_rating",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"update_average_rating"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Sponsor",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "24e002a5-1cf3-4444-9e23-cce19343e286",
+									"type": "text"
+								},
+								{
+									"key": "cities",
+									"value": "85572,85521",
+									"type": "text"
+								},
+								{
+									"key": "sponsor_type",
+									"value": "1",
+									"description": "1 for Basic, 2 for Premium",
+									"type": "text"
+								},
+								{
+									"key": "days",
+									"value": "20",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/sponsor/add",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"sponsor",
+								"add"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"item": [
+				{
+					"name": "Create Video Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "7f759eb5-8326-45f4-9c83-ca284db6bb36",
+									"type": "text"
+								},
+								{
+									"key": "category_id",
+									"value": "4c53ccc0-1ebb-4fd3-b1b2-07c11fab2d3d",
+									"type": "text"
+								},
+								{
+									"key": "comments",
+									"value": "test report comments and its details asda a dadas das dasd ",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/reports/add",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"reports",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Categories",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}reports/categories?type=1",
+							"host": [
+								"{{base_url}}reports"
+							],
+							"path": [
+								"categories"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "1",
+									"description": "Video"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}notifications/list",
+							"host": [
+								"{{base_url}}notifications"
+							],
+							"path": [
+								"list"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Audios",
+			"item": [
+				{
+					"name": "List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "search",
+									"value": "english",
+									"type": "text",
+									"disabled": true
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}audios/list",
+							"host": [
+								"{{base_url}}audios"
+							],
+							"path": [
+								"list"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://192.168.1.7/cookster_admin/public/api/",
+			"type": "string"
+		},
+		{
+			"key": "language",
+			"value": "en",
+			"type": "string"
+		},
+		{
+			"key": "bearer_token",
+			"value": "153|f1NucTaxpZK4tZlfNYd52lJ9gdl07Nd7tXRNdogW1c2f5de0",
+			"type": "string"
+		},
+		{
+			"key": "live_base_url",
+			"value": "https://beta.cookster.org/public/api/",
+			"type": "string"
+		}
+	]
+}

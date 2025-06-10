@@ -1,0 +1,219 @@
+Phase: 1.0
+Development Start Date: 21-Feb-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+
+==========================================================================
+
+Phase: 1.1
+Development Start Date: 14-March-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create table followers
+
+==========================================================================
+
+Phase: 1.2
+Development Start Date: 20-March-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `categories` CHANGE `image` `type` INT NULL DEFAULT '1'; 
+- create table video_reports, notifications
+
+==========================================================================
+
+Phase: 1.3
+Development Start Date: 11-April-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- 
+
+==========================================================================
+
+Phase: 1.3
+Development Start Date: 17-April-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- create table user_saved_videos
+
+==========================================================================
+
+Phase: 1.4
+Development Start Date: 22-April-2025
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- Create table verification_codes
+
+==========================================================================
+
+Phase: 1.5
+Development Start Date: 23-April-2025
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- Create table push_notifications
+- ALTER TABLE `business_account_additional_data`
+  DROP `country`,
+  DROP `state`,
+  DROP `city`; 
+- ALTER TABLE `front_users` ADD `country` INT NOT NULL DEFAULT '0' AFTER `image`, ADD `state` INT NOT NULL DEFAULT '0' AFTER `country`, ADD `city` INT NOT NULL DEFAULT '0' AFTER `state`; 
+- ALTER TABLE `videos` CHANGE `state` `country` INT(11) NOT NULL DEFAULT '0'; 
+- ALTER TABLE `videos` ADD `city` INT NOT NULL DEFAULT '0' AFTER `country`; 
+- DELETE FROM `permissions` WHERE `permissions`.`id` = 170;
+- INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'Notifications', '17', '1', current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'notifications-list', 'web', '52', current_timestamp(), current_timestamp()), (NULL, 'notifications-create', 'web', '52', current_timestamp(), current_timestamp()); 
+- ALTER TABLE `notifications` CHANGE `to_type` `to_type` TINYINT(4) NOT NULL DEFAULT '1' COMMENT '1 for admin, 2 for front user'; 
+- ALTER TABLE `notifications` ADD `front_user_category` TINYINT NOT NULL DEFAULT '0' COMMENT '0 for All, 1 for Personal Accounts, 2 for Business Accounts' AFTER `to_type`; 
+- ALTER TABLE `notifications` ADD `push_notification_id` INT NOT NULL DEFAULT '0' AFTER `video_report_id`; 
+- ALTER TABLE `front_users` ADD `uuid` TEXT NULL DEFAULT NULL AFTER `city`; 
+- UPDATE `entities` SET `status` = '0' WHERE `entities`.`id` = 3; 
+- ALTER TABLE `videos` ADD `average_rating` FLOAT NOT NULL DEFAULT '0' AFTER `city`;
+- ALTER TABLE `notifications` ADD `front_user_id` CHAR(36) NULL DEFAULT NULL AFTER `to_type`; 
+- ALTER TABLE `notifications` ADD `video_id` CHAR(36) NULL DEFAULT NULL AFTER `push_notification_id`; 
+==========================================================================
+
+Phase: 1.6
+Development Start Date: 30-April-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create new table packages, packages_description, subscription_history, sponsored_videos, sponsored_videos_history, cities_groups
+- INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'Packages', '18', '1', current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'packages-list', 'web', '53', current_timestamp(), current_timestamp()), (NULL, 'packages-create', 'web', '53', current_timestamp(), current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'packages-edit', 'web', '53', current_timestamp(), current_timestamp()), (NULL, 'packages-delete', 'web', '53', current_timestamp(), current_timestamp()); 
+- ALTER TABLE `settings` ADD `basic_sponsored_video_price` FLOAT NOT NULL DEFAULT '0' COMMENT 'Per Day' AFTER `linkedin`, ADD `premium_sponsored_video_price` FLOAT NOT NULL DEFAULT '0' COMMENT 'Per Day' AFTER `basic_sponsored_video_price`; 
+- INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'Cities Groups', '19', '1', current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'cities-groups-list', 'web', '54', current_timestamp(), current_timestamp()), (NULL, 'cities-groups-create', 'web', '54', current_timestamp(), current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'cities-groups-edit', 'web', '54', current_timestamp(), current_timestamp()), (NULL, 'cities-groups-delete', 'web', '54', current_timestamp(), current_timestamp()); 
+- ALTER TABLE `settings` ADD `allow_general_videos` TINYINT NOT NULL DEFAULT '0' AFTER `premium_sponsored_video_price`; 
+
+==========================================================================
+
+Packages
+- Title, Amount, Duration (In months: 1,6,12), description (Done)
+- Business account user must have to subscribe during registration.
+- Subscription history of the user. Latest last subscription will be considered as the current subscription (Done)
+
+Sponsor Types
+- In settings give option to set per day price against Basic and Premium (Done)
+- Add video to sponsor api which save the videos in sponsored_videos table along with (Done)
+video_id, cities(multiple city ids), sponsor_type (1 for Basic, 2 for Premium), days, start_date, end_date, per_day_price, total_amount, status, created_at, updated_at
+Also need to add this data in sponsored_videos_history. (Done)
+- Write a cronjob which will delete the expired (end_date less than current date time) sponsored videos from sponsored_videos table (Done) 
+
+==========================================================================
+
+Phase: 1.7
+Development Start Date: 12-May-2025
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create new table audios, audios_description
+- ALTER TABLE `videos` ADD `is_image` TINYINT NOT NULL DEFAULT '0' AFTER `average_rating`; 
+- ALTER TABLE `front_users` ADD `current_subscription_id` CHAR(36) NULL DEFAULT NULL AFTER `entity`; 
+- ALTER TABLE `settings` ADD `sponsor_video_discount` FLOAT NOT NULL DEFAULT '0' COMMENT 'Discount for Business account because they have already paid account' AFTER `premium_sponsored_video_price`; 
+- ALTER TABLE `sponsored_videos` ADD `discount_percentage` FLOAT NOT NULL DEFAULT '0' AFTER `per_day_price`, ADD `discount_amount` FLOAT NOT NULL DEFAULT '0' AFTER `discount_percentage`; 
+- ALTER TABLE `sponsored_videos_history` ADD `discount_percentage` FLOAT NOT NULL DEFAULT '0' AFTER `per_day_price`, ADD `discount_amount` FLOAT NOT NULL DEFAULT '0' AFTER `discount_percentage`; 
+- INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'Audios', '20', '1', current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'audios-list', 'web', '55', current_timestamp(), current_timestamp()), (NULL, 'audios-create', 'web', '55', current_timestamp(), current_timestamp()); 
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'audios-edit', 'web', '55', current_timestamp(), current_timestamp()), (NULL, 'audios-delete', 'web', '55', current_timestamp(), current_timestamp()); 
+- 
+------------------------------------
+Other Changes
+- Currency change in .env
+- composer require james-heinrich/getid3
+- Update composer and vendor files
+==========================================================================
+
+Phase: 1.8
+Development Start Date: 15-May-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create new table sponsored_account_additional_data
+- ALTER TABLE `entities` ADD `subscription_required` TINYINT(4) NOT NULL DEFAULT '0' AFTER `sort_order`, ADD `is_sponsored` TINYINT(4) NOT NULL DEFAULT '0' AFTER `subscription_required`;
+- INSERT INTO `entities` (`id`, `name`, `sort_order`, `subscription_required`, `is_sponsored`, `status`, `created_at`, `updated_at`) VALUES (NULL, 'Sponsored', '4', '0', '1', '1', '2025-01-10 17:04:47', '2025-01-10 17:04:47');
+- UPDATE `entities` SET `subscription_required` = '1' WHERE `entities`.`id` = 2;
+- ALTER TABLE `videos` ADD `is_sponsored` TINYINT(4) NOT NULL DEFAULT '0' AFTER `is_image`;
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'sponsored-accounts', 'web', '46', '2025-02-01 14:24:58', '2025-02-01 14:24:58');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Khobar', '2851', '03', '194', 'SA', '26.2172', '50.1971', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Dammam', '2851', '03', '194', 'SA', '26.4207', '50.0888', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Dhahran', '2851', '03', '194', 'SA', '26.2361', '50.0393', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Mubaraz', '2851', '03', '194', 'SA', '25.4051', '49.5484', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Houfouf', '2851', '03', '194', 'SA', '25.3800', '49.5888', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+- INSERT INTO `cities` (`id`, `name`, `state_id`, `state_code`, `country_id`, `country_code`, `latitude`, `longitude`, `created_at`, `updated_at`, `flag`, `wikiDataId`) VALUES (NULL, 'Abqiaq', '2851', '03', '194', 'SA', '25.9326', '49.6640', '2021-09-26 23:17:59', '2021-09-26 23:17:59', '1', 'Q8076276');
+
+==========================================================================
+
+Phase: 1.9
+Development Start Date: 19-May-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `push_notifications` CHANGE `to_type` `to_type` INT(11) NOT NULL DEFAULT '0' COMMENT ' 0 for All, Greater than 0 for entities';
+- ALTER TABLE `notifications` CHANGE `front_user_category` `front_user_category` TINYINT(4) NOT NULL DEFAULT '0' COMMENT ' 0 for All, Greater than 0 for entities';
+- ALTER TABLE `notifications` CHANGE `front_user_category` `front_user_category` INT(11) NOT NULL DEFAULT '0' COMMENT ' 0 for All, Greater than 0 for entities';
+- ALTER TABLE `front_users` ADD `cover_image` VARCHAR(100) NULL AFTER `image`;
+
+==========================================================================
+
+Phase: 2.0
+Development Start Date: 27-May-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `entities` ADD `name_ar` VARCHAR(255) NULL AFTER `name`;
+
+==========================================================================
+
+Phase: 2.1
+Development Start Date: 05-June-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `settings` ADD `currency_symbol` VARCHAR(100) NULL AFTER `allow_general_videos`;
+- ALTER TABLE `settings` ADD `play_store_link` VARCHAR(255) NULL AFTER `currency_symbol`, ADD `app_store_link` VARCHAR(255) NULL AFTER `play_store_link`;
+
+==========================================================================
+
+Phase: 2.2
+Development Start Date: 10-June-2025
+Developer: HA
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- Create table "user_payments"
+- ALTER TABLE `settings` ADD `allow_following_videos` TINYINT(4) NOT NULL DEFAULT '0' AFTER `allow_general_videos`;
+- ALTER TABLE `front_users` ADD `is_soft_delete` TINYINT(4) NOT NULL DEFAULT '0' AFTER `status`;
+- ALTER TABLE `front_users` ADD `sd_email` VARCHAR(100) NULL AFTER `is_soft_delete`;
+
+==========================================================================
+
+
+
+Personal Account Token
+50|GdF9TbPgszdtnbXYsJgqSxYeJbRA3ijdmIJu2HOke634e50e
+
+Business Account Token
+51|mMcFMrGOFxAnTuJbQdTr2T2veaow7DuuoO9m42lV639eed12
+
+Chef Account Token
+52|igWjpH9PYP7MNTjeoCwfgIPu87AaBz0a2Eh74JOv0d9769a9
+
+
+Lahore: 85572
+Karachi: 85521
+
+Video 1: sponsor type 1 : Lahore
+Video 2: sponsor type 2 : Lahore
+Video 3: sponsor type 1 : Lahore,Karachi

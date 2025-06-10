@@ -1,0 +1,43 @@
+<?php
+
+return [
+    'required' => 'The :attribute field is required.',
+    'email' => 'The :attribute must be a valid email address.',
+    'min' => [
+        'string' => 'The :attribute must be at least :min characters.',
+    ],
+    'confirmed' => 'The :attribute confirmation does not match.',
+    'unique' => 'The :attribute has already been taken.',
+    'in' => 'The selected :attribute is invalid.',
+    'attributes' => [
+        'name' => 'Name',
+        'email' => 'Email Address',
+        'phone' => 'Phone',
+        'password' => 'Password',
+        'dob' => 'DOB',
+        'entity' => 'Entity',
+        'business_type' => 'Business Type',
+        'country' => 'Country',
+        'state' => 'State',
+        'city' => 'City',
+        'contact_phone' => 'Contact Phone',
+        'contact_email' => 'Contact Email',
+        'website' => 'Website',
+        'location' => 'Location',
+        'latitude' => 'Latitude',
+        'longitude' => 'Longitude',
+        'dob_*' => 'DOB',
+        'gender_*' => 'Gender',
+        'country_*' => 'Country',
+        'state_*' => 'State',
+        'city_*' => 'City',
+        'post_code_*' => 'Post Code',
+        'title' => 'Title',
+        'video_type' => 'Video Type',
+        'description' => 'Description',
+        'menu' => 'Menu',
+        'publish_type' => 'Publish Type',
+        'video_id' => 'Video ID',
+        'comment' => 'Comment',
+    ]
+];

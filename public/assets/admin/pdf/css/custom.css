@@ -1,0 +1,65 @@
+@page {margin:10px !important; padding:0!important}
+.label_body{
+    border: 1px solid #000 !important;
+    padding: 15px;
+}
+.label_body table th, .label_body table td {
+    padding: 5px !important;
+    border: 1px solid #000 !important;
+    font-weight: 400 !important;
+    
+}
+.label_body p{
+    font-size: 14px;
+}
+.lable_img{
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+.lable_img img{
+    width: 80% !important;
+}
+.small_font_table tr th{
+    background-color: #ddd;
+}
+.small_font_table tr th, .small_font_table tr td{
+    font-size: 12px;
+}
+.tiny_font_table tr td{
+    font-size: 11px;
+}
+.label_body .no_border_table, .label_body .no_border_table th, .label_body .no_border_table td{
+    border: 0px !important;
+}
+.label_body table th{
+    font-weight: bold !important;
+}
+
+.custom_invoice_wrapper .table_main_details{
+    font-size: 13px;
+}
+.custom_invoice_wrapper .table_main_details p{
+    margin-bottom: 3px;
+}
+.custom_invoice_wrapper .invoice_animals_table{
+    font-size: 12px;
+}
+.fs-13{
+    font-size: 13px;
+}
+.footer_details{
+    margin-top: 30px;
+}
+.footer_details p{
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+.terms_wrapper{
+    font-size: 14px;
+    padding-right: 20px;
+    text-align: justify;
+}
