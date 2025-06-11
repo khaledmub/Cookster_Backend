@@ -37,4 +37,8 @@ return [
     'subscription_expired_msg' => "Your subscription has expired. Please renew your subscription to avail the services.",
     'follower_removed' => "Follower removed.",
     'account_deleted_successfully' => 'Account deleted successfully.',
+    'cannot_block_yourself' => "You cannot block yourself.",
+    'user_unblocked_success' => "User unblocked successfully.",
+    'user_blocked_success' => "User blocked successfully.",
+    'inappropriate_content_detected' => "Inappropriate content detected.",
 ];

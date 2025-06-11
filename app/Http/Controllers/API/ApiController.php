@@ -18,6 +18,8 @@ use DateInterval;
 use Image;
 use Illuminate\Support\Facades\Validator;
 use App\Services\S3Service;
+use App\Services\ProfanityFilterService;
+
 class ApiController extends Controller
 {
     public function __construct(private S3Service $s3Service) {}
@@ -742,6 +744,80 @@ class ApiController extends Controller
             'page' => $page,
         ], 200);
     }
+    public function block_user(Request $request){
+        $validator = Validator::make($request->all(), [
+            'blocked_user' => 'required|exists:front_users,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $user = Auth::user();
+
+        $blocked_by = $user->id; // Authenticated user
+        $blocked_user = $request->blocked_user;
+
+        if ($blocked_by == $blocked_user) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.cannot_block_yourself'),
+            ], 400);
+        }
+
+        $existingBlocked = DB::table('blocked_users')
+            ->where('blocked_by', $blocked_by)
+            ->where('blocked_user', $blocked_user)
+            ->first();
+
+        if ($existingBlocked) {
+            // Unblock
+            DB::table('blocked_users')
+                ->where('blocked_by', $blocked_by)
+                ->where('blocked_user', $blocked_user)
+                ->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => __('messages.user_unblocked_success'),
+            ], 200);
+        } else {
+            // Block
+            DB::table('blocked_users')->insert([
+                'blocked_by' => $blocked_by,
+                'blocked_user' => $blocked_user,
+                'created_at' => now(),
+            ]);
+
+            // Delete following
+            DB::table('followers')
+                ->where('follower_id', $blocked_by)
+                ->where('following_id', $blocked_user)
+                ->delete();
+
+            // Delete follower
+            DB::table('followers')
+                ->where('follower_id', $blocked_user)
+                ->where('following_id', $blocked_by)
+                ->delete();
+
+            // Delete blocked user saved videos
+            $blocked_user_videos = DB::table('videos')->where('front_user_id', $blocked_user)->pluck('id');
+            if($blocked_user_videos){
+                DB::table('user_saved_videos')
+                    ->where('front_user_id', $blocked_by)
+                    ->whereIn('video_id', $blocked_user_videos)
+                    ->delete();
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => __('messages.user_blocked_success'),
+            ], 200);
+        }
+    }
     public function follow_unfollow(Request $request){
         $validator = Validator::make($request->all(), [
             'following_id' => 'required|exists:front_users,id',
@@ -832,6 +908,9 @@ class ApiController extends Controller
         $followingIds = DB::table('followers')
         ->where('follower_id', $follower_id)
         ->pluck('following_id');
+        $blocked_users = DB::table('blocked_users')
+        ->where('blocked_by', $user->id)
+        ->pluck('blocked_user');
         // $country = $user->country;
         // $city = $user->city;
         $country = 0;
@@ -901,6 +980,11 @@ class ApiController extends Controller
                 }
             }
 
+            // Exclude those videos which are from blocked user
+            if($blocked_users){
+                $query->whereNotIn('v.front_user_id', $blocked_users);
+            }
+
             $query->where('v.status', 1);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -968,6 +1052,11 @@ class ApiController extends Controller
                 }
             }
 
+            // Exclude those videos which are from blocked user
+            if($blocked_users){
+                $query->whereNotIn('v.front_user_id', $blocked_users);
+            }
+
             $query->where('v.status', 1);
             $query->where('u.entity', 2);
             $query1 = clone $query;
@@ -1014,6 +1103,12 @@ class ApiController extends Controller
                 $q->orWhere('v.menu', 'LIKE', '%'.$keywords.'%');
                 $q->orWhere('video_type_description.name', 'LIKE', '%'.$keywords.'%');
             });
+
+            // Exclude those videos which are from blocked user
+            if($blocked_users){
+                $query->whereNotIn('v.front_user_id', $blocked_users);
+            }
+
             $query->where('v.status', 1);
             $query->where('u.entity', 3);
             $query1 = clone $query;
@@ -1057,6 +1152,11 @@ class ApiController extends Controller
                 if(!empty($cities_ids)){
                     $query->whereIn('v.city', $cities_ids);
                 }
+            }
+
+            // Exclude those videos which are from blocked user
+            if($blocked_users){
+                $query->whereNotIn('v.front_user_id', $blocked_users);
             }
 
             $query->where('v.status', 1);
@@ -1146,6 +1246,33 @@ class ApiController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
+
+        // Check if content has bad words, if has then throw error
+        $title = $request->title;
+        $description = $request->description;
+        $tags = $request->tags;
+
+        $filter = new ProfanityFilterService();
+
+        if((!empty($title) && $filter->hasProfanity($title)) || (!empty($description) && $filter->hasProfanity($description))){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.inappropriate_content_detected')
+            ], 422);
+        }
+
+        if(!empty($tags)){
+            $tagList = array_map('trim', explode(',', $tags));
+            foreach($tagList as $tag){
+                if($filter->hasProfanity($tag)){
+                    return response()->json([
+                        'status' => false,
+                        'message' => __('messages.inappropriate_content_detected')
+                    ], 422);
+                }
+            }
+        }
+
         $user = Auth::user();
         $language = App::getLocale();
 
@@ -1294,6 +1421,33 @@ class ApiController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
+
+        // Check if content has bad words, if has then throw error
+        $title = $request->title;
+        $description = $request->description;
+        $tags = $request->tags;
+
+        $filter = new ProfanityFilterService();
+        
+        if((!empty($title) && $filter->hasProfanity($title)) || (!empty($description) && $filter->hasProfanity($description))){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.inappropriate_content_detected')
+            ], 422);
+        }
+
+        if(!empty($tags)){
+            $tagList = array_map('trim', explode(',', $tags));
+            foreach($tagList as $tag){
+                if($filter->hasProfanity($tag)){
+                    return response()->json([
+                        'status' => false,
+                        'message' => __('messages.inappropriate_content_detected')
+                    ], 422);
+                }
+            }
+        }
+
         $data = array();
         $data['title'] = $request->title;
         $data['video_type'] = $request->video_type;
@@ -1370,6 +1524,9 @@ class ApiController extends Controller
         $followingIds = DB::table('followers')
         ->where('follower_id', $follower_id)
         ->pluck('following_id');
+        $blocked_users = DB::table('blocked_users')
+        ->where('blocked_by', $user->id)
+        ->pluck('blocked_user');
 
         if(isset($input['country']) && $input['country']!=''){
             $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
@@ -1392,7 +1549,6 @@ class ApiController extends Controller
                 $cities_ids = array($city);
             }
         }
-        
 
         // Base query to clone for all types
         $baseQuery = DB::table('videos as v')
@@ -1427,6 +1583,11 @@ class ApiController extends Controller
         $baseQuery->where(function ($query) {
             $query->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
         });
+
+        // Exclude those videos which are from blocked user
+        if($blocked_users){
+            $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
+        }
             
         // NORMAL VIDEOS
         $normalQuery = clone $baseQuery;

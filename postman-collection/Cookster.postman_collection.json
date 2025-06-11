@@ -292,18 +292,25 @@
 								},
 								{
 									"key": "keywords",
-									"value": "pizza",
+									"value": "a",
 									"type": "text"
 								},
 								{
 									"key": "country",
-									"value": "Pakistan",
+									"value": "Qatar",
 									"type": "text"
 								},
 								{
 									"key": "city",
-									"value": "Lahore",
+									"value": "Doha",
 									"type": "text"
+								},
+								{
+									"key": "is_following",
+									"value": "1",
+									"description": "For \"Following\" tab",
+									"type": "text",
+									"disabled": true
 								}
 							]
 						},
@@ -502,6 +509,46 @@
 								{
 									"key": "package_id",
 									"value": "6478f1f9-a6d2-47df-a5c3-fd74f92f793b",
+									"type": "text"
+								},
+								{
+									"key": "PaymentId",
+									"value": "2516116736046379691",
+									"type": "text"
+								},
+								{
+									"key": "TranId",
+									"value": "2516116736046379691",
+									"type": "text"
+								},
+								{
+									"key": "ECI",
+									"value": "05",
+									"type": "text"
+								},
+								{
+									"key": "TrackId",
+									"value": "PRO_1749562908969",
+									"type": "text"
+								},
+								{
+									"key": "RRN",
+									"value": "516113071044",
+									"type": "text"
+								},
+								{
+									"key": "cardBrand",
+									"value": "VISA",
+									"type": "text"
+								},
+								{
+									"key": "maskedPAN",
+									"value": "444000XXXXXX0010",
+									"type": "text"
+								},
+								{
+									"key": "PaymentType",
+									"value": "DebitCard",
 									"type": "text"
 								}
 							]
@@ -1023,6 +1070,62 @@
 									"description": "Sponsored",
 									"type": "text",
 									"disabled": true
+								},
+								{
+									"key": "PaymentId",
+									"value": "2516116736046379691",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "TranId",
+									"value": "2516116736046379691",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "ECI",
+									"value": "05",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "TrackId",
+									"value": "PRO_1749562908969",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "RRN",
+									"value": "516113071044",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "cardBrand",
+									"value": "VISA",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "maskedPAN",
+									"value": "444000XXXXXX0010",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "PaymentType",
+									"value": "DebitCard",
+									"description": "Business",
+									"type": "text",
+									"disabled": true
 								}
 							]
 						},
@@ -1157,6 +1260,41 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Delete Account",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}delete_account",
+							"host": [
+								"{{base_url}}delete_account"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -1232,6 +1370,13 @@
 									"value": "Usman Khan",
 									"description": "General",
 									"type": "text"
+								},
+								{
+									"key": "phone",
+									"value": "03001234567",
+									"description": "General",
+									"type": "text",
+									"disabled": true
 								},
 								{
 									"key": "password",
@@ -1386,6 +1531,132 @@
 							"raw": "{{base_url}}follow_unfollow",
 							"host": [
 								"{{base_url}}follow_unfollow"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Follower",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "follower_id",
+									"value": "9bba0b9f-dd60-4650-a06a-528eb5ccc8f6",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}remove_follower",
+							"host": [
+								"{{base_url}}remove_follower"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Followers List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}followers_list",
+							"host": [
+								"{{base_url}}followers_list"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Block User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "blocked_user",
+									"value": "9bba0b9f-dd60-4650-a06a-528eb5ccc8f6",
+									"description": "Blocked User ID",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}block_user",
+							"host": [
+								"{{base_url}}block_user"
 							]
 						}
 					},
@@ -1633,13 +1904,13 @@
 									"key": "image",
 									"description": "Thumbnail",
 									"type": "file",
-									"src": "/C:/Users/Dell/Desktop/cookster media/1740737163.png"
+									"src": "/D:/Test Attachments/images (33).jpeg"
 								},
 								{
 									"key": "video",
 									"description": "Video",
 									"type": "file",
-									"src": "/C:/Users/Dell/Desktop/cookster media/17407373531.mp4"
+									"src": "/D:/Test Attachments/17407373531.mp4"
 								},
 								{
 									"key": "country",
@@ -1910,7 +2181,8 @@
 								{
 									"key": "page",
 									"value": "1",
-									"type": "text"
+									"type": "text",
+									"disabled": true
 								},
 								{
 									"key": "country",
@@ -1928,6 +2200,13 @@
 								{
 									"key": "tags",
 									"value": "burger",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "is_following",
+									"value": "1",
+									"description": "For \"Following\" tab",
 									"type": "text",
 									"disabled": true
 								}
@@ -2190,6 +2469,46 @@
 									"key": "days",
 									"value": "20",
 									"type": "text"
+								},
+								{
+									"key": "PaymentId",
+									"value": "2516116736046379691",
+									"type": "text"
+								},
+								{
+									"key": "TranId",
+									"value": "2516116736046379691",
+									"type": "text"
+								},
+								{
+									"key": "ECI",
+									"value": "05",
+									"type": "text"
+								},
+								{
+									"key": "TrackId",
+									"value": "PRO_1749562908969",
+									"type": "text"
+								},
+								{
+									"key": "RRN",
+									"value": "516113071044",
+									"type": "text"
+								},
+								{
+									"key": "cardBrand",
+									"value": "VISA",
+									"type": "text"
+								},
+								{
+									"key": "maskedPAN",
+									"value": "444000XXXXXX0010",
+									"type": "text"
+								},
+								{
+									"key": "PaymentType",
+									"value": "DebitCard",
+									"type": "text"
 								}
 							]
 						},
@@ -2440,7 +2759,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://192.168.1.7/cookster_admin/public/api/",
+			"value": "http://192.168.1.9/cookster_admin/public/api/",
 			"type": "string"
 		},
 		{
@@ -2450,7 +2769,7 @@
 		},
 		{
 			"key": "bearer_token",
-			"value": "153|f1NucTaxpZK4tZlfNYd52lJ9gdl07Nd7tXRNdogW1c2f5de0",
+			"value": "353|CIru5AWNWYDqkcv7TJaOfQ2xLct0ntkk5PeLCpY0881d9fd6",
 			"type": "string"
 		},
 		{

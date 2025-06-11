@@ -36,5 +36,9 @@ return [
     'sponsor_add_success' => "تمت إضافة رعاية الفيديو بنجاح.",
     'subscription_expired_msg' => "انتهى اشتراكك. يرجى تجديد الاشتراك للاستفادة من الخدمات.",
     'follower_removed' => "تمت إزالة المتابع.",
-    'account_deleted_successfully' => 'تم حذف الحساب بنجاح',
+    'account_deleted_successfully' => 'تم حذف الحساب بنجاح.',
+    'cannot_block_yourself' => 'لا يمكنك حظر نفسك.',
+    'user_unblocked_success' => 'تم رفع الحظر عن المستخدم بنجاح.',
+    'user_blocked_success' => 'تم حظر المستخدم بنجاح.',
+    'inappropriate_content_detected' => 'تم اكتشاف محتوى غير لائق.',
 ];
