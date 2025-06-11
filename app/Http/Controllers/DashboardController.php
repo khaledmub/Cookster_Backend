@@ -53,17 +53,17 @@ class DashboardController extends Controller
             $comments_count = 0;
             $likes = 0;
 
-            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}/comments?key=".env('FIREBASE_KEY');
-            $comments = AppHelper::call_curl_request($url);
-            if(isset($comments['documents'])){
-                $comments_count = sizeof($comments['documents']);
-            }
+            // $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}/comments?key=".env('FIREBASE_KEY');
+            // $comments = AppHelper::call_curl_request($url);
+            // if(isset($comments['documents'])){
+            //     $comments_count = sizeof($comments['documents']);
+            // }
 
-            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
-            $video_collection = AppHelper::call_curl_request($url);
-            if(isset($video_collection['fields']['likes']['arrayValue']) && isset($video_collection['fields']['likes']['arrayValue']['values'])){
-                $likes = count($video_collection['fields']['likes']['arrayValue']['values']);
-            }
+            // $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
+            // $video_collection = AppHelper::call_curl_request($url);
+            // if(isset($video_collection['fields']['likes']['arrayValue']) && isset($video_collection['fields']['likes']['arrayValue']['values'])){
+            //     $likes = count($video_collection['fields']['likes']['arrayValue']['values']);
+            // }
 
             $data['latest_videos'][$key]->total_likes = $likes;
             $data['latest_videos'][$key]->total_comments = $comments_count;

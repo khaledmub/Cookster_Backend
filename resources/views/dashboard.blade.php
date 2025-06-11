@@ -149,7 +149,7 @@
                                             <div class="box-content">
                                                 <div class="d-flex align-items-center mt-1">
                                                     <div class="flex-grow-1 text-muted">by <a href="" class="text-body text-truncate">{{$video->user_name}}</a></div>
-                                                    <div class="flex-shrink-0">
+                                                    <!-- <div class="flex-shrink-0">
                                                         <div class="d-flex gap-3">
                                                             <button type="button" class="btn btn-sm fs-12 btn-link text-body text-decoration-none px-0">
                                                                 <i class="ri-thumb-up-fill text-muted align-bottom me-1"></i> {{$video->total_likes}}
@@ -158,7 +158,7 @@
                                                                 <i class="ri-question-answer-fill text-muted align-bottom me-1"></i> {{$video->total_comments}}
                                                             </button>
                                                         </div>
-                                                    </div>
+                                                    </div> -->
                                                 </div>
                                             </div>
                                         </div>
