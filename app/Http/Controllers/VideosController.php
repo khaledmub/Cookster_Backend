@@ -133,72 +133,74 @@ class VideosController extends Controller
         });
         $data['video_details'] = $query->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'countries.name as country_name', 'cities.name as city_name'])->where('v.id', $id)->first();
 
-        $video_id = $id;
-        // $video_id = "35f91fbf-eda0-4396-bcd4-4b477f42dda0";
-        $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}/comments?key=".env('FIREBASE_KEY');
-        // Fetch documents
-        // $response = file_get_contents($url);
-        
-        $comments = AppHelper::call_curl_request($url);
-        
-        if(isset($comments['documents'])){
-            $data['comments'] = $comments['documents'];
+        if($data['video_details']){
+            $video_id = $id;
+            // $video_id = "35f91fbf-eda0-4396-bcd4-4b477f42dda0";
+            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}/comments?key=".env('FIREBASE_KEY');
+            // Fetch documents
+            // $response = file_get_contents($url);
+            
+            $comments = AppHelper::call_curl_request($url);
+            
+            if(isset($comments['documents'])){
+                $data['comments'] = $comments['documents'];
+            }
+            else{
+                $data['comments'] = array();
+            }
+
+            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
+            // Fetch documents
+            $video_collection = AppHelper::call_curl_request($url);
+            $likes = 0;
+            if(isset($video_collection['fields']['likes']['arrayValue']) && isset($video_collection['fields']['likes']['arrayValue']['values'])){
+                $likes = count($video_collection['fields']['likes']['arrayValue']['values']);
+            }
+            $data['likes'] = $likes;
+
+            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/countContactClick/{$video_id}?key=".env('FIREBASE_KEY');
+            $video_collection = AppHelper::call_curl_request($url);
+            $order_clicks = 0;
+            if(isset($video_collection['fields']['totalClicks']['integerValue'])){
+                $order_clicks = $video_collection['fields']['totalClicks']['integerValue'];
+            }
+            $data['order_clicks'] = $order_clicks;
+            // $data['comments'] = DB::table('video_comments as c')->join('front_users as u', 'u.id', '=', 'c.front_user_id')
+            // ->select('c.id', 'c.system_id', 'c.video_id', 'c.comment', 'c.created_at', 'u.name as user_name', 'u.image as user_image')
+            // ->where('c.video_id', $id)
+            // ->whereNull('c.parent_id') // Fetch only top-level comments
+            // ->orderBy('c.created_at', 'ASC')
+            // ->get()
+            // ->map(function ($comment) {
+            //     // Fetch replies for each comment
+            //     $comment->replies = DB::table('video_comments as c2')->join('front_users as u2', 'u2.id', '=', 'c2.front_user_id')
+            //         ->select('c2.id', 'c2.system_id', 'c2.video_id', 'c2.comment', 'c2.created_at', 'u2.name as user_name', 'u2.image as user_image')
+            //         ->where('c2.parent_id', $comment->id)
+            //         ->orderBy('c2.created_at', 'ASC')
+            //         ->get();
+
+            //     return $comment;
+            // });
+
+            // echo "<pre>";
+            // var_dump($data['comments']);
+            // exit;
+
+            $query=DB::table('video_reports as r');
+            $query->join('front_users as ru', 'ru.id', '=', 'r.reported_by');
+            $query->leftJoin('categories_description as category_description', 'category_description.category_id', '=', 'r.category_id')->leftJoin('site_languages as category_language', 'category_description.language_id', '=', 'category_language.id');
+            $query->where(function ($q){
+                $q->where('category_language.is_default', 1)
+                ->orWhere('r.category_id', null); 
+            });
+            $query->where('r.video_id', $id);
+            $query->orderBy('r.system_id', 'DESC');
+            $reports = $query->select(['r.*', 'ru.name as reported_by_name', 'ru.image as user_image', 'category_description.name as category_name'])->get();
+            $data['reports'] = $reports;
+
+            $query = DB::table('sponsored_videos_history')->select(['sponsored_videos_history.*']);
+            $data['sponsored_history'] = $query->where('sponsored_videos_history.video_id', $id)->orderBy('sponsored_videos_history.system_id', 'DESC')->get();
         }
-        else{
-            $data['comments'] = array();
-        }
-
-        $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
-        // Fetch documents
-        $video_collection = AppHelper::call_curl_request($url);
-        $likes = 0;
-        if(isset($video_collection['fields']['likes']['arrayValue']) && isset($video_collection['fields']['likes']['arrayValue']['values'])){
-            $likes = count($video_collection['fields']['likes']['arrayValue']['values']);
-        }
-        $data['likes'] = $likes;
-
-        $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/countContactClick/{$video_id}?key=".env('FIREBASE_KEY');
-        $video_collection = AppHelper::call_curl_request($url);
-        $order_clicks = 0;
-        if(isset($video_collection['fields']['totalClicks']['integerValue'])){
-            $order_clicks = $video_collection['fields']['totalClicks']['integerValue'];
-        }
-        $data['order_clicks'] = $order_clicks;
-        // $data['comments'] = DB::table('video_comments as c')->join('front_users as u', 'u.id', '=', 'c.front_user_id')
-        // ->select('c.id', 'c.system_id', 'c.video_id', 'c.comment', 'c.created_at', 'u.name as user_name', 'u.image as user_image')
-        // ->where('c.video_id', $id)
-        // ->whereNull('c.parent_id') // Fetch only top-level comments
-        // ->orderBy('c.created_at', 'ASC')
-        // ->get()
-        // ->map(function ($comment) {
-        //     // Fetch replies for each comment
-        //     $comment->replies = DB::table('video_comments as c2')->join('front_users as u2', 'u2.id', '=', 'c2.front_user_id')
-        //         ->select('c2.id', 'c2.system_id', 'c2.video_id', 'c2.comment', 'c2.created_at', 'u2.name as user_name', 'u2.image as user_image')
-        //         ->where('c2.parent_id', $comment->id)
-        //         ->orderBy('c2.created_at', 'ASC')
-        //         ->get();
-
-        //     return $comment;
-        // });
-
-        // echo "<pre>";
-        // var_dump($data['comments']);
-        // exit;
-
-        $query=DB::table('video_reports as r');
-        $query->join('front_users as ru', 'ru.id', '=', 'r.reported_by');
-        $query->leftJoin('categories_description as category_description', 'category_description.category_id', '=', 'r.category_id')->leftJoin('site_languages as category_language', 'category_description.language_id', '=', 'category_language.id');
-        $query->where(function ($q){
-            $q->where('category_language.is_default', 1)
-              ->orWhere('r.category_id', null); 
-        });
-        $query->where('r.video_id', $id);
-        $query->orderBy('r.system_id', 'DESC');
-        $reports = $query->select(['r.*', 'ru.name as reported_by_name', 'ru.image as user_image', 'category_description.name as category_name'])->get();
-        $data['reports'] = $reports;
-
-        $query = DB::table('sponsored_videos_history')->select(['sponsored_videos_history.*']);
-        $data['sponsored_history'] = $query->where('sponsored_videos_history.video_id', $id)->orderBy('sponsored_videos_history.system_id', 'DESC')->get();
 
         return view($this->view_folder_name.'.show',compact('data'));
     }

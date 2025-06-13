@@ -407,6 +407,18 @@ class ApiController extends Controller
             'message' => __('messages.account_deleted_successfully'),
         ], 200);
     }
+    public function blocked_users_list(){
+        $user = Auth::user();
+
+        // Blocked Users list
+        $blocked_users = DB::table('blocked_users')->leftJoin('front_users', 'front_users.id', '=', 'blocked_users.blocked_user')->where('blocked_users.blocked_by', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+            
+        $return_data = array(
+            'status' => true,
+            'blocked_users' => $blocked_users
+        );
+        return response()->json($return_data, 200);
+    }
     public function followers_list(){
         $user = Auth::user();
 

@@ -263,6 +263,54 @@ $(document).ready(function () {
             initialize_videos_datatable();
         });
     }
+    if (pageName == 'user_payments.index') {
+        function initialize_user_payments_datatable(){
+            var DTable = $('.dynamicTable').DataTable({
+                "processing": true,
+                "serverSide": true,
+                "bInfo": true,
+                "ajax": {
+                    url: baseurl + "admin/ajax/get_user_payments",
+                    'data': function (data) {
+                        var user = $('#searchFormListing').find('select[name="user"]').val();
+                        var payment_for = $('#searchFormListing').find('select[name="payment_for"]').val();
+                        var TranId = $('#searchFormListing').find('input[name="TranId"]').val();
+                        var start_date = $('#searchFormListing').find('input[name="start_date"]').val();
+                        var end_date = $('#searchFormListing').find('input[name="end_date"]').val();
+                        
+                        data._token = $('meta[name="csrf-token"]').attr('content');
+                        if(user!=null && user!=undefined && user!=''){
+                            data.user = user;
+                        }
+                        if(payment_for!=null && payment_for!=undefined && payment_for!=''){
+                            data.payment_for = payment_for;
+                        }
+                        if(TranId!=null && TranId!=undefined && TranId!=''){
+                            data.TranId = TranId;
+                        }
+                        if(start_date!=null && start_date!=undefined && start_date!=''){
+                            data.start_date = start_date;
+                        }
+                        if(end_date!=null && end_date!=undefined && end_date!=''){
+                            data.end_date = end_date;
+                        }
+                    },
+                    type: "POST"
+                },
+                "aLengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                dom: 'lBfrtip',
+                'ordering': false,
+                oLanguage: {},
+                buttons: []
+            });
+        }
+        initialize_user_payments_datatable();
+        $('.searchSubmitter').click(function(){
+            $('.dynamicTable').DataTable().clear();
+            $('.dynamicTable').DataTable().destroy();
+            initialize_user_payments_datatable();
+        });
+    }
     if (pageName == 'notifications.index') {
         function initialize_notifications_datatable(){
             var DTable = $('.dynamicTable').DataTable({

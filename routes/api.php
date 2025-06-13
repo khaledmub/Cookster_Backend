@@ -42,6 +42,7 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::post('/logout', [ApiController::class, 'logout']);
         Route::post('/delete_account', [ApiController::class, 'delete_account']);
         Route::post('/block_user', [ApiController::class, 'block_user']);
+        Route::get('/blocked_users_list', [ApiController::class, 'blocked_users_list']);
         Route::post('/follow_unfollow', [ApiController::class, 'follow_unfollow']);
         Route::post('/remove_follower', [ApiController::class, 'remove_follower']);
         Route::get('/followers_list', [ApiController::class, 'followers_list']);

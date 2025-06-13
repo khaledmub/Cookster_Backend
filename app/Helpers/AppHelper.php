@@ -150,6 +150,9 @@ class AppHelper
         else if($type==5){
             $return_data = env('SPONSORED_ACCOUNTS_PREFIX').$id;
         }
+        else if($type==6){
+            $return_data = env('USER_PAYMENT_PREFIX').$id;
+        }
         return $return_data;
     }
     public static function run_add_tag_script($tags){

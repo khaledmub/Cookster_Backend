@@ -12,6 +12,7 @@ use App\Http\Controllers\GenerickeyController;
 use App\Http\Controllers\GenerickeyvalueController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\VideosController;
+use App\Http\Controllers\UserPaymentsController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\WorksController;
@@ -72,6 +73,10 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     // Videos
     Route::resource('videos', VideosController::class);
     Route::post('ajax/get_videos', [VideosController::class, 'get_data_ajax']);
+
+    // User Payments
+    Route::resource('user_payments', UserPaymentsController::class);
+    Route::post('ajax/get_user_payments', [UserPaymentsController::class, 'get_data_ajax']);
 
     // Notifications
     Route::resource('notifications', NotificationsController::class);
