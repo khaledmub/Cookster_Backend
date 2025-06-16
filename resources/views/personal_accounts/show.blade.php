@@ -90,7 +90,7 @@
                                                         </tr>
                                                         <tr>
                                                             <th class="" scope="row">DOB</th>
-                                                            <td class="text-muted">{{date(env('DATE_FORMAT'), strtotime($data['general_data']->dob))}}</td>
+                                                            <td class="text-muted">{{ $data['general_data']->dob? date(env('DATE_FORMAT'), strtotime($data['general_data']->dob)): '' }}</td>
                                                             <th class="" scope="row">City</th>
                                                             <td class="text-muted">{{$data['general_data']->city_name}}</td>
                                                         </tr>

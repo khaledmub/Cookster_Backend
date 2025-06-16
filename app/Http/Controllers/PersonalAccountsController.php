@@ -69,27 +69,27 @@ class PersonalAccountsController extends Controller
             else{
                 $checked = "";
             }
-            $sub_array=array();
-            $sub_array[]=AppHelper::id_formatter(1, $sdata->system_id);
-            $sub_array[]=$sdata->name;
-            $sub_array[]=$sdata->email;
-            $sub_array[]=date(env('DATE_FORMAT'), strtotime($sdata->dob));
+            $sub_array = array();
+            $sub_array[] = AppHelper::id_formatter(1, $sdata->system_id);
+            $sub_array[] = $sdata->name;
+            $sub_array[] = $sdata->email;
+            $sub_array[] = $sdata->dob? date(env('DATE_FORMAT'), strtotime($sdata->dob)): '';
             
             if($sdata->is_soft_delete==1){
-                $sub_array[]='<span class="badge bg-success">Yes</span>';
+                $sub_array[] = '<span class="badge bg-success">Yes</span>';
             }
             else{
-                $sub_array[]='<span class="badge bg-danger">No</span>';
+                $sub_array[] = '<span class="badge bg-danger">No</span>';
             }
 
-            $sub_array[]='<div class="form-check form-switch" dir="ltr"><input class="form-check-input userStatusChanger" data-id="'.$sdata->id.'" type="checkbox" role="switch" id="flexSwitchCheckChecked" '.$checked.'></div>';
+            $sub_array[] = '<div class="form-check form-switch" dir="ltr"><input class="form-check-input userStatusChanger" data-id="'.$sdata->id.'" type="checkbox" role="switch" id="flexSwitchCheckChecked" '.$checked.'></div>';
 
-            $actionshtml="";
+            $actionshtml = "";
             if(auth()->user()->can($this->permission_initial)){
-                $actionshtml.='<a href="'.route($this->url_path.'.show',$sdata->id).'" class="btn btn-primary btn-icon waves-effect waves-light"><i class="fa-light fa-eye"></i></a>';
+                $actionshtml .= '<a href="'.route($this->url_path.'.show',$sdata->id).'" class="btn btn-primary btn-icon waves-effect waves-light"><i class="fa-light fa-eye"></i></a>';
             }
-            $sub_array[]=$actionshtml;
-            $dataToPass[]=$sub_array;
+            $sub_array[] = $actionshtml;
+            $dataToPass[] = $sub_array;
         }
         $output=array(
             "draw"  =>  intval($input['draw']),

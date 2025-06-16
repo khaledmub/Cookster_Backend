@@ -89,12 +89,12 @@ class ApiController extends Controller
             'id' => (string) \Str::uuid(),
             'name' => $input['name'],
             'email' => $input['email'],
-            'phone' => isset($input['phone']) ? $input['phone'] : null,
+            'phone' => isset($input['phone'])? $input['phone']: NULL,
             'password' => Hash::make($input['password']),
-            'dob' => isset($input['dob']) ? date('Y-m-d', strtotime($input['dob'])) : null,
-            'country' => $input['country'],
+            'dob' => isset($input['dob'])? date('Y-m-d', strtotime($input['dob'])): NULL,
+            'country' => $input['country']? $input['country']: 0,
             'state' => 0,
-            'city' => $input['city'],
+            'city' => $input['city']? $input['city']: 0,
             'uuid' => $input['uuid'],
             'entity' => $input['entity'],
         ]);
@@ -441,6 +441,15 @@ class ApiController extends Controller
         $additional_data = array();
         $form_settings = array();
         $cities = array();
+
+        if($language == 'ar'){
+            $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
+        }
+        else{
+            $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
+        }
+        
+        $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
 
         if($user->entity==2){
             $form_settings['business_types'] = AppHelper::get_key_values(1);
