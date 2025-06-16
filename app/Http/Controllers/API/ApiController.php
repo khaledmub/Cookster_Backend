@@ -925,15 +925,19 @@ class ApiController extends Controller
         $videos = array();
         $business_accounts = array();
         $chef_accounts = array();
-        $follower_id = $user->id;
-        $followingIds = DB::table('followers')
-        ->where('follower_id', $follower_id)
-        ->pluck('following_id');
-        $blocked_users = DB::table('blocked_users')
-        ->where('blocked_by', $user->id)
-        ->pluck('blocked_user');
-        // $country = $user->country;
-        // $city = $user->city;
+
+        if($user){
+            $follower_id = $user->id;
+            $followingIds = DB::table('followers')
+                                    ->where('follower_id', $follower_id)
+                                    ->pluck('following_id');
+            $blocked_users = DB::table('blocked_users')
+                                    ->where('blocked_by', $user->id)
+                                    ->pluck('blocked_user');
+            // $country = $user->country;
+            // $city = $user->city;
+        }
+
         $country = 0;
         $city = 0;
         if(isset($input['country']) && $input['country']!=''){
@@ -976,9 +980,12 @@ class ApiController extends Controller
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
             });
-            $query->where(function ($q){
-                $q->where('v.publish_type', 1); 
-                $q->orWhere('v.publish_type', 2);
+            $query->where(function ($q) use($user){
+                $q->where('v.publish_type', 2); 
+                
+                if($user){
+                    $q->orWhere('v.publish_type', 1);
+                }
             });
             $query->where(function ($q) use ($keywords){
                 $q->where('v.title', 'LIKE', '%'.$keywords.'%');
@@ -988,7 +995,7 @@ class ApiController extends Controller
                 $q->orWhere('video_type_description.name', 'LIKE', '%'.$keywords.'%');
             });
 
-            if(isset($input['is_following']) && $input['is_following'] == 1){
+            if($user && isset($input['is_following']) && $input['is_following'] == 1){
                 $query->whereIn('v.front_user_id', $followingIds);
             }
             else{
@@ -1002,8 +1009,10 @@ class ApiController extends Controller
             }
 
             // Exclude those videos which are from blocked user
-            if($blocked_users){
-                $query->whereNotIn('v.front_user_id', $blocked_users);
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('v.front_user_id', $blocked_users);
+                }
             }
 
             $query->where('v.status', 1);
@@ -1048,9 +1057,12 @@ class ApiController extends Controller
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
             });
-            $query->where(function ($q){
-                $q->where('v.publish_type', 1); 
-                $q->orWhere('v.publish_type', 2);
+            $query->where(function ($q) use($user){
+                $q->where('v.publish_type', 2); 
+                
+                if($user){
+                    $q->orWhere('v.publish_type', 1);
+                }
             });
             $query->where(function ($q) use ($keywords){
                 $q->where('v.title', 'LIKE', '%'.$keywords.'%');
@@ -1060,7 +1072,7 @@ class ApiController extends Controller
                 $q->orWhere('video_type_description.name', 'LIKE', '%'.$keywords.'%');
             });
 
-            if(isset($input['is_following']) && $input['is_following'] == 1){
+            if($user && isset($input['is_following']) && $input['is_following'] == 1){
                 $query->whereIn('v.front_user_id', $followingIds);
             }
             else{
@@ -1074,8 +1086,10 @@ class ApiController extends Controller
             }
 
             // Exclude those videos which are from blocked user
-            if($blocked_users){
-                $query->whereNotIn('v.front_user_id', $blocked_users);
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('v.front_user_id', $blocked_users);
+                }
             }
 
             $query->where('v.status', 1);
@@ -1113,9 +1127,12 @@ class ApiController extends Controller
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
             });
-            $query->where(function ($q){
-                $q->where('v.publish_type', 1); 
-                $q->orWhere('v.publish_type', 2);
+            $query->where(function ($q) use($user){
+                $q->where('v.publish_type', 2); 
+                
+                if($user){
+                    $q->orWhere('v.publish_type', 1);
+                }
             });
             $query->where(function ($q) use ($keywords){
                 $q->where('v.title', 'LIKE', '%'.$keywords.'%');
@@ -1126,8 +1143,10 @@ class ApiController extends Controller
             });
 
             // Exclude those videos which are from blocked user
-            if($blocked_users){
-                $query->whereNotIn('v.front_user_id', $blocked_users);
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('v.front_user_id', $blocked_users);
+                }
             }
 
             $query->where('v.status', 1);
@@ -1150,9 +1169,12 @@ class ApiController extends Controller
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
             });
-            $query->where(function ($q){
-                $q->where('v.publish_type', 1); 
-                $q->orWhere('v.publish_type', 2);
+            $query->where(function ($q) use($user){
+                $q->where('v.publish_type', 2); 
+                
+                if($user){
+                    $q->orWhere('v.publish_type', 1);
+                }
             });
             $query->where(function ($q) use ($keywords){
                 $q->where('v.title', 'LIKE', '%'.$keywords.'%');
@@ -1162,7 +1184,7 @@ class ApiController extends Controller
                 $q->orWhere('video_type_description.name', 'LIKE', '%'.$keywords.'%');
             });
             
-            if(isset($input['is_following']) && $input['is_following'] == 1){
+            if($user && isset($input['is_following']) && $input['is_following'] == 1){
                 $query->whereIn('v.front_user_id', $followingIds);
             }
             else{
@@ -1176,8 +1198,10 @@ class ApiController extends Controller
             }
 
             // Exclude those videos which are from blocked user
-            if($blocked_users){
-                $query->whereNotIn('v.front_user_id', $blocked_users);
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('v.front_user_id', $blocked_users);
+                }
             }
 
             $query->where('v.status', 1);
@@ -1541,13 +1565,6 @@ class ApiController extends Controller
         $cities_ids = array();
         $country = 0;
         $city = 0;
-        $follower_id = $user->id;
-        $followingIds = DB::table('followers')
-        ->where('follower_id', $follower_id)
-        ->pluck('following_id');
-        $blocked_users = DB::table('blocked_users')
-        ->where('blocked_by', $user->id)
-        ->pluck('blocked_user');
 
         if(isset($input['country']) && $input['country']!=''){
             $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
@@ -1606,8 +1623,13 @@ class ApiController extends Controller
         });
 
         // Exclude those videos which are from blocked user
-        if($blocked_users){
-            $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
+        if($user){
+            $blocked_users = DB::table('blocked_users')
+                                    ->where('blocked_by', $user->id)
+                                    ->pluck('blocked_user');
+            if($blocked_users){
+                $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
+            }
         }
             
         // NORMAL VIDEOS
@@ -1627,21 +1649,31 @@ class ApiController extends Controller
             }
         }
 
-        if(isset($input['is_following']) && $input['is_following'] == 1){
-            $normalQuery->where(function ($q) use ($followingIds) {
-                $q->where('v.publish_type', 2)
-                    ->orWhere('v.publish_type', 1);
-            });
-            $normalQuery->whereIn('v.front_user_id', $followingIds);
+        if($user){
+            $follower_id = $user->id;
+            $followingIds = DB::table('followers')
+                                    ->where('follower_id', $follower_id)
+                                    ->pluck('following_id');
+
+            if(isset($input['is_following']) && $input['is_following'] == 1){
+                $normalQuery->where(function ($q) use ($followingIds) {
+                    $q->where('v.publish_type', 2)
+                        ->orWhere('v.publish_type', 1);
+                });
+                $normalQuery->whereIn('v.front_user_id', $followingIds);
+            }
+            else{
+                $normalQuery->where(function ($q) use ($followingIds) {
+                    $q->where('v.publish_type', 2)
+                        ->orWhere(function ($iq) use ($followingIds) {
+                            $iq->where('v.publish_type', 1)
+                                ->whereIn('v.front_user_id', $followingIds);
+                        });
+                });
+            }
         }
         else{
-            $normalQuery->where(function ($q) use ($followingIds) {
-                $q->where('v.publish_type', 2)
-                    ->orWhere(function ($iq) use ($followingIds) {
-                        $iq->where('v.publish_type', 1)
-                            ->whereIn('v.front_user_id', $followingIds);
-                    });
-            });
+            $normalQuery->where('v.publish_type', 2);
         }
         
         $normalQuery->leftJoin('sponsored_videos as sv', function ($join) use ($cities_ids, $input) {

@@ -9,7 +9,7 @@ use App\Http\Middleware\SetLanguage;
 Route::get('/videos/list2', [ApiController::class, 'videos_list2']);
 
 Route::middleware([SetLanguage::class])->group(function () {
-    // General
+    /** General **/
     Route::get('/entities', [ApiController::class, 'entities']);
     Route::get('/site_languages', [ApiController::class, 'site_languages']);
     Route::get('/countries', [ApiController::class, 'countries']);
@@ -20,7 +20,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/started_screens', [ApiController::class, 'started_screens']);
     Route::get('/packages/list', [ApiController::class, 'packages_list']);
 
-    // Auth
+    /** Auth **/
     Route::get('/registration_settings', [ApiController::class, 'registration_settings']);
     Route::post('/register', [ApiController::class, 'register']);
     Route::post('/validate_register', [ApiController::class, 'validate_register']);
@@ -31,11 +31,20 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::post('/forgot_password/verify_code', [ApiController::class, 'forgot_password_verify_code']);
     Route::post('/forgot_password/update_password', [ApiController::class, 'forgot_password_update_password']);
 
+    /** Without Auth **/
+    Route::post('/search', [ApiController::class, 'search']);
+    Route::get('/profile_details', [ApiController::class, 'profile_details']);
+
+    // Videos
+    Route::get('/videos/settings', [ApiController::class, 'video_settings']);
+    Route::post('/videos/list', [ApiController::class, 'videos_list']);
+    Route::get('/videos/details', [ApiController::class, 'video_details']);
+
+    // Nearest Business Accounts/Restaurants
+    Route::post('/business_accounts/nearest', [ApiController::class, 'nearest_business_accounts']);
+
+    /** With Auth **/
     Route::middleware(['auth:sanctum'])->group( function () {
-
-        Route::post('/search', [ApiController::class, 'search']);
-        Route::get('/profile_details', [ApiController::class, 'profile_details']);
-
         // My Account
         Route::get('/profile', [ApiController::class, 'profile']);
         Route::post('/edit_profile', [ApiController::class, 'edit_profile']);
@@ -48,12 +57,9 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::get('/followers_list', [ApiController::class, 'followers_list']);
 
         // Videos
-        Route::get('/videos/settings', [ApiController::class, 'video_settings']);
         Route::post('/videos/create', [ApiController::class, 'create_video']);
         Route::post('/videos/edit', [ApiController::class, 'edit_video']);
         Route::delete('/videos/delete', [ApiController::class, 'delete_video']);
-        Route::post('/videos/list', [ApiController::class, 'videos_list']);
-        Route::get('/videos/details', [ApiController::class, 'video_details']);
         Route::post('/videos/contact_for_order', [ApiController::class, 'contact_for_order']);
 
         Route::post('/videos/save_unsave', [ApiController::class, 'video_save_unsave']);
@@ -71,9 +77,6 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         // Video Comments
         Route::post('/videos/comments/create', [ApiController::class, 'create_video_comment']);
-
-        // Nearest Business Accounts/Restaurants
-        Route::post('/business_accounts/nearest', [ApiController::class, 'nearest_business_accounts']);
 
         // Notifications
         Route::get('/notifications/list', [ApiController::class, 'notifications_list']);
