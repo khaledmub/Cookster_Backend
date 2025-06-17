@@ -919,7 +919,7 @@ class ApiController extends Controller
         ], 200);
     }
     public function search(Request $request){
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user();
         $input = $request->all();
         $keywords = $input['keywords'];
         $videos = array();
@@ -1557,7 +1557,7 @@ class ApiController extends Controller
         ], 201);
     }
     public function videos_list(Request $request){
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user();
         $input = $request->all();
         $page = $input['page'] ?? 1; // Default to page 1 if not provided
         $length = 100000; // Number of records per page
@@ -1843,7 +1843,6 @@ class ApiController extends Controller
         ], 200);
     }
     public function video_details(Request $request){
-        $user = Auth::user();
         $input = $request->all();
 
         $query=DB::table('videos as v');
@@ -2143,7 +2142,6 @@ class ApiController extends Controller
     }
 
     public function nearest_business_accounts(Request $request){
-        $user = Auth::user();
         $input = $request->all();
         $latitude = $request->input('latitude');
         $longitude = $request->input('longitude');
