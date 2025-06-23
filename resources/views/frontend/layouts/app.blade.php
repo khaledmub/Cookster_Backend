@@ -217,10 +217,24 @@ $works=\App\Helpers\AppHelper::get_works();
                     <div class="col-sm-3">
                         <h4>{{ __('general.social_links') }}</h4>
                         <div class="f_socail_icons">
-                            <a target="_blank" href="{{$settings->facebook}}"><img src="{{ asset('assets/frontend/images/facebook.png') }}" alt=""></a>
-                            <a target="_blank" href="{{$settings->twitter}}"><img src="{{ asset('assets/frontend/images/twitter.png') }}" alt=""></a>
-                            <a target="_blank" href="{{$settings->instagram}}"><img src="{{ asset('assets/frontend/images/instagram.png') }}" alt=""></a>
-                            <a target="_blank" href="{{$settings->linkedin}}"><img src="{{ asset('assets/frontend/images/linkedin.png') }}" alt=""></a>
+                            @if($settings->facebook)
+                            <a target="_blank" href="{{ $settings->facebook }}"><img src="{{ asset('assets/frontend/images/facebook.png') }}" alt=""></a>
+                            @endif
+                            @if($settings->twitter)
+                            <a target="_blank" href="{{ $settings->twitter }}"><img src="{{ asset('assets/frontend/images/twitter.png') }}" alt=""></a>
+                            @endif
+                            @if($settings->instagram)
+                            <a target="_blank" href="{{ $settings->instagram }}"><img src="{{ asset('assets/frontend/images/instagram.png') }}" alt=""></a>
+                            @endif
+                            @if($settings->linkedin)
+                            <a target="_blank" href="{{ $settings->linkedin }}"><img src="{{ asset('assets/frontend/images/linkedin.png') }}" alt=""></a>
+                            @endif
+                            @if($settings->tiktok)
+                            <a target="_blank" href="{{ $settings->tiktok }}"><img src="{{ asset('assets/frontend/images/tiktok.png') }}" alt=""></a>
+                            @endif
+                            @if($settings->snapchat)
+                            <a target="_blank" href="{{ $settings->snapchat }}"><img src="{{ asset('assets/frontend/images/snapchat.png') }}" alt=""></a>
+                            @endif
                         </div>
                     </div>
                 </div>

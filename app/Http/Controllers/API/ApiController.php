@@ -483,6 +483,7 @@ class ApiController extends Controller
             $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
             $query->leftJoin('sponsored_videos as sv', 'sv.video_id', '=', 'v.id');
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query->where('v.video_type', $video_type->id);
             $query->where('v.front_user_id', $user->id);
             $query1 = clone $query;
@@ -976,9 +977,13 @@ class ApiController extends Controller
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
             $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
             $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
+            });
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
             });
             $query->where(function ($q) use($user){
                 $q->where('v.publish_type', 2); 
@@ -1016,6 +1021,7 @@ class ApiController extends Controller
             }
 
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query1 = clone $query;
             $query2 = clone $query;
 
@@ -1053,9 +1059,13 @@ class ApiController extends Controller
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
             $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
             $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
+            });
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
             });
             $query->where(function ($q) use($user){
                 $q->where('v.publish_type', 2); 
@@ -1093,6 +1103,7 @@ class ApiController extends Controller
             }
 
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query->where('u.entity', 2);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1123,9 +1134,13 @@ class ApiController extends Controller
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
             $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
             $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
+            });
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
             });
             $query->where(function ($q) use($user){
                 $q->where('v.publish_type', 2); 
@@ -1150,6 +1165,7 @@ class ApiController extends Controller
             }
 
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query->where('u.entity', 3);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1165,9 +1181,13 @@ class ApiController extends Controller
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
             $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
             $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
                   ->orWhere('v.video_type', 0); 
+            });
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
             });
             $query->where(function ($q) use($user){
                 $q->where('v.publish_type', 2); 
@@ -1205,6 +1225,7 @@ class ApiController extends Controller
             }
 
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query->where('v.average_rating', 5);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1239,9 +1260,14 @@ class ApiController extends Controller
         foreach($video_types as $key => $video_type){
             $query=DB::table('videos as v');
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
             $query->where('v.video_type', $video_type->id);
             $query->where('v.front_user_id', $user->id);
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
+            });
             $query1 = clone $query;
             $query2 = clone $query;
             $totalData = $query1->select(['v.id'])->count();
@@ -1528,28 +1554,35 @@ class ApiController extends Controller
             ], 404);
         }
 
-        $videoReportIds = DB::table('video_reports')
-        ->where('video_id', $request->id)
-        ->pluck('id');
+        /* Soft Delete */
+        $data = array();
+        $data['is_soft_delete'] = 1;
+        DB::table('videos')->where('id', $request->id)->update($data);
 
-        DB::table('notifications')
-        ->whereIn('video_report_id', $videoReportIds)
-        ->delete();
+        DB::table('user_saved_videos')->where('video_id', $request->id)->delete();
+        /* Soft Delete */
 
-        DB::table('video_reports')->where('video_id', $request->id)->delete();
+        // $videoReportIds = DB::table('video_reports')
+        // ->where('video_id', $request->id)
+        // ->pluck('id');
 
+        // DB::table('notifications')
+        // ->whereIn('video_report_id', $videoReportIds)
+        // ->delete();
 
-        $s3 = app(S3Service::class);
+        // DB::table('video_reports')->where('video_id', $request->id)->delete();
 
-        if (!empty($video->video)) {
-            $s3->deleteFile('videos/' . $video->video);
-        }
+        // $s3 = app(S3Service::class);
 
-        if (!empty($video->image)) {
-            $s3->deleteFile('videos/' . $video->image); // original image
-            $s3->deleteFile('videos/thumbnail/' . $video->image); // thumbnail
-        }
-        DB::table('videos')->where('id', $request->id)->delete();
+        // if (!empty($video->video)) {
+        //     $s3->deleteFile('videos/' . $video->video);
+        // }
+
+        // if (!empty($video->image)) {
+        //     $s3->deleteFile('videos/' . $video->image); // original image
+        //     $s3->deleteFile('videos/thumbnail/' . $video->image); // thumbnail
+        // }
+        // DB::table('videos')->where('id', $request->id)->delete();
 
         return response()->json([
             'status' => true,
@@ -1601,7 +1634,8 @@ class ApiController extends Controller
             $q->where('video_type_language.is_default', 1)
               ->orWhere('v.video_type', 0);
         })
-        ->where('v.status', 1);
+        ->where('v.status', 1)
+        ->where('v.is_soft_delete', 0);
 
         if (isset($input['search']['value']) && $input['search']['value'] != '') {
             $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
@@ -2107,9 +2141,13 @@ class ApiController extends Controller
         $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
         $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
         $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+        $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
         $query->where(function ($q){
             $q->where('video_type_language.is_default', 1)
               ->orWhere('v.video_type', 0); 
+        });
+        $query->where(function ($q) {
+            $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
         });
         
         if(isset($input['search']['value']) && $input['search']['value']!=''){

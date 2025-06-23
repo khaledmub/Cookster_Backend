@@ -1193,12 +1193,12 @@
 							"formdata": [
 								{
 									"key": "email",
-									"value": "danish.personal@gmail.com",
+									"value": "sachal.personal@gmail.com",
 									"type": "text"
 								},
 								{
-									"key": "",
-									"value": "",
+									"key": "uuid",
+									"value": "Test",
 									"type": "text"
 								}
 							]
@@ -2774,7 +2774,7 @@
 		},
 		{
 			"key": "live_base_url",
-			"value": "https://beta.cookster.org/public/api/",
+			"value": "https://cookster.org/public/api/",
 			"type": "string"
 		}
 	]

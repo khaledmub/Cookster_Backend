@@ -189,7 +189,7 @@ Database Changes
 Phase: 2.2
 Development Start Date: 10-June-2025
 Developer: HA
-Upload Status: N/A
+Upload Status: Done
 -----------------------------------
 Database Changes
 - Create table "user_payments", "blocked_users"
@@ -198,6 +198,17 @@ Database Changes
 - ALTER TABLE `front_users` ADD `sd_email` VARCHAR(100) NULL AFTER `is_soft_delete`;
 - INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'User Payments', '21', '1', '2025-05-14 15:20:04');
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'user-payments-list', 'web', '56', '2025-02-28 12:40:45', '2025-02-28 12:40:45');
+- ALTER TABLE `settings` ADD `tiktok` VARCHAR(255) NULL AFTER `linkedin`, ADD `snapchat` VARCHAR(255) NULL AFTER `tiktok`;
+
+==========================================================================
+
+Phase: 2.3
+Development Start Date: 23-June-2025
+Developer: HA
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- ALTER TABLE `videos` ADD `is_soft_delete` TINYINT(4) NOT NULL DEFAULT '0' AFTER `is_sponsored`;
 
 ==========================================================================
 

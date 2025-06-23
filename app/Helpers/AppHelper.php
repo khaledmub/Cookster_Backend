@@ -231,9 +231,16 @@ class AppHelper
         if($notification->type==1){
             // Notification for admin when any report submitted by the user against the video
             $video_details = DB::table('video_reports')->where('id', $notification->video_report_id)->first();
-            $details['subject']="Video Reported";
-            $details['text']="User have submitted the report against a video";
-            $details['href']=url('admin/videos/'.$video_details->video_id.'?notification_id='.$notification->id);
+            $details['subject']=__('messages.video_reported');
+            $details['text']=__('messages.video_reported_msg');
+            
+            if($video_details){
+                $details['href']=url('admin/videos/'.$video_details->video_id.'?notification_id='.$notification->id);
+            }
+            else{
+                $details['text']=__('messages.video_not_found_msg');
+            }
+
             $details['date_time']=date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
         }
         else if($notification->type==2){
@@ -246,8 +253,15 @@ class AppHelper
         else if($notification->type==3){
             // Notification for front user when admin disable the video
             $video_details = DB::table('videos')->where('id', $notification->video_id)->first();
-            $details['title']="Deactivated Video";
-            $details['text']='Your video ('.$video_details->title.') has been deactivated due to some restrictions. Please contact the administrator for more details.';
+            $details['title']=__('messages.deactivated_video');
+            
+            if($video_details){
+                $details['text']=__('messages.your_video') . ' ('.$video_details->title.') ' . __('messages.deactivated_video_msg');
+            }
+            else{
+                $details['text']=__('messages.video_not_found_msg');
+            }
+
             $details['date_time']=date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
         }
         return $details;

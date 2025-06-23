@@ -102,8 +102,14 @@
                                 </div>
                                 <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
                                     <div class="form-group">
-                                        <label class="form-label">Currency Symbol</label>
-                                        <input type="text" name="currency_symbol" placeholder="" class="form-control" value="{{ $setting->currency_symbol }}">
+                                        <label class="form-label">TikTok</label>
+                                        <input type="text" name="tiktok" placeholder="" class="form-control" value="{{ $setting->tiktok }}">
+                                    </div>
+                                </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Snapchat</label>
+                                        <input type="text" name="snapchat" placeholder="" class="form-control" value="{{ $setting->snapchat }}">
                                     </div>
                                 </div>
                                 <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
@@ -116,6 +122,12 @@
                                     <div class="form-group">
                                         <label class="form-label">App Store Link</label>
                                         <input type="text" name="app_store_link" placeholder="" class="form-control" value="{{ $setting->app_store_link }}">
+                                    </div>
+                                </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Currency Symbol</label>
+                                        <input type="text" name="currency_symbol" placeholder="" class="form-control" value="{{ $setting->currency_symbol }}">
                                     </div>
                                 </div>
                             </div>

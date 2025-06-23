@@ -41,4 +41,10 @@ return [
     'user_unblocked_success' => "User unblocked successfully.",
     'user_blocked_success' => "User blocked successfully.",
     'inappropriate_content_detected' => "Inappropriate content detected.",
+    'video_reported' => "Video Reported",
+    'video_reported_msg' => "User have submitted the report against a video.",
+    'deactivated_video' => "Deactivated Video",
+    'video_not_found_msg' => "Video not found. It is either deleted by you or removed by admin.",
+    'your_video' => "Your video",
+    'deactivated_video_msg' => "has been deactivated due to some restrictions. Please contact the administrator for more details.",
 ];

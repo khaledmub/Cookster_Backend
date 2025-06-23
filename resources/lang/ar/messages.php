@@ -41,4 +41,10 @@ return [
     'user_unblocked_success' => 'تم رفع الحظر عن المستخدم بنجاح.',
     'user_blocked_success' => 'تم حظر المستخدم بنجاح.',
     'inappropriate_content_detected' => 'تم اكتشاف محتوى غير لائق.',
+    'video_reported' => "تم الإبلاغ عن الفيديو",
+    'video_reported_msg' => "قام المستخدم بتقديم بلاغ ضد فيديو.",
+    'deactivated_video' => "فيديو معطل",
+    'video_not_found_msg' => "الفيديو غير موجود. قد يكون تم حذفه من قبلك أو من قبل المسؤول.",
+    'your_video' => "فيديوك",
+    'deactivated_video_msg' => "تم تعطيله بسبب بعض القيود. يرجى الاتصال بالمسؤول لمزيد من التفاصيل.",
 ];
