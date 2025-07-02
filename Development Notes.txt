@@ -3,3 +3,8 @@
 
 - Account deletion: it soft deletes the user by setting the is_soft_delete bit to 1 in DB and for sign in with Google/Apple, it soft deletes by setting this bit to 1 and also overwriting the email to "sd_id@cookster.com" and saving original email in another column named "sd_email"
 -------------------------------------------------------------------------------------------------------------------------------
+
+- Add assetslinks.json file at this path for mobile app deep/scheme links:
+
+    https://cookster.org/.well-known/assetlinks.json
+-------------------------------------------------------------------------------------------------------------------------------

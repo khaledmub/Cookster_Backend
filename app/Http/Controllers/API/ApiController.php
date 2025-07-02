@@ -419,14 +419,14 @@ class ApiController extends Controller
         );
         return response()->json($return_data, 200);
     }
-    public function followers_list(){
-        $user = Auth::user();
+    public function followers_list(Request $request){
+        $user_id = $request->user_id;
 
         // Followers
-        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user_id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
 
         // Following
-        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
             
         $return_data = array(
             'status' => true,

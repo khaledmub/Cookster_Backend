@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.cookster.cooksterapp",
+      "sha256_cert_fingerprints": [
+        "29:EA:D4:28:4B:EB:5A:11:DC:F7:F9:C0:25:CC:F5:36:63:72:4C:C3:85:7D:6A:5A:9E:EB:04:E5:29:2D:80:FF"
+      ]
+    }
+  }
+]

@@ -44,7 +44,6 @@ class AppHelper
         $data['medium'] = $medium;
         $data['front_user_id'] = $user->id;
         $verfication_code = self::generateVerificationCode(5);
-        $verfication_code = 12345;
         $data['code'] = $verfication_code;
         DB::table('verification_codes')->insert($data);
 

@@ -65,6 +65,9 @@ class VideosController extends Controller
         if(isset($input['title']) && $input['title']!=''){
             $query->where('v.title', 'LIKE', '%'.$input['title'].'%');
         }
+        if(isset($input['is_soft_delete']) && $input['is_soft_delete']!=''){
+            $query->where('v.is_soft_delete', $input['is_soft_delete']);
+        }
         $query1 = clone $query;
         $query2 = clone $query;
 
@@ -89,6 +92,14 @@ class VideosController extends Controller
             $sub_array[]=$sdata->title;
             $sub_array[]=$sdata->video_type_name;
             $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.env('AWS_CLOUD_FRONT_PATH')."videos/".$sdata->image.'">';
+
+            if($sdata->is_soft_delete==1){
+                $sub_array[] = '<span class="badge bg-success">Yes</span>';
+            }
+            else{
+                $sub_array[] = '<span class="badge bg-danger">No</span>';
+            }
+
             $sub_array[]=$status_label;
 
             $actionshtml="";

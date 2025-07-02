@@ -1571,14 +1571,7 @@
 					"name": "Followers List",
 					"request": {
 						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{bearer_token}}",
-									"type": "string"
-								}
-							]
+							"type": "noauth"
 						},
 						"method": "GET",
 						"header": [
@@ -1594,9 +1587,15 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}followers_list",
+							"raw": "{{base_url}}followers_list?user_id=9bba0b9f-dd60-4650-a06a-528eb5ccc8f6",
 							"host": [
 								"{{base_url}}followers_list"
+							],
+							"query": [
+								{
+									"key": "user_id",
+									"value": "9bba0b9f-dd60-4650-a06a-528eb5ccc8f6"
+								}
 							]
 						}
 					},

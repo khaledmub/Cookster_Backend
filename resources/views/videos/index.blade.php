@@ -57,6 +57,16 @@
                                             <input type="text" name="title" class="form-control">
                                         </div>
                                     </div>
+                                    <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                        <div class="form-group">
+                                            <label class="form-label">Is Soft Delete?</label>
+                                            <select name="is_soft_delete" class="form-select select2">
+                                                <option value="">Please select option</option>
+                                                <option {{ request('is_soft_delete') && request('is_soft_delete')==1 ? 'selected' : '' }} value="1">Yes</option>
+                                                <option {{ request('is_soft_delete') && request('is_soft_delete')==0 ? 'selected' : '' }} value="0">No</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div class="col-xs-3 col-sm-3 col-md-3 mb-3" style="margin-top:28px">
                                         <button type="button" class="btn btn-primary searchSubmitter">Submit</button>
                                     </div>
@@ -83,6 +93,7 @@
                                  <th>Title</th>
                                  <th>Video Type</th>
                                  <th>Image</th>
+                                 <th>Is Soft Delete?</th>
                                  <th>Status</th>
                                  <th width="280px">Action</th>
                               </tr>

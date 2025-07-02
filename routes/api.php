@@ -34,6 +34,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     /** Without Auth **/
     Route::post('/search', [ApiController::class, 'search']);
     Route::get('/profile_details', [ApiController::class, 'profile_details']);
+    Route::get('/followers_list', [ApiController::class, 'followers_list']);
 
     // Videos
     Route::get('/videos/settings', [ApiController::class, 'video_settings']);
@@ -54,7 +55,6 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::get('/blocked_users_list', [ApiController::class, 'blocked_users_list']);
         Route::post('/follow_unfollow', [ApiController::class, 'follow_unfollow']);
         Route::post('/remove_follower', [ApiController::class, 'remove_follower']);
-        Route::get('/followers_list', [ApiController::class, 'followers_list']);
 
         // Videos
         Route::post('/videos/create', [ApiController::class, 'create_video']);

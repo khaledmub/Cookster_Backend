@@ -47,6 +47,7 @@ class DashboardController extends Controller
         $query=DB::table('videos as v');
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
         $query->orderBy('v.system_id', 'DESC');
+        $query->where('v.is_soft_delete', 0);
         $data['latest_videos'] = $query->select(['v.*', 'u.name as user_name'])->limit(8)->get();
         foreach($data['latest_videos'] as $key => $video){
             $video_id = $video->id;

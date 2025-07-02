@@ -235,6 +235,7 @@ $(document).ready(function () {
                         var user = $('#searchFormListing').find('select[name="user"]').val();
                         var video_type = $('#searchFormListing').find('select[name="video_type"]').val();
                         var title = $('#searchFormListing').find('input[name="title"]').val();
+                        var is_soft_delete = $('#searchFormListing').find('select[name="is_soft_delete"]').val();
                         
                         data._token = $('meta[name="csrf-token"]').attr('content');
                         if(user!=null && user!=undefined && user!=''){
@@ -245,6 +246,9 @@ $(document).ready(function () {
                         }
                         if(title!=null && title!=undefined && title!=''){
                             data.title = title;
+                        }
+                        if(is_soft_delete!=null && is_soft_delete!=undefined && is_soft_delete!=''){
+                            data.is_soft_delete = is_soft_delete;
                         }
                     },
                     type: "POST"
