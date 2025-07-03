@@ -83,5 +83,11 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         // Subscription
         Route::post('/packages/subscribe', [ApiController::class, 'subscribe_package']);
+
+        // B2B
+        Route::post('/b2b/change_b2b_status', [ApiController::class, 'change_b2b_status']);
+        Route::get('/b2b/b2b_categories', [ApiController::class, 'b2b_categories']);
+        Route::get('/b2b/b2b_accounts_list', [ApiController::class, 'b2b_accounts_list']);
+        Route::get('/b2b/b2b_accounts_list_category_wise', [ApiController::class, 'b2b_accounts_list_category_wise']);
     });
 });

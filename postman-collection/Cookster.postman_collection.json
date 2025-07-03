@@ -1681,6 +1681,175 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Change B2B Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "is_b2b",
+									"value": "1",
+									"description": "0 | 1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}b2b/change_b2b_status",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"change_b2b_status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "B2B Categories",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_categories",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_categories"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "B2B Accounts List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_accounts_list?category_id=1",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_accounts_list"
+							],
+							"query": [
+								{
+									"key": "category_id",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "B2B Accounts List Category Wise",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_accounts_list_category_wise",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_accounts_list_category_wise"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -2773,7 +2942,7 @@
 		},
 		{
 			"key": "live_base_url",
-			"value": "https://cookster.org/public/api/",
+			"value": "https://cookster.org/api/",
 			"type": "string"
 		}
 	]

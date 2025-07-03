@@ -2230,6 +2230,75 @@ class ApiController extends Controller
             'message' => __('messages.subscribe_success')
         ]);
     }
+    public function change_b2b_status(Request $request){
+        $user = Auth::user();
+
+        $data = array(
+            'is_b2b' => $request->is_b2b == 1? 1: 0
+        );
+
+        DB::table('business_account_additional_data')->where('front_user_id', $user->id)->update($data);
+
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.updated_successfully')
+        ]);
+    }
+    public function b2b_categories(Request $request){
+        $language = App::getLocale();
+
+        $query = DB::table('front_users as u');
+        $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'u.id');
+        $query->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type');
+        $query->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id');
+        $query->where('key_language.code', $language);
+        $query->where('b.is_b2b', 1);
+        $query->where('u.status', 1);
+        $query->where('u.is_soft_delete', 0);
+        $query->orderBy('u.name', 'ASC');
+        $business_types = $query->select(['bt.value_id as id', 'bt.name'])->distinct()->get();
+
+        return response()->json([
+            'status' => true,
+            'business_types' => $business_types
+        ]);
+    }
+    public function b2b_accounts_list(Request $request){
+        $query = DB::table('front_users as u');
+        $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'u.id');
+        $query->where('b.business_type', $request->category_id);
+        $query->where('b.is_b2b', 1);
+        $query->where('u.status', 1);
+        $query->where('u.is_soft_delete', 0);
+        $query->orderBy('u.name', 'ASC');
+        $b2b_accounts_list = $query->select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.image'])->get();
+
+        return response()->json([
+            'status' => true,
+            'b2b_accounts_list' => $b2b_accounts_list
+        ]);
+    }
+    public function b2b_accounts_list_category_wise(Request $request){
+        $language = App::getLocale();
+
+        $query = DB::table('front_users as u');
+        $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'u.id');
+        $query->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type');
+        $query->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id');
+        $query->where('key_language.code', $language);
+        $query->where('b.is_b2b', 1);
+        $query->where('u.status', 1);
+        $query->where('u.is_soft_delete', 0);
+        $query->orderBy('u.name', 'ASC');
+        $accounts = $query->select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.image', 'bt.name as business_type_name'])->get();
+
+        $grouped = $accounts->groupBy('business_type_name');
+
+        return response()->json([
+            'status' => true,
+            'b2b_accounts_list' => $grouped
+        ]);
+    }
 
     // Audios
     public function audios_list(Request $request){

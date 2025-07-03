@@ -47,4 +47,5 @@ return [
     'video_not_found_msg' => "Video not found. It is either deleted by you or removed by admin.",
     'your_video' => "Your video",
     'deactivated_video_msg' => "has been deactivated due to some restrictions. Please contact the administrator for more details.",
+    'updated_successfully' => "Updated successfully.",
 ];

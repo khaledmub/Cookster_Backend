@@ -212,6 +212,16 @@ Database Changes
 
 ==========================================================================
 
+Phase: 2.4
+Development Start Date: 03-July-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `business_account_additional_data` ADD `is_b2b` TINYINT(4) NOT NULL DEFAULT '0' AFTER `longitude`;
+
+==========================================================================
+
 
 
 Personal Account Token
