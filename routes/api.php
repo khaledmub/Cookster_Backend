@@ -44,6 +44,11 @@ Route::middleware([SetLanguage::class])->group(function () {
     // Nearest Business Accounts/Restaurants
     Route::post('/business_accounts/nearest', [ApiController::class, 'nearest_business_accounts']);
 
+    // B2B
+    Route::get('/b2b/b2b_categories', [ApiController::class, 'b2b_categories']);
+    Route::get('/b2b/b2b_accounts_list', [ApiController::class, 'b2b_accounts_list']);
+    Route::get('/b2b/b2b_accounts_list_category_wise', [ApiController::class, 'b2b_accounts_list_category_wise']);
+
     /** With Auth **/
     Route::middleware(['auth:sanctum'])->group( function () {
         // My Account
@@ -86,8 +91,5 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         // B2B
         Route::post('/b2b/change_b2b_status', [ApiController::class, 'change_b2b_status']);
-        Route::get('/b2b/b2b_categories', [ApiController::class, 'b2b_categories']);
-        Route::get('/b2b/b2b_accounts_list', [ApiController::class, 'b2b_accounts_list']);
-        Route::get('/b2b/b2b_accounts_list_category_wise', [ApiController::class, 'b2b_accounts_list_category_wise']);
     });
 });

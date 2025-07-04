@@ -2255,7 +2255,7 @@ class ApiController extends Controller
         $query->where('b.is_b2b', 1);
         $query->where('u.status', 1);
         $query->where('u.is_soft_delete', 0);
-        $query->orderBy('u.name', 'ASC');
+        $query->orderBy('bt.name', 'ASC');
         $business_types = $query->select(['bt.value_id as id', 'bt.name'])->distinct()->get();
 
         return response()->json([
