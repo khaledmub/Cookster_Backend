@@ -44,6 +44,7 @@ class BusinessAccountsController extends Controller
         $input=$request->all();
 
         $query=DB::table('front_users as business_account');
+        $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'business_account.id');
         $query->where('business_account.entity', 2);
         if(isset($input['search']['value']) && $input['search']['value']!=''){
             $query->where(function ($q) use ($input) {
@@ -61,7 +62,7 @@ class BusinessAccountsController extends Controller
             $query2->offset($input['start'])->limit($input['length']);
         }
         $query2->orderBy('business_account.system_id', 'ASC');
-        $data = $query2->select(['business_account.*'])->get();
+        $data = $query2->select(['business_account.*', 'b.is_b2b'])->get();
         $dataToPass=array();
         foreach($data as $sdata){
             if($sdata->status==1){
@@ -75,6 +76,13 @@ class BusinessAccountsController extends Controller
             $sub_array[]=$sdata->name;
             $sub_array[]=$sdata->email;
             $sub_array[]=$sdata->phone;
+
+            if($sdata->is_b2b==1){
+                $sub_array[]='<span class="badge bg-success">Yes</span>';
+            }
+            else{
+                $sub_array[]='<span class="badge bg-danger">No</span>';
+            }
 
             if($sdata->is_soft_delete==1){
                 $sub_array[]='<span class="badge bg-success">Yes</span>';

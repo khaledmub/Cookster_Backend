@@ -423,10 +423,10 @@ class ApiController extends Controller
         $user_id = $request->user_id;
 
         // Followers
-        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user_id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
 
         // Following
-        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
             
         $return_data = array(
             'status' => true,
@@ -506,8 +506,8 @@ class ApiController extends Controller
             $video_types[$key]->videos = $videos;
         }
 
-        $followers = DB::table('followers')->where('following_id', $user->id)->pluck('follower_id'); // Followers
-        $following = DB::table('followers')->where('follower_id', $user->id)->pluck('following_id'); // Following
+        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->pluck('followers.follower_id'); // Followers
+        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user->id)->where('front_users.is_soft_delete', 0)->pluck('followers.following_id'); // Following
 
         $subscription = DB::table('subscription_history')->join('packages', 'packages.id', '=', 'subscription_history.package_id')->join('packages_description', 'packages_description.package_id', '=', 'packages.id')->join('site_languages', 'packages_description.language_id', '=', 'site_languages.id')->where('site_languages.code', $language)->where('subscription_history.front_user_id', $user->id)->orderBy('subscription_history.system_id', 'DESC')->select(['subscription_history.*', 'packages_description.title', 'packages_description.description'])->first();
             
@@ -1276,8 +1276,8 @@ class ApiController extends Controller
             $video_types[$key]->videos = $videos;
         }
 
-        $followers = DB::table('followers')->where('following_id', $user->id)->count(); // Count of followers
-        $following = DB::table('followers')->where('follower_id', $user->id)->count(); // Count of following
+        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of followers
+        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of following
 
         return response()->json([
             'status' => true,
@@ -2247,16 +2247,20 @@ class ApiController extends Controller
     public function b2b_categories(Request $request){
         $language = App::getLocale();
 
-        $query = DB::table('front_users as u');
-        $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'u.id');
-        $query->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type');
-        $query->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id');
-        $query->where('key_language.code', $language);
-        $query->where('b.is_b2b', 1);
-        $query->where('u.status', 1);
-        $query->where('u.is_soft_delete', 0);
-        $query->orderBy('bt.name', 'ASC');
-        $business_types = $query->select(['bt.value_id as id', 'bt.name'])->distinct()->get();
+        // This returns those business types in any account exists
+        // $query = DB::table('front_users as u');
+        // $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'u.id');
+        // $query->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type');
+        // $query->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id');
+        // $query->where('key_language.code', $language);
+        // $query->where('b.is_b2b', 1);
+        // $query->where('u.status', 1);
+        // $query->where('u.is_soft_delete', 0);
+        // $query->orderBy('bt.name', 'ASC');
+        // $business_types = $query->select(['bt.value_id as id', 'bt.name'])->distinct()->get();
+
+        // This returns all business types
+        $business_types = AppHelper::get_key_values(1);
 
         return response()->json([
             'status' => true,
