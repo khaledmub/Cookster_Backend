@@ -698,7 +698,7 @@ class ApiController extends Controller
         });
         $query->whereDate('notifications.created_at', '>=', $user->created_at);
         $query->where('to_type', 2)->where('read_status', 0);
-        $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'read_status', 'status', 'created_at'])->get();
+        $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'user_review_id', 'read_status', 'status', 'created_at'])->get();
         foreach($notifications as $key => $notification){
             $notifications[$key]->details = AppHelper::get_notification_subject_text($notification);
         }
@@ -2330,7 +2330,207 @@ class ApiController extends Controller
             'audios' => $audios,
         ], 200);
     }
-    
+
+    // User Reviews
+    public function add_user_review(Request $request){
+        $validator = Validator::make($request->all(), [
+            'reviewed_user_id' => 'required',
+            'rating' => 'required',
+            'review' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $input = $request->all();
+
+        $exists = DB::table('user_reviews')->where(['reviewer_id' => $user->id, 'reviewed_user_id' => $request->reviewed_user_id])->first();
+        if($exists){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_rating_already_added_msg')
+            ], 422);
+        }
+        else{
+            $user_review_id = (string) \Str::uuid();
+            $data = array();
+            $data['id'] = $user_review_id;
+            $data['reviewer_id'] = $user->id;
+            $data['reviewed_user_id'] = $request->reviewed_user_id;
+            $data['rating'] = $request->rating;
+            $data['review'] = $request->review;
+            DB::table('user_reviews')->insert($data);
+
+            $reviewed_user = DB::table('front_users')->where('id', $request->reviewed_user_id)->first();
+
+            if($reviewed_user && $reviewed_user->uuid){
+                $deviceTokens = array($reviewed_user->uuid);
+                $notification_data = [
+                    'status' => true,
+                ];
+                $push_notification_text = [
+                    'title' => 'New User Review',
+                    'text' => 'User ('.$user->name.') has given a review against your profile.',
+                    'notification_data' => $notification_data
+                ];
+                AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+
+                /* Create Notification Start */
+                $notification_data = array();
+                $notification_data['to_type'] = 2;
+                $notification_data['front_user_id'] = $reviewed_user->id;
+                $notification_data['front_user_category'] = 2;
+                $notification_data['type'] = 4;
+                $notification_data['user_review_id'] = $user_review_id;
+                DB::table('notifications')->insert($notification_data);
+                /* Create Notification End */
+            }
+            
+            return response()->json([
+                'status' => true,
+                'message' => __('messages.user_rating_added_success')
+            ], 200);
+        }
+    }
+    public function user_reviews_list(Request $request) {
+        $user = Auth::guard('sanctum')->user();
+        $user_id = $request->user_id;
+
+        $query = DB::table('user_reviews as ur')
+            ->leftJoin('front_users as ru', 'ru.id', '=', 'ur.reviewed_user_id')
+            ->leftJoin('front_users as r', 'r.id', '=', 'ur.reviewer_id')
+            ->where('ru.id', $user_id)
+            ->when(!$user || $user_id != $user->id, function ($q) {
+                $q->where('ur.status', 1)->where('ur.is_visible', 1);
+            });
+
+        // Clone for multiple usages
+        $query_reviews = clone $query;
+        $query_count   = clone $query;
+        $query_avg     = clone $query;
+
+        // Get review list
+        $user_reviews = $query_reviews->select([
+            'ur.*',
+            'r.id as reviewer_id',
+            'r.name as reviewer_name',
+            'r.image as reviewer_image'
+        ])->get();
+
+        // Total number of reviews
+        $total_reviews = $query_count->count();
+
+        // Total average rating
+        $average_rating = round($query_avg->avg('ur.rating'), 2);
+
+        // Average per star (1 to 5)
+        $rating_breakdown = DB::table('user_reviews as ur')
+            ->where('ur.reviewed_user_id', $user_id)
+            ->when(!$user || $user_id != $user->id, function ($q) {
+                $q->where('ur.status', 1)->where('ur.is_visible', 1);
+            })
+            ->select('ur.rating', DB::raw('count(*) as count'))
+            ->groupBy('ur.rating')
+            ->pluck('count', 'rating')
+            ->toArray();
+
+        // Ensure all 1–5 stars are present (fill with 0 if not)
+        $rating_counts = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $rating_counts[$i] = $rating_breakdown[$i] ?? 0;
+        }
+
+        return response()->json([
+            'status' => true,
+            'user_reviews' => $user_reviews,
+            'review_counters' => [
+                'total_reviews' => $total_reviews,
+                'average_rating' => $average_rating,
+                'ratings' => $rating_counts
+            ]
+        ], 200);
+    }
+    public function update_review_status(Request $request){
+        if($request->status == 1){
+            // Approve
+            $data = array(
+                'is_visible' => 1,
+                'status' => 1
+            );
+
+            DB::table('user_reviews')->where('id', $request->id)->update($data);
+
+            // Push Notification
+            $user_review = DB::table('user_reviews as ur')
+                ->join('front_users as ru', 'ru.id', '=', 'ur.reviewed_user_id')
+                ->join('front_users as u', 'u.id', '=', 'ur.reviewer_id')
+                ->where('ur.id', $request->id)
+                ->select(['ur.*', 'ru.name as reviewed_user_name', 'u.name as reviewer_name', 'u.uuid as reviewer_uuid'])
+                ->first();
+
+            if($user_review && $user_review->reviewer_uuid){
+                $deviceTokens = array($user_review->reviewer_uuid);
+                $notification_data = [
+                    'status' => true,
+                ];
+                $push_notification_text = [
+                    'title' => 'User Review Approved',
+                    'text' => 'Your review against this profile ('.$user_review->reviewed_user_name.') has been approved.',
+                    'notification_data' => $notification_data
+                ];
+                AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+            }
+        }
+        else if($request->status == 2){
+            // Reject
+
+            // Push Notification
+            $user_review = DB::table('user_reviews as ur')
+                ->join('front_users as ru', 'ru.id', '=', 'ur.reviewed_user_id')
+                ->join('front_users as u', 'u.id', '=', 'ur.reviewer_id')
+                ->where('ur.id', $request->id)
+                ->select(['ur.*', 'ru.name as reviewed_user_name', 'u.name as reviewer_name', 'u.uuid as reviewer_uuid'])
+                ->first();
+
+            if($user_review && $user_review->reviewer_uuid){
+                $deviceTokens = array($user_review->reviewer_uuid);
+                $notification_data = [
+                    'status' => true,
+                ];
+                $push_notification_text = [
+                    'title' => 'User Review Rejected',
+                    'text' => 'Your review against this profile ('.$user_review->reviewed_user_name.') has been rejected.',
+                    'notification_data' => $notification_data
+                ];
+                AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+            }
+
+            DB::table('user_reviews')->where('id', $request->id)->delete();
+            DB::table('notifications')->where('user_review_id', $request->id)->delete();
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.updated_successfully')
+        ]);
+    }
+    public function update_review_visibility(Request $request){
+        $data = array(
+            'is_visible' => $request->is_visible == 1? 1: 0
+        );
+
+        DB::table('user_reviews')->where('id', $request->id)->update($data);
+
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.updated_successfully')
+        ]);
+    }
 
     // General
     public function packages_list(){

@@ -49,6 +49,9 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/b2b/b2b_accounts_list', [ApiController::class, 'b2b_accounts_list']);
     Route::get('/b2b/b2b_accounts_list_category_wise', [ApiController::class, 'b2b_accounts_list_category_wise']);
 
+    // User Reviews
+    Route::get('/user_reviews_list', [ApiController::class, 'user_reviews_list']);
+
     /** With Auth **/
     Route::middleware(['auth:sanctum'])->group( function () {
         // My Account
@@ -91,5 +94,10 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         // B2B
         Route::post('/b2b/change_b2b_status', [ApiController::class, 'change_b2b_status']);
+
+        // User Reviews
+        Route::post('/add_user_review', [ApiController::class, 'add_user_review']);
+        Route::post('/update_review_status', [ApiController::class, 'update_review_status']);
+        Route::post('/update_review_visibility', [ApiController::class, 'update_review_visibility']);
     });
 });

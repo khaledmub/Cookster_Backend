@@ -48,4 +48,9 @@ return [
     'your_video' => "Your video",
     'deactivated_video_msg' => "has been deactivated due to some restrictions. Please contact the administrator for more details.",
     'updated_successfully' => "Updated successfully.",
+    'user_rating_added_success' => "Rating given successfully",
+    'user_rating_already_added_msg' => "You have already given rating against this account.",
+    'new_user_review' => "New User Review",
+    'new_user_review_msg' => "has given a review against your profile.",
+    'user' => "User",
 ];

@@ -457,6 +457,105 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "B2B Categories",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_categories",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_categories"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "B2B Accounts List",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_accounts_list?category_id=1",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_accounts_list"
+							],
+							"query": [
+								{
+									"key": "category_id",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "B2B Accounts List Category Wise",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}b2b/b2b_accounts_list_category_wise",
+							"host": [
+								"{{base_url}}b2b"
+							],
+							"path": [
+								"b2b_accounts_list_category_wise"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -1730,9 +1829,14 @@
 						}
 					},
 					"response": []
-				},
+				}
+			]
+		},
+		{
+			"name": "User Reviews",
+			"item": [
 				{
-					"name": "B2B Categories",
+					"name": "Add User Review",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -1744,7 +1848,7 @@
 								}
 							]
 						},
-						"method": "GET",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Accept",
@@ -1757,20 +1861,37 @@
 								"type": "text"
 							}
 						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "reviewed_user_id",
+									"value": "017d743e-e10a-46a3-8a5e-148db731c867",
+									"type": "text"
+								},
+								{
+									"key": "rating",
+									"value": "4.5",
+									"type": "text"
+								},
+								{
+									"key": "review",
+									"value": "Test",
+									"type": "text"
+								}
+							]
+						},
 						"url": {
-							"raw": "{{base_url}}b2b/b2b_categories",
+							"raw": "{{base_url}}add_user_review",
 							"host": [
-								"{{base_url}}b2b"
-							],
-							"path": [
-								"b2b_categories"
+								"{{base_url}}add_user_review"
 							]
 						}
 					},
 					"response": []
 				},
 				{
-					"name": "B2B Accounts List",
+					"name": "User Reviews List",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -1796,17 +1917,14 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}b2b/b2b_accounts_list?category_id=1",
+							"raw": "{{base_url}}user_reviews_list?user_id=4cb3004e-7a86-460c-9d19-ee8e67d57e00",
 							"host": [
-								"{{base_url}}b2b"
-							],
-							"path": [
-								"b2b_accounts_list"
+								"{{base_url}}user_reviews_list"
 							],
 							"query": [
 								{
-									"key": "category_id",
-									"value": "1"
+									"key": "user_id",
+									"value": "4cb3004e-7a86-460c-9d19-ee8e67d57e00"
 								}
 							]
 						}
@@ -1814,7 +1932,7 @@
 					"response": []
 				},
 				{
-					"name": "B2B Accounts List Category Wise",
+					"name": "Update Review Status",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -1826,7 +1944,7 @@
 								}
 							]
 						},
-						"method": "GET",
+						"method": "POST",
 						"header": [
 							{
 								"key": "Accept",
@@ -1839,13 +1957,77 @@
 								"type": "text"
 							}
 						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "id",
+									"value": "017d743e-e10a-46a3-8a5e-148db731c867",
+									"type": "text"
+								},
+								{
+									"key": "status",
+									"value": "1",
+									"description": "1:Approve, 2:Reject",
+									"type": "text"
+								}
+							]
+						},
 						"url": {
-							"raw": "{{base_url}}b2b/b2b_accounts_list_category_wise",
+							"raw": "{{base_url}}update_review_status",
 							"host": [
-								"{{base_url}}b2b"
-							],
-							"path": [
-								"b2b_accounts_list_category_wise"
+								"{{base_url}}update_review_status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Review Visibility",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "id",
+									"value": "017d743e-e10a-46a3-8a5e-148db731c867",
+									"type": "text"
+								},
+								{
+									"key": "is_visible",
+									"value": "1",
+									"description": "0 | 1",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}update_review_visibility",
+							"host": [
+								"{{base_url}}update_review_visibility"
 							]
 						}
 					},
@@ -2937,7 +3119,7 @@
 		},
 		{
 			"key": "bearer_token",
-			"value": "353|CIru5AWNWYDqkcv7TJaOfQ2xLct0ntkk5PeLCpY0881d9fd6",
+			"value": "555|CvO3CJ8OajqMwJCWiVQ3B1kh1IMY4jY3U5Wbs5Ya00020142",
 			"type": "string"
 		},
 		{

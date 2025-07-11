@@ -315,6 +315,54 @@ $(document).ready(function () {
             initialize_user_payments_datatable();
         });
     }
+    if (pageName == 'user_reviews.index') {
+        function initialize_user_reviews_datatable(){
+            var DTable = $('.dynamicTable').DataTable({
+                "processing": true,
+                "serverSide": true,
+                "bInfo": true,
+                "ajax": {
+                    url: baseurl + "admin/ajax/get_user_reviews",
+                    'data': function (data) {
+                        var user = $('#searchFormListing').find('select[name="user"]').val();
+                        var rating = $('#searchFormListing').find('select[name="rating"]').val();
+                        var status = $('#searchFormListing').find('select[name="status"]').val();
+                        var start_date = $('#searchFormListing').find('input[name="start_date"]').val();
+                        var end_date = $('#searchFormListing').find('input[name="end_date"]').val();
+                        
+                        data._token = $('meta[name="csrf-token"]').attr('content');
+                        if(user!=null && user!=undefined && user!=''){
+                            data.user = user;
+                        }
+                        if(rating!=null && rating!=undefined && rating!=''){
+                            data.rating = rating;
+                        }
+                        if(status!=null && status!=undefined && status!=''){
+                            data.status = status;
+                        }
+                        if(start_date!=null && start_date!=undefined && start_date!=''){
+                            data.start_date = start_date;
+                        }
+                        if(end_date!=null && end_date!=undefined && end_date!=''){
+                            data.end_date = end_date;
+                        }
+                    },
+                    type: "POST"
+                },
+                "aLengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                dom: 'lBfrtip',
+                'ordering': false,
+                oLanguage: {},
+                buttons: []
+            });
+        }
+        initialize_user_reviews_datatable();
+        $('.searchSubmitter').click(function(){
+            $('.dynamicTable').DataTable().clear();
+            $('.dynamicTable').DataTable().destroy();
+            initialize_user_reviews_datatable();
+        });
+    }
     if (pageName == 'notifications.index') {
         function initialize_notifications_datatable(){
             var DTable = $('.dynamicTable').DataTable({
@@ -689,6 +737,30 @@ $(document).ready(function () {
             data: {
                 id: id,
                 status: status,
+                _token: $('meta[name="csrf-token"]').attr('content')
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoader();
+                if(data.status == true){
+                    displaySuccesMessage(data.message);
+                }
+            }
+        });  
+    });
+    $('body').on('change', '.userReviewVisibilityChanger', function() {
+        var id = $(this).data('id');
+        var is_visible = 0;
+        if ($(this).is(':checked')) {
+            is_visible=1;
+        }
+        showLoader();
+        $.ajax({
+            url: baseurl + "admin/ajax/change_user_review_visibility",
+            type: 'POST',
+            data: {
+                id: id,
+                is_visible: is_visible,
                 _token: $('meta[name="csrf-token"]').attr('content')
             },
             dataType: "json",

@@ -524,6 +524,13 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                             </a>
                         </li>
                         @endif
+                        @if(auth()->user()->can('user-reviews-list'))
+                        <li class="nav-item">
+                            <a class="nav-link menu-link {{ request()->is('admin/user_reviews') || request()->is('admin/user_reviews/*') ? 'active' : '' }}" href="{{ route('user_reviews.index') }}">
+                                <i class="fa-solid fa-star"></i> <span data-key="t-dashboards">User Reviews</span>
+                            </a>
+                        </li>
+                        @endif
                         @if(auth()->user()->can('notifications-list'))
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ request()->is('admin/notifications') ||  request()->is('admin/notifications/*') ? 'active' : '' }}" href="{{ route('notifications.index') }}">

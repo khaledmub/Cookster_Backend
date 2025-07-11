@@ -13,6 +13,7 @@ use App\Http\Controllers\GenerickeyvalueController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\VideosController;
 use App\Http\Controllers\UserPaymentsController;
+use App\Http\Controllers\UserReviewsController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\BannersController;
 use App\Http\Controllers\WorksController;
@@ -78,6 +79,11 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::resource('user_payments', UserPaymentsController::class);
     Route::post('ajax/get_user_payments', [UserPaymentsController::class, 'get_data_ajax']);
 
+    // User Reviews
+    Route::resource('user_reviews', UserReviewsController::class);
+    Route::post('ajax/get_user_reviews', [UserReviewsController::class, 'get_data_ajax']);
+    Route::get('user_review_status_update/{id}/{status}', [UserReviewsController::class, 'user_review_status_update']);
+
     // Notifications
     Route::resource('notifications', NotificationsController::class);
     Route::post('ajax/get_notifications', [NotificationsController::class, 'get_data_ajax']);
@@ -135,6 +141,7 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::post('ajax/get_country_cities', [DashboardController::class, 'get_country_cities']);
     Route::post('ajax/change_user_status', [DashboardController::class, 'change_user_status']);
     Route::post('ajax/change_video_status', [DashboardController::class, 'change_video_status']);
+    Route::post('ajax/change_user_review_visibility', [DashboardController::class, 'change_user_review_visibility']);
     Route::post('ajax/get_front_users_list', [DashboardController::class, 'get_front_users_list']);
 });
 

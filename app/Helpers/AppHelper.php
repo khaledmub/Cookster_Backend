@@ -26,6 +26,7 @@ class AppHelper
 
 	public static function send_email($from_email, $to_email, $subject, $message){
         return true;
+        $from_email = 'info@cookster.org';
         Mail::send([], [], function ($inner_message) use ($to_email, $subject, $from_email, $message){
           $inner_message->to($to_email)
             ->subject($subject)
@@ -152,6 +153,9 @@ class AppHelper
         else if($type==6){
             $return_data = env('USER_PAYMENT_PREFIX').$id;
         }
+        else if($type==7){
+            $return_data = env('USER_REVIEW_PREFIX').$id;
+        }
         return $return_data;
     }
     public static function run_add_tag_script($tags){
@@ -262,6 +266,13 @@ class AppHelper
             }
 
             $details['date_time']=date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
+        }
+        else if($notification->type==4){
+            // Notification for front user when new review against its profile is given
+            $user_reviews_details = DB::table('user_reviews')->join('front_users', 'front_users.id', '=', 'user_reviews.reviewer_id')->where('user_reviews.id', $notification->user_review_id)->select('user_reviews.*', 'front_users.name as reviewer_name')->first();
+            $details['title'] = __('messages.new_user_review');
+            $details['text'] = __('messages.user') . ' (' . $user_reviews_details->reviewer_name . ') ' . __('messages.new_user_review_msg');
+            $details['date_time'] = date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
         }
         return $details;
     }

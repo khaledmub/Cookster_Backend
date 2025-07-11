@@ -64,6 +64,10 @@
                                                 <h6>Feedback</h6>
                                                 <div class="likes_share_body">
                                                     <div class="counter_custom_box">
+                                                        <h4>{{$data['views']}}</h4>
+                                                        <small>Views</small>
+                                                    </div>
+                                                    <div class="counter_custom_box">
                                                         <h4>{{$data['likes']}}</h4>
                                                         <small>Likes</small>
                                                     </div>

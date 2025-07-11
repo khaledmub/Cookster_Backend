@@ -222,6 +222,19 @@ Database Changes
 
 ==========================================================================
 
+Phase: 2.5
+Development Start Date: 11-July-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create table "user_reviews"
+- ALTER TABLE `notifications` ADD `user_review_id` CHAR(36) NULL AFTER `video_id`;
+- INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'User Reviews', '22', '1', '2025-05-14 15:20:04');
+- INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'user-reviews-list', 'web', '57', '2025-02-28 12:40:45', '2025-02-28 12:40:45');
+
+==========================================================================
+
 
 
 Personal Account Token

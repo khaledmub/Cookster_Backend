@@ -138,4 +138,12 @@ class DashboardController extends Controller
         DB::table('videos')->where('id',$input['id'])->update($data);
         return response()->json(['status' => true, 'message' => 'Status changed successfully!']);
     }
+    public function change_user_review_visibility(Request $request){
+        $input = $request->all();
+        $data=array(
+            'is_visible' => $input['is_visible']
+        );
+        DB::table('user_reviews')->where('id',$input['id'])->update($data);
+        return response()->json(['status' => true, 'message' => 'Visibility changed successfully!']);
+    }
 }

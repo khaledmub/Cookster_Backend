@@ -48,4 +48,9 @@ return [
     'your_video' => "فيديوك",
     'deactivated_video_msg' => "تم تعطيله بسبب بعض القيود. يرجى الاتصال بالمسؤول لمزيد من التفاصيل.",
     'updated_successfully' => "تم التحديث بنجاح.",
+    'user_rating_added_success' => "تم إعطاء التقييم بنجاح",
+    'user_rating_already_added_msg' => "لقد قمت بالفعل بإعطاء تقييم لهذا الحساب.",
+    'new_user_review' => "مراجعة مستخدم جديدة",
+    'new_user_review_msg' => "قام بكتابة مراجعة لملفك الشخصي.",
+    'user' => "المستخدم",
 ];

@@ -160,8 +160,17 @@ class VideosController extends Controller
                 $data['comments'] = array();
             }
 
+            // Views
             $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
-            // Fetch documents
+            $video_collection = AppHelper::call_curl_request($url);
+            $views = 0;
+            if(isset($video_collection['fields']['views']['arrayValue']) && isset($video_collection['fields']['views']['arrayValue']['values'])){
+                $views = count($video_collection['fields']['views']['arrayValue']['values']);
+            }
+            $data['views'] = $views;
+
+            // Likes
+            $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/videos/{$video_id}?key=".env('FIREBASE_KEY');
             $video_collection = AppHelper::call_curl_request($url);
             $likes = 0;
             if(isset($video_collection['fields']['likes']['arrayValue']) && isset($video_collection['fields']['likes']['arrayValue']['values'])){
@@ -169,6 +178,7 @@ class VideosController extends Controller
             }
             $data['likes'] = $likes;
 
+            // Order Clicks
             $url = "https://firestore.googleapis.com/v1/projects/".env('FIREBASE_PROJECT_ID')."/databases/(default)/documents/countContactClick/{$video_id}?key=".env('FIREBASE_KEY');
             $video_collection = AppHelper::call_curl_request($url);
             $order_clicks = 0;
