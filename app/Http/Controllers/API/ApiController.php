@@ -16,6 +16,7 @@ use DatePeriod;
 use DateTime;
 use DateInterval;
 use Image;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
@@ -2364,6 +2365,7 @@ class ApiController extends Controller
             $data['reviewed_user_id'] = $request->reviewed_user_id;
             $data['rating'] = $request->rating;
             $data['review'] = $request->review;
+            $data['human_utc_date'] = Carbon::now()->format('F j, Y \a\t g:i:s A \U\T\C+3');
             DB::table('user_reviews')->insert($data);
 
             $reviewed_user = DB::table('front_users')->where('id', $request->reviewed_user_id)->first();

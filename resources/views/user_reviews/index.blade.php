@@ -2,6 +2,13 @@
 
 @section('content')
 
+<style>
+    th, td{
+        max-width: 300px !important;
+        white-space: unset !important;
+    }
+</style>
+
 <div class="page-content">
     <div class="container-fluid">
 
