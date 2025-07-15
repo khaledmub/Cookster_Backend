@@ -235,6 +235,16 @@ Database Changes
 
 ==========================================================================
 
+Phase: 2.6
+Development Start Date: 15-July-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `entities` ADD `description` TEXT NULL AFTER `name_ar`, ADD `description_ar` TEXT NULL AFTER `description`;
+
+==========================================================================
+
 
 
 Personal Account Token

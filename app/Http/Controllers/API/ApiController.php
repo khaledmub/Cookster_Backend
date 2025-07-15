@@ -712,10 +712,10 @@ class ApiController extends Controller
         $language = App::getLocale();
 
         if($language == 'ar'){
-            $e_select = ['id', 'name_ar as name', 'subscription_required', 'is_sponsored'];
+            $e_select = ['id', 'name_ar as name', 'description_ar as description', 'subscription_required', 'is_sponsored'];
         }
         else{
-            $e_select = ['id', 'name', 'subscription_required', 'is_sponsored'];
+            $e_select = ['id', 'name', 'description', 'subscription_required', 'is_sponsored'];
         }
 
         $entities = DB::table('entities')->where('status', 1)->select($e_select)->orderBy('sort_order', 'ASC')->get();
@@ -2554,10 +2554,10 @@ class ApiController extends Controller
         $language = App::getLocale();
 
         if($language == 'ar'){
-            $e_select = ['id', 'name_ar as name', 'subscription_required', 'is_sponsored'];
+            $e_select = ['id', 'name_ar as name', 'description_ar as description', 'subscription_required', 'is_sponsored'];
         }
         else{
-            $e_select = ['id', 'name', 'subscription_required', 'is_sponsored'];
+            $e_select = ['id', 'name', 'description', 'subscription_required', 'is_sponsored'];
         }
 
         $entities = DB::table('entities')->where('status', 1)->select($e_select)->orderBy('sort_order', 'ASC')->get();
