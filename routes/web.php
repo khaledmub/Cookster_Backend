@@ -148,3 +148,4 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
 // Cronjob Scripts
 Route::get('delete_expire_sponsored_videos', [CronjobController::class, 'delete_expire_sponsored_videos'])->name('delete_expire_sponsored_videos');
 Route::get('send_reminder_for_subscription_expiry', [CronjobController::class, 'send_reminder_for_subscription_expiry'])->name('send_reminder_for_subscription_expiry');
+Route::get('send_reminder_for_sponsored_video_expiry', [CronjobController::class, 'send_reminder_for_sponsored_video_expiry'])->name('send_reminder_for_sponsored_video_expiry');
