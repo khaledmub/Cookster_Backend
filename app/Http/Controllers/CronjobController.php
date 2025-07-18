@@ -57,7 +57,8 @@ class CronjobController extends Controller
         ->join('front_users as fu', 'fu.id', '=', 'v.front_user_id')
         ->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
         ->whereDate('sv.end_date', '=', now()->addHours(5))
-        ->select('fu.*', 'v.title as video_title', 'sv.end_date as sponsored_video_end_date')
+        ->where('sv.is_expiry_reminder_sent', 0)
+        ->select('fu.*', 'v.title as video_title', 'sv.end_date as sponsored_video_end_date', 'sv.id as sponsored_video_id')
         ->get();
 
         foreach($expiringSponsoredVideos as $video){
@@ -71,6 +72,11 @@ class CronjobController extends Controller
                 'notification_data' => $notification_data
             ];
             AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+
+            $update_data = [
+                'is_expiry_reminder_sent' => 1
+            ];
+            DB::table('sponsored_videos')->where('id', $video->sponsored_video_id)->update($update_data);
         }
         return response()->json([
             'status' => true,

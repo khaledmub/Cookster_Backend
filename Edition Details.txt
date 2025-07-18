@@ -248,11 +248,12 @@ Database Changes
 Phase: 2.7
 Development Start Date: 17-July-2025
 Developer: HA
-Upload Status: N/A
+Upload Status: Done
 -----------------------------------
 Database Changes
 - ALTER TABLE `sponsored_videos` CHANGE `end_date` `end_date` DATETIME NOT NULL;
 - ALTER TABLE `sponsored_videos_history` CHANGE `end_date` `end_date` DATETIME NOT NULL;
+- ALTER TABLE `sponsored_videos` ADD `is_expiry_reminder_sent` TINYINT(4) NOT NULL DEFAULT '0' AFTER `total_amount`;
 
 ==========================================================================
 
