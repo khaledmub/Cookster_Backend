@@ -10,6 +10,7 @@ Route::get('/videos/list2', [ApiController::class, 'videos_list2']);
 
 Route::middleware([SetLanguage::class])->group(function () {
     /** General **/
+    Route::get('/urway_credentials', [ApiController::class, 'urway_credentials']);
     Route::get('/entities', [ApiController::class, 'entities']);
     Route::get('/site_languages', [ApiController::class, 'site_languages']);
     Route::get('/countries', [ApiController::class, 'countries']);

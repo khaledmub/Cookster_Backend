@@ -2550,6 +2550,14 @@ class ApiController extends Controller
             'packages' => $packages,
         ], 200);
     }
+    public function urway_credentials(){
+        return response()->json([
+            'merchantKey' => env('URWAY_MERCHANT_KEY'),
+            'terminalId' => env('URWAY_TERMINAL_ID'),
+            'terminalPass' => env('URWAY_TERMINAL_PASS'),
+            'requestUrl' => env('URWAY_REQUEST_URL')
+        ], 200);
+    }
     public function entities(){
         $language = App::getLocale();
 
