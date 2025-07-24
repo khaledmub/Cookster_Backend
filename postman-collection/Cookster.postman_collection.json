@@ -509,7 +509,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}b2b/b2b_accounts_list?category_id=1",
+							"raw": "{{base_url}}b2b/b2b_accounts_list?category_id=1&country=Jordan&city=Al Jafr",
 							"host": [
 								"{{base_url}}b2b"
 							],
@@ -520,6 +520,14 @@
 								{
 									"key": "category_id",
 									"value": "1"
+								},
+								{
+									"key": "country",
+									"value": "Jordan"
+								},
+								{
+									"key": "city",
+									"value": "Al Jafr"
 								}
 							]
 						}

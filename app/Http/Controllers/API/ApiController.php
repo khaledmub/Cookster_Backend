@@ -2275,6 +2275,41 @@ class ApiController extends Controller
         $query->where('b.is_b2b', 1);
         $query->where('u.status', 1);
         $query->where('u.is_soft_delete', 0);
+
+        // Country and city validation with city group
+        $country = 0;
+        $city = 0;
+        if($request->country && $request->country != ''){
+            $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($request->country)])->first();
+            if(isset($country_details->id)){
+                $country = $country_details->id;
+            }
+        }
+        if($request->city && $request->city != ''){
+            $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($request->city)])->first();
+            if(isset($city_details->id)){
+                $city = $city_details->id;
+            }
+        }
+        $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
+        if(!empty($city_group)){
+            $cities_ids = explode(',', $city_group->cities);
+        }
+        else if($city != 0){
+            $cities_ids = array($city);
+        }
+        else{
+            $cities_ids = array();
+        }
+
+        if($country != 0){
+            $query->where('u.country', $country);
+        }
+
+        if(!empty($cities_ids)){
+            $query->whereIn('u.city', $cities_ids);
+        }
+
         $query->orderBy('u.name', 'ASC');
         $b2b_accounts_list = $query->select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.image'])->get();
 
