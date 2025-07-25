@@ -136,6 +136,11 @@ class DashboardController extends Controller
             'status' => $input['status']
         );
         DB::table('videos')->where('id',$input['id'])->update($data);
+        
+        if($input['status'] == 1){
+            DB::table('video_reports')->where('video_id', $input['id'])->delete();
+        }
+
         return response()->json(['status' => true, 'message' => 'Status changed successfully!']);
     }
     public function change_user_review_visibility(Request $request){

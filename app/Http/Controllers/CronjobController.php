@@ -83,4 +83,28 @@ class CronjobController extends Controller
             'message' => 'Executed Successfully!',
         ], 201);
     }
+    public function disable_reported_videos(Request $request){
+        // http://localhost/cookster_admin/public/disable_reported_videos
+        
+        $videos = DB::table('videos')
+            ->join('video_reports', 'videos.id', '=', 'video_reports.video_id')
+            ->where('videos.status', 1)
+            ->where('videos.is_soft_delete', 0)
+            ->select('videos.id')
+            ->groupBy('videos.id')
+            ->havingRaw('COUNT(DISTINCT video_reports.reported_by) >= 10')
+            ->get();
+
+        foreach($videos as $video){
+            $data = [
+                'status' => 0
+            ];
+            DB::table('videos')->where('id', $video->id)->update($data);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Executed Successfully!',
+        ], 201);
+    }
 }

@@ -53,4 +53,6 @@ return [
     'new_user_review' => "New User Review",
     'new_user_review_msg' => "has given a review against your profile.",
     'user' => "User",
+    'review_status_updated_successfully' => "Review status updated successfully.",
+    'review_visibility_updated_successfully' => "Review visibility updated successfully.",
 ];

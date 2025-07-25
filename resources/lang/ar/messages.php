@@ -53,4 +53,6 @@ return [
     'new_user_review' => "مراجعة مستخدم جديدة",
     'new_user_review_msg' => "قام بكتابة مراجعة لملفك الشخصي.",
     'user' => "المستخدم",
+    'review_status_updated_successfully' => "تم تحديث حالة المراجعة بنجاح.",
+    'review_visibility_updated_successfully' => "تم تحديث ظهور المراجعة بنجاح.",
 ];

@@ -36,7 +36,7 @@
                             $checked = "";
                         }
                         @endphp
-                        <div class="form-check form-switch form-switch-success" dir="ltr"><input class="form-check-input videoStatusChanger" data-id="{{$data['video_details']->id}}" type="checkbox" role="switch" id="flexSwitchCheckChecked" {{$checked}}></div>
+                        <div class="form-check form-switch form-switch-success" dir="ltr"><input class="form-check-input videoStatusChanger" data-id="{{$data['video_details']->id}}" data-reports_counter="{{$data['reports_counter']}}" type="checkbox" role="switch" id="flexSwitchCheckChecked" {{$checked}}></div>
                     </div><!-- end card header -->
 
                     <div class="card-body">

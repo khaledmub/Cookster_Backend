@@ -215,9 +215,13 @@ class VideosController extends Controller
                 ->orWhere('r.category_id', null); 
             });
             $query->where('r.video_id', $id);
-            $query->orderBy('r.system_id', 'DESC');
-            $reports = $query->select(['r.*', 'ru.name as reported_by_name', 'ru.image as user_image', 'category_description.name as category_name'])->get();
+
+            $query1 = clone $query;
+            $query2 = clone $query;
+
+            $reports = $query1->select(['r.*', 'ru.name as reported_by_name', 'ru.image as user_image', 'category_description.name as category_name'])->orderBy('r.system_id', 'DESC')->get();
             $data['reports'] = $reports;
+            $data['reports_counter'] = $query2->count();
 
             $query = DB::table('sponsored_videos_history')->select(['sponsored_videos_history.*']);
             $data['sponsored_history'] = $query->where('sponsored_videos_history.video_id', $id)->orderBy('sponsored_videos_history.system_id', 'DESC')->get();

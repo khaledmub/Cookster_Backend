@@ -726,6 +726,11 @@ $(document).ready(function () {
     });
     $('body').on('change', '.videoStatusChanger', function() {
         var id = $(this).data('id');
+        var reports_counter = $(this).attr('data-reports_counter');
+        if(reports_counter >= 10){
+
+        }
+
         var status = 0;
         if ($(this).is(':checked')) {
             status=1;

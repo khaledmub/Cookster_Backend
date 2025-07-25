@@ -1993,6 +1993,25 @@ class ApiController extends Controller
         AppHelper::send_email($report->reported_by_email, $email_to, $subject, $html);
         /* Email Notification End */
 
+        /* Disable video if reports are greater than or equal to 10 */
+        $video = DB::table('videos')
+            ->join('video_reports', 'videos.id', '=', 'video_reports.video_id')
+            ->where('videos.id', $request->video_id)
+            ->where('videos.status', 1)
+            ->where('videos.is_soft_delete', 0)
+            ->select('videos.id')
+            ->groupBy('videos.id')
+            ->havingRaw('COUNT(DISTINCT video_reports.reported_by) >= 2')
+            ->first();
+
+        if($video){
+            $data = [
+                'status' => 0
+            ];
+            DB::table('videos')->where('id', $video->id)->update($data);
+        }
+        /* Disable video if reports are greater than or equal to 10 */
+
         return response()->json([
             'status' => true,
             'message' => __('messages.video_report_create_success'),
@@ -2172,7 +2191,7 @@ class ApiController extends Controller
         $query2->offset($start)->limit($length);
         // $query2->orderBy('v.system_id', 'DESC');
         $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-        DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
+        DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('sv.system_id', 'DESC')->get();
         
         return response()->json([
             'status' => true,
@@ -2553,7 +2572,7 @@ class ApiController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => __('messages.updated_successfully')
+            'message' => __('messages.review_status_updated_successfully')
         ]);
     }
     public function update_review_visibility(Request $request){
@@ -2565,7 +2584,7 @@ class ApiController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => __('messages.updated_successfully')
+            'message' => __('messages.review_visibility_updated_successfully')
         ]);
     }
 
