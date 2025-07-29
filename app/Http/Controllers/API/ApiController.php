@@ -942,18 +942,53 @@ class ApiController extends Controller
 
         $country = 0;
         $city = 0;
-        if(isset($input['country']) && $input['country']!=''){
-            $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
-            if(isset($country_details->id)){
-                $country = $country_details->id;
-            }
-        }
+
+        // if(isset($input['country']) && $input['country']!=''){
+        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
+        //     if(isset($country_details->id)){
+        //         $country = $country_details->id;
+        //     }
+        // }
+        // if(isset($input['city']) && $input['city']!=''){
+        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
+        //     if(isset($city_details->id)){
+        //         $city = $city_details->id;
+        //     }
+        // }
+
         if(isset($input['city']) && $input['city']!=''){
-            $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
-            if(isset($city_details->id)){
-                $city = $city_details->id;
+            $city = $input['city'];
+        }
+        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
+            $currentLat = $input['latitude'];
+            $currentLng = $input['longitude'];
+            $radiusList = [10, 25, 50];
+            foreach($radiusList as $radiusKm){
+                $nearestCity = DB::table('cities')
+                    ->select(
+                        'id',
+                        'name',
+                        DB::raw("(
+                            6371 * acos(
+                                cos(radians($currentLat)) *
+                                cos(radians(latitude)) *
+                                cos(radians(longitude) - radians($currentLng)) +
+                                sin(radians($currentLat)) *
+                                sin(radians(latitude))
+                            )
+                        ) AS distance")
+                    )
+                    ->having('distance', '<', $radiusKm)
+                    ->orderBy('distance', 'asc')
+                    ->first();
+    
+                if($nearestCity){
+                    $city = $nearestCity->id;
+                    break; // Stop if a city is found
+                }
             }
         }
+
         $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
         if(!empty($city_group)){
             $cities_ids = explode(',', $city_group->cities);
@@ -1600,18 +1635,52 @@ class ApiController extends Controller
         $country = 0;
         $city = 0;
 
-        if(isset($input['country']) && $input['country']!=''){
-            $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
-            if(isset($country_details->id)){
-                $country = $country_details->id;
-            }
-        }
+        // if(isset($input['country']) && $input['country']!=''){
+        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
+        //     if(isset($country_details->id)){
+        //         $country = $country_details->id;
+        //     }
+        // }
+        // if(isset($input['city']) && $input['city']!=''){
+        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
+        //     if(isset($city_details->id)){
+        //         $city = $city_details->id;
+        //     }
+        // }
+
         if(isset($input['city']) && $input['city']!=''){
-            $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
-            if(isset($city_details->id)){
-                $city = $city_details->id;
+            $city = $input['city'];
+        }
+        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
+            $currentLat = $input['latitude'];
+            $currentLng = $input['longitude'];
+            $radiusList = [10, 25, 50];
+            foreach($radiusList as $radiusKm){
+                $nearestCity = DB::table('cities')
+                    ->select(
+                        'id',
+                        'name',
+                        DB::raw("(
+                            6371 * acos(
+                                cos(radians($currentLat)) *
+                                cos(radians(latitude)) *
+                                cos(radians(longitude) - radians($currentLng)) +
+                                sin(radians($currentLat)) *
+                                sin(radians(latitude))
+                            )
+                        ) AS distance")
+                    )
+                    ->having('distance', '<', $radiusKm)
+                    ->orderBy('distance', 'asc')
+                    ->first();
+    
+                if($nearestCity){
+                    $city = $nearestCity->id;
+                    break; // Stop if a city is found
+                }
             }
         }
+
         if($city){
             $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
             if(!empty($city_group)){
@@ -1628,8 +1697,20 @@ class ApiController extends Controller
         ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
         ->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')
         ->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id')
-        ->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id')
-        ->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id')
+        ->leftJoin(DB::raw("
+            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.follower_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.following_id) as followers
+        "), 'followers.following_id', '=', 'u.id')
+        ->leftJoin(DB::raw("
+            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.following_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.follower_id) as following
+        "), 'following.follower_id', '=', 'u.id')
         ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
         ->where(function ($q) {
             $q->where('video_type_language.is_default', 1)
@@ -1883,8 +1964,20 @@ class ApiController extends Controller
         $query=DB::table('videos as v');
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
         $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-        $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-        $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+        $query->leftJoin(DB::raw("
+            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.follower_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.following_id) as followers
+        "), 'followers.following_id', '=', 'u.id');
+        $query->leftJoin(DB::raw("
+            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.following_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.follower_id) as following
+        "), 'following.follower_id', '=', 'u.id');
         $query->where(function ($q){
             $q->where('video_type_language.is_default', 1)
               ->orWhere('v.video_type', 0); 
@@ -2159,8 +2252,20 @@ class ApiController extends Controller
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
         $query->join('user_saved_videos as sv', 'sv.video_id', '=', 'v.id');
         $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-        $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-        $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+        $query->leftJoin(DB::raw("
+            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.follower_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.following_id) as followers
+        "), 'followers.following_id', '=', 'u.id');
+        $query->leftJoin(DB::raw("
+            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.following_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.follower_id) as following
+        "), 'following.follower_id', '=', 'u.id');
         $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
         $query->where(function ($q){
             $q->where('video_type_language.is_default', 1)
