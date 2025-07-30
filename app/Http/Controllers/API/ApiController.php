@@ -1011,8 +1011,20 @@ class ApiController extends Controller
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
             $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-            $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-            $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.follower_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.following_id) as followers
+            "), 'followers.following_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.following_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.follower_id) as following
+            "), 'following.follower_id', '=', 'u.id');
             $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
@@ -1093,8 +1105,20 @@ class ApiController extends Controller
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
             $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-            $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-            $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.follower_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.following_id) as followers
+            "), 'followers.following_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.following_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.follower_id) as following
+            "), 'following.follower_id', '=', 'u.id');
             $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
@@ -1168,8 +1192,20 @@ class ApiController extends Controller
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
             $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-            $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-            $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.follower_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.following_id) as followers
+            "), 'followers.following_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.following_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.follower_id) as following
+            "), 'following.follower_id', '=', 'u.id');
             $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)
@@ -1215,8 +1251,20 @@ class ApiController extends Controller
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
             $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
             $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
-            $query->leftJoin(DB::raw('(SELECT following_id, COUNT(follower_id) as followers_count FROM followers GROUP BY following_id) as followers'), 'followers.following_id', '=', 'u.id');
-            $query->leftJoin(DB::raw('(SELECT follower_id, COUNT(following_id) as following_count FROM followers GROUP BY follower_id) as following'), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.follower_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.following_id) as followers
+            "), 'followers.following_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.following_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.follower_id) as following
+            "), 'following.follower_id', '=', 'u.id');
             $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
             $query->where(function ($q){
                 $q->where('video_type_language.is_default', 1)

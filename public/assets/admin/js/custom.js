@@ -724,17 +724,7 @@ $(document).ready(function () {
             }
         });  
     });
-    $('body').on('change', '.videoStatusChanger', function() {
-        var id = $(this).data('id');
-        var reports_counter = $(this).attr('data-reports_counter');
-        if(reports_counter >= 10){
-
-        }
-
-        var status = 0;
-        if ($(this).is(':checked')) {
-            status=1;
-        }
+    function videoStatusChanger(id, status) {
         showLoader();
         $.ajax({
             url: baseurl + "admin/ajax/change_video_status",
@@ -751,7 +741,34 @@ $(document).ready(function () {
                     displaySuccesMessage(data.message);
                 }
             }
-        });  
+        });
+    }
+    $('body').on('change', '.videoStatusChanger', function() {
+        var id = $(this).data('id');
+        var reports_counter = $(this).attr('data-reports_counter');
+        var status = 0;
+        if ($(this).is(':checked')) {
+            status=1;
+        }
+
+        if(status == 1 && reports_counter >= 10){
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This video was disabled due to high number of reports.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, enable it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    videoStatusChanger(id, status);
+                }
+            });
+        }
+        else{
+            videoStatusChanger(id, status);
+        }
     });
     $('body').on('change', '.userReviewVisibilityChanger', function() {
         var id = $(this).data('id');
