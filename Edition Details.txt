@@ -257,6 +257,17 @@ Database Changes
 
 ==========================================================================
 
+Phase: 2.8
+Development Start Date: 08-August-2025
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- ALTER TABLE `sponsored_videos` CHANGE `start_date` `start_date` DATETIME NOT NULL;
+- ALTER TABLE `sponsored_videos_history` CHANGE `start_date` `start_date` DATETIME NOT NULL;
+
+==========================================================================
+
 
 
 Personal Account Token

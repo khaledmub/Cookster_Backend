@@ -374,7 +374,7 @@ class AppHelper
         $ins_data['cities'] = $cities;
         $ins_data['sponsor_type'] = $sponsor_type;
         $ins_data['days'] = $days;
-        $ins_data['start_date'] = date('Y-m-d');
+        $ins_data['start_date'] = date('Y-m-d H:i:s');
         $ins_data['end_date'] = date('Y-m-d H:i:s', strtotime('+'.$days.' days'));
         $ins_data['per_day_price'] = $per_day_price;
         $ins_data['discount_percentage'] = $discount_percentage;

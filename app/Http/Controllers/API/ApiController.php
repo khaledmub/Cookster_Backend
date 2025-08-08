@@ -1930,6 +1930,348 @@ class ApiController extends Controller
         ])->get();
 
         // MERGE VIDEO LOGIC
+        // $finalList = [];
+        // $normalCount = 0;
+        // $sponsoredIndex = 0;
+        // $premiumIndex = 0;
+        // $sponsoredCount = 0;
+        // $totalNormal = count($normalVideos);
+        // $i = 0;
+        // $normal_videos_cc = 5; // This counter is used to show the sponor video after xyz number of normal videos
+
+        // while ($i < $totalNormal) {
+        //     for ($j = 0; $j < $normal_videos_cc && $i < $totalNormal; $j++, $i++) {
+        //         $finalList[] = $normalVideos[$i];
+        //     }
+
+        //     if (isset($sponsoredVideos[$sponsoredIndex])) {
+        //         $finalList[] = $sponsoredVideos[$sponsoredIndex++];
+        //         $sponsoredCount++;
+
+        //         if ($sponsoredCount % 3 == 0 && isset($premiumSponsoredVideos[$premiumIndex])) {
+        //             $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
+        //         }
+        //     }
+        // }
+
+        // while (isset($sponsoredVideos[$sponsoredIndex])) {
+        //     $finalList[] = $sponsoredVideos[$sponsoredIndex++];
+        // }
+
+        // while (isset($premiumSponsoredVideos[$premiumIndex])) {
+        //     $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
+        // }
+
+        // NEW MERGE LOGIC - WEIGHTED BUT NEVER TOGETHER
+        $finalList = [];
+        $normalIndex = 0;
+        $premiumIndex = 0;
+        $normalSponsoredIndex = 0;
+
+        $totalNormal = count($normalVideos);
+        $totalPremium = count($premiumSponsoredVideos);
+        $totalNormalSponsored = count($sponsoredVideos);
+
+        $pattern = []; // This will store pattern like ['P','P','S']
+        if($totalPremium > 0 && $totalNormalSponsored > 0){
+            $pattern = ['P', 'P', 'S']; // 2 premium then 1 normal
+        }
+        elseif($totalPremium > 0){
+            $pattern = ['P']; // Only premium
+        }
+        elseif($totalNormalSponsored > 0){
+            $pattern = ['S']; // Only normal sponsored
+        }
+
+        $patternIndex = 0;
+        $normal_videos_cc = 5; // number of non-sponsored before sponsored
+
+        while($normalIndex < $totalNormal){
+            // Add 5 non-sponsored videos
+            for($j = 0; $j < $normal_videos_cc && $normalIndex < $totalNormal; $j++, $normalIndex++){
+                $finalList[] = $normalVideos[$normalIndex];
+            }
+
+            // If we have a pattern and any sponsored videos
+            if(!empty($pattern)){
+                $type = $pattern[$patternIndex];
+
+                if($type === 'P' && $totalPremium > 0){
+                    $finalList[] = $premiumSponsoredVideos[$premiumIndex];
+                    $premiumIndex = ($premiumIndex + 1) % $totalPremium; // loop
+                }
+                elseif($type === 'S' && $totalNormalSponsored > 0){
+                    $finalList[] = $sponsoredVideos[$normalSponsoredIndex];
+                    $normalSponsoredIndex = ($normalSponsoredIndex + 1) % $totalNormalSponsored; // loop
+                }
+
+                // Move to next in pattern
+                $patternIndex = ($patternIndex + 1) % count($pattern);
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'videos' => $finalList,
+        ], 200);
+    }
+    public function videos_list_old(Request $request){
+        $user = Auth::guard('sanctum')->user();
+        $input = $request->all();
+        $page = $input['page'] ?? 1; // Default to page 1 if not provided
+        $length = 100000; // Number of records per page
+        $start = ($page - 1) * $length;
+        $cities_ids = array();
+        $country = 0;
+        $city = 0;
+
+        // if(isset($input['country']) && $input['country']!=''){
+        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
+        //     if(isset($country_details->id)){
+        //         $country = $country_details->id;
+        //     }
+        // }
+        // if(isset($input['city']) && $input['city']!=''){
+        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
+        //     if(isset($city_details->id)){
+        //         $city = $city_details->id;
+        //     }
+        // }
+
+        if(isset($input['city']) && $input['city']!=''){
+            $city = $input['city'];
+        }
+        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
+            $currentLat = $input['latitude'];
+            $currentLng = $input['longitude'];
+            $radiusList = [10, 25, 50];
+            foreach($radiusList as $radiusKm){
+                $nearestCity = DB::table('cities')
+                    ->select(
+                        'id',
+                        'name',
+                        DB::raw("(
+                            6371 * acos(
+                                cos(radians($currentLat)) *
+                                cos(radians(latitude)) *
+                                cos(radians(longitude) - radians($currentLng)) +
+                                sin(radians($currentLat)) *
+                                sin(radians(latitude))
+                            )
+                        ) AS distance")
+                    )
+                    ->having('distance', '<', $radiusKm)
+                    ->orderBy('distance', 'asc')
+                    ->first();
+    
+                if($nearestCity){
+                    $city = $nearestCity->id;
+                    break; // Stop if a city is found
+                }
+            }
+        }
+
+        if($city){
+            $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
+            if(!empty($city_group)){
+                $cities_ids = explode(',', $city_group->cities);
+            }
+            else{
+                $cities_ids = array($city);
+            }
+        }
+
+        // Base query to clone for all types
+        $baseQuery = DB::table('videos as v')
+        ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
+        ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
+        ->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')
+        ->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id')
+        ->leftJoin(DB::raw("
+            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.follower_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.following_id) as followers
+        "), 'followers.following_id', '=', 'u.id')
+        ->leftJoin(DB::raw("
+            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+            FROM followers f
+            JOIN front_users fu ON fu.id = f.following_id
+            WHERE fu.is_soft_delete = 0
+            GROUP BY f.follower_id) as following
+        "), 'following.follower_id', '=', 'u.id')
+        ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
+        ->where(function ($q) {
+            $q->where('video_type_language.is_default', 1)
+              ->orWhere('v.video_type', 0);
+        })
+        ->where('v.status', 1)
+        ->where('v.is_soft_delete', 0);
+
+        if (isset($input['search']['value']) && $input['search']['value'] != '') {
+            $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
+        }
+        if (isset($input['user']) && $input['user'] != '') {
+            $baseQuery->where('v.front_user_id', $input['user']);
+        }
+        if (isset($input['video_type']) && $input['video_type'] != '') {
+            $baseQuery->where('v.video_type', $input['video_type']);
+        }
+        if (isset($input['title']) && $input['title'] != '') {
+            $baseQuery->where('v.title', 'LIKE', '%' . $input['title'] . '%');
+        }
+        if (isset($input['tags']) && $input['tags'] != '') {
+            $baseQuery->where('v.tags', 'LIKE', '%' . $input['tags'] . '%');
+        }
+        $baseQuery->where(function ($query) {
+            $query->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
+        });
+
+        // Exclude those videos which are from blocked user
+        if($user){
+            $blocked_users = DB::table('blocked_users')
+                                    ->where('blocked_by', $user->id)
+                                    ->pluck('blocked_user');
+            if($blocked_users){
+                $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
+            }
+        }
+            
+        // NORMAL VIDEOS
+        $normalQuery = clone $baseQuery;
+
+        // is_following = 1, this bit is used to get only following videos
+
+        if(isset($input['is_following']) && $input['is_following'] == 1){
+            // do nothing
+        }
+        else{
+            if($country){
+                $normalQuery->where('v.country', $country);
+            }
+            if(!empty($cities_ids)){
+                $normalQuery->whereIn('v.city', $cities_ids);
+            }
+        }
+
+        if($user){
+            $follower_id = $user->id;
+            $followingIds = DB::table('followers')
+                                    ->where('follower_id', $follower_id)
+                                    ->pluck('following_id');
+
+            if(isset($input['is_following']) && $input['is_following'] == 1){
+                $normalQuery->where(function ($q) use ($followingIds) {
+                    $q->where('v.publish_type', 2)
+                        ->orWhere('v.publish_type', 1);
+                });
+                $normalQuery->whereIn('v.front_user_id', $followingIds);
+            }
+            else{
+                $normalQuery->where(function ($q) use ($followingIds) {
+                    $q->where('v.publish_type', 2)
+                        ->orWhere(function ($iq) use ($followingIds) {
+                            $iq->where('v.publish_type', 1)
+                                ->whereIn('v.front_user_id', $followingIds);
+                        });
+                });
+            }
+        }
+        else{
+            $normalQuery->where('v.publish_type', 2);
+        }
+        
+        $normalQuery->leftJoin('sponsored_videos as sv', function ($join) use ($cities_ids, $input) {
+            $join->on('sv.video_id', '=', 'v.id');
+
+            // Add OR conditions using FIND_IN_SET
+            if(isset($input['is_following']) && $input['is_following'] == 1){
+                // do nothing
+            }
+            else{
+                $join->where(function ($query) use ($cities_ids) {
+                    foreach ($cities_ids as $cityId) {
+                        $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
+                    }
+                });
+            }
+        });
+
+        $normalQuery->where(function ($q) {
+            $q->where('v.is_sponsored', 0)
+                ->whereNull('sv.video_id');
+        });
+
+        $normalVideos = $normalQuery->inRandomOrder()->select([
+            'v.*', 'sv.sponsor_type',
+            'video_type_description.name as video_type_name',
+            'u.name as user_name',
+            'u.email as user_email',
+            'u.image as user_image',
+            'ba.contact_phone',
+            'ba.contact_email',
+            'ba.website',
+            'ba.location',
+            'ba.latitude',
+            'ba.longitude',
+            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
+            DB::raw('COALESCE(following.following_count, 0) as following_count')
+        ])->get();
+
+        // SPONSORED VIDEOS
+        $sponsoredQuery = clone $baseQuery;
+        $sponsoredQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
+        ->where(function ($query) use ($cities_ids) {
+            foreach ($cities_ids as $cityId) {
+                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
+            }
+        })
+        ->where('sv.sponsor_type', 1);
+
+        $sponsoredVideos = $sponsoredQuery->inRandomOrder()->select([
+            'v.*', 'sv.sponsor_type',
+            'video_type_description.name as video_type_name',
+            'u.name as user_name',
+            'u.email as user_email',
+            'u.image as user_image',
+            'ba.contact_phone',
+            'ba.contact_email',
+            'ba.website',
+            'ba.location',
+            'ba.latitude',
+            'ba.longitude',
+            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
+            DB::raw('COALESCE(following.following_count, 0) as following_count')
+        ])->get();
+
+        // PREMIUM SPONSORED VIDEOS
+        $premiumQuery = clone $baseQuery;
+        $premiumQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
+            ->where(function ($query) use ($cities_ids) {
+            foreach ($cities_ids as $cityId) {
+                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
+            }
+        })
+        ->where('sv.sponsor_type', 2);
+
+        $premiumSponsoredVideos = $premiumQuery->inRandomOrder()->select([
+            'v.*', 'sv.sponsor_type',
+            'video_type_description.name as video_type_name',
+            'u.name as user_name',
+            'u.email as user_email',
+            'u.image as user_image',
+            'ba.contact_phone',
+            'ba.contact_email',
+            'ba.website',
+            'ba.location',
+            'ba.latitude',
+            'ba.longitude',
+            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
+            DB::raw('COALESCE(following.following_count, 0) as following_count')
+        ])->get();
+
+        // MERGE VIDEO LOGIC
         $finalList = [];
         $normalCount = 0;
         $sponsoredIndex = 0;
