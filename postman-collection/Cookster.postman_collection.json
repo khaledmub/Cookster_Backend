@@ -286,29 +286,45 @@
 							"formdata": [
 								{
 									"key": "type",
-									"value": "4",
+									"value": "1",
 									"description": "1 for General Search, 2 for Business Accounts, 3 for Chef Accounts, 4 for Top Rated",
 									"type": "text"
 								},
 								{
 									"key": "keywords",
-									"value": "a",
+									"value": "t",
 									"type": "text"
 								},
 								{
 									"key": "country",
 									"value": "Qatar",
-									"type": "text"
+									"description": "not using it",
+									"type": "text",
+									"disabled": true
 								},
 								{
 									"key": "city",
-									"value": "Doha",
-									"type": "text"
+									"value": "134555",
+									"description": "using id now",
+									"type": "text",
+									"disabled": true
 								},
 								{
 									"key": "is_following",
 									"value": "1",
 									"description": "For \"Following\" tab",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "latitude",
+									"value": "30.33920000",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "longitude",
+									"value": "48.30430000",
 									"type": "text",
 									"disabled": true
 								}
@@ -2552,13 +2568,14 @@
 								{
 									"key": "country",
 									"value": "Pakistan",
+									"description": "not using it",
 									"type": "text",
 									"disabled": true
 								},
 								{
 									"key": "city",
-									"value": "Lahore",
-									"description": "Optional",
+									"value": "134555",
+									"description": "Optional (using id now)",
 									"type": "text",
 									"disabled": true
 								},
@@ -2572,6 +2589,18 @@
 									"key": "is_following",
 									"value": "1",
 									"description": "For \"Following\" tab",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "latitude",
+									"value": "31.4244844",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "longitude",
+									"value": "74.2837742",
 									"type": "text",
 									"disabled": true
 								}
@@ -2652,6 +2681,55 @@
 							],
 							"path": [
 								"list2"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Liked Videos List",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_ids",
+									"value": "7539ce9a-5faa-4086-ac2c-d300dce73757,7539ce9a-5faa-4086-ac2c-d300dce73758",
+									"description": "Comma Seperated",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/liked_videos_list",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"liked_videos_list"
 							]
 						}
 					},

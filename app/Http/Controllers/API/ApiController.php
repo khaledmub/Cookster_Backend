@@ -2632,11 +2632,6 @@ class ApiController extends Controller
         $page = $input['page'] ?? 1; // Default to page 1 if not provided
         $length = 100000; // Number of records per page
         $start = ($page - 1) * $length;
-
-        $follower_id = $user->id;
-        $followingIds = DB::table('followers')
-        ->where('follower_id', $follower_id)
-        ->pluck('following_id');
         
         $query=DB::table('videos as v');
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
@@ -2679,6 +2674,8 @@ class ApiController extends Controller
         }
         $query->where('v.status', 1);
         $query->where('sv.front_user_id', $user->id);
+        $query->where('v.is_soft_delete', 0);
+
         $query1 = clone $query;
         $query2 = clone $query;
 
@@ -2687,6 +2684,73 @@ class ApiController extends Controller
         // $query2->orderBy('v.system_id', 'DESC');
         $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
         DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('sv.system_id', 'DESC')->get();
+        
+        return response()->json([
+            'status' => true,
+            'videos' => $videos,
+        ], 200);
+    }
+    public function liked_videos_list(Request $request){
+        $input = $request->all();
+        $page = $input['page'] ?? 1; // Default to page 1 if not provided
+        $length = 100000; // Number of records per page
+        $start = ($page - 1) * $length;
+        $videos = [];
+
+        if(isset($input['video_ids']) && $input['video_ids'] != ''){
+            $video_ids = explode(',', $input['video_ids']);
+            
+            $query=DB::table('videos as v');
+            $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
+            $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.follower_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.following_id) as followers
+            "), 'followers.following_id', '=', 'u.id');
+            $query->leftJoin(DB::raw("
+                (SELECT f.follower_id, COUNT(f.following_id) as following_count 
+                FROM followers f
+                JOIN front_users fu ON fu.id = f.following_id
+                WHERE fu.is_soft_delete = 0
+                GROUP BY f.follower_id) as following
+            "), 'following.follower_id', '=', 'u.id');
+            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
+            $query->where(function ($q){
+                $q->where('video_type_language.is_default', 1)
+                ->orWhere('v.video_type', 0); 
+            });
+            $query->where(function ($q) {
+                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
+            });
+            
+            if(isset($input['search']['value']) && $input['search']['value']!=''){
+                $query->where('v.title', 'LIKE', '%'.$input['search']['value'].'%');
+            }
+            if(isset($input['user']) && $input['user']!=''){
+                $query->where('v.front_user_id', $input['user']);
+            }
+            if(isset($input['video_type']) && $input['video_type']!=''){
+                $query->where('v.video_type', $input['video_type']);
+            }
+            if(isset($input['title']) && $input['title']!=''){
+                $query->where('v.title', 'LIKE', '%'.$input['title'].'%');
+            }
+            $query->where('v.status', 1);
+            $query->where('v.is_soft_delete', 0);
+            $query->whereIn('v.id', $video_ids);
+            $query->distinct();
+
+            $query1 = clone $query;
+            $query2 = clone $query;
+
+            $totalData = $query1->select(['v.id'])->count();
+            $query2->offset($start)->limit($length);
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
+            DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('v.system_id', 'DESC')->get();
+        }
         
         return response()->json([
             'status' => true,

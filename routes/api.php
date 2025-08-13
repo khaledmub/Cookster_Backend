@@ -73,6 +73,7 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         Route::post('/videos/save_unsave', [ApiController::class, 'video_save_unsave']);
         Route::post('/videos/saved_list', [ApiController::class, 'saved_videos_list']);
+        Route::post('/videos/liked_videos_list', [ApiController::class, 'liked_videos_list']);
         Route::post('/videos/update_average_rating', [ApiController::class, 'update_video_average_rating']);
 
         Route::post('/videos/sponsor/add', [ApiController::class, 'add_video_sponsor']);
