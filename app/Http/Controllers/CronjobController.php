@@ -20,7 +20,7 @@ class CronjobController extends Controller
 
     public function delete_expire_sponsored_videos(Request $request){
         // http://localhost/cookster_admin/public/delete_expire_sponsored_videos
-        DB::table('sponsored_videos')->where('end_date', '<', Carbon::today())->delete();
+        DB::table('sponsored_videos')->where('end_date', '<', Carbon::now())->delete();
         return response()->json([
             'status' => true,
             'message' => 'Executed Successfully!',
