@@ -22,7 +22,8 @@ class ProfanityFilterService
     public function hasProfanity(string $text): bool
     {
         foreach ($this->badWords as $word) {
-            if (stripos($text, $word) !== false) {
+            $pattern = '/\b' . preg_quote($word, '/') . '\b/iu'; // \b ensures whole word match
+            if (preg_match($pattern, $text)) {
                 return true;
             }
         }
@@ -32,7 +33,7 @@ class ProfanityFilterService
     public function clean(string $text): string
     {
         foreach ($this->badWords as $word) {
-            $pattern = '/' . preg_quote($word, '/') . '/iu'; // 'u' flag for Arabic UTF-8
+            $pattern = '/\b' . preg_quote($word, '/') . '\b/iu';
             $replacement = str_repeat('*', mb_strlen($word));
             $text = preg_replace($pattern, $replacement, $text);
         }

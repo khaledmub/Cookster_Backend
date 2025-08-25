@@ -438,6 +438,7 @@ class ApiController extends Controller
     }
     public function profile(){
         $user = Auth::user();
+        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $user->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
         $language = App::getLocale();
         $additional_data = array();
         $form_settings = array();
@@ -1329,7 +1330,7 @@ class ApiController extends Controller
     public function profile_details(Request $request){
         $input = $request->all();
         $language = App::getLocale();
-        $user = DB::table('front_users')->where('id', $request->id)->first();
+        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
         $additional_data = array();
         if($user->entity==2){
             $additional_data = DB::table('business_account_additional_data as b')->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type')->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id')->where('key_language.code', $language)->where('b.front_user_id', $user->id)->select('b.*', 'bt.name as business_type_name')->first();
