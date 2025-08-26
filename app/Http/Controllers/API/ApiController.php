@@ -926,6 +926,7 @@ class ApiController extends Controller
         $input = $request->all();
         $keywords = $input['keywords'];
         $videos = array();
+        $users = array();
         $business_accounts = array();
         $chef_accounts = array();
 
@@ -1319,12 +1320,97 @@ class ApiController extends Controller
             $query2->offset($start)->limit($length);
             $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
         }
+        else if($input['type']==6){
+            $query=DB::table('front_users');
+            $query->where(function ($q) use ($keywords){
+                $q->where('name', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('email', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('phone', 'LIKE', '%'.$keywords.'%');
+            });
+
+            if($user && isset($input['is_following']) && $input['is_following'] == 1){
+                $query->whereIn('id', $followingIds);
+            }
+            else{
+                if($country != 0){
+                    $query->where('country', $country);
+                }
+
+                if(!empty($cities_ids)){
+                    $query->whereIn('city', $cities_ids);
+                }
+            }
+
+            // Exclude those videos which are from blocked user
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('id', $blocked_users);
+                }
+            }
+
+            $query->where('status', 1);
+            $query->where('is_soft_delete', 0);
+            $users = $query->select(['*'])->inRandomOrder()->get();
+        }
+        else if($input['type']==7){
+            $avgSubquery = DB::table('user_reviews')
+                ->select('reviewed_user_id', DB::raw('AVG(rating) as average_rating'))
+                ->groupBy('reviewed_user_id');
+
+            $query=DB::table('front_users as ba');
+            $query->join('business_account_additional_data as ad', 'ad.front_user_id', '=', 'ba.id');
+            $query->leftJoinSub($avgSubquery, 'avg_reviews', function ($join) {
+                $join->on('avg_reviews.reviewed_user_id', '=', 'ba.id');
+            });
+            $query->leftJoin('generic_key_values_description as business_type_description', 'business_type_description.value_id', '=', 'ad.business_type')->leftJoin('site_languages as business_type_language', 'business_type_description.language_id', '=', 'business_type_language.id');
+            $query->where(function ($q){
+                $q->where('business_type_language.is_default', 1)
+                  ->orWhere('ad.business_type', 0); 
+            });
+            $query->where(function ($q) use ($keywords){
+                $q->where('ba.name', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ba.email', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ba.phone', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ad.contact_phone', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ad.contact_email', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ad.website', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('ad.location', 'LIKE', '%'.$keywords.'%');
+                $q->orWhere('business_type_description.name', 'LIKE', '%'.$keywords.'%');
+            });
+
+            if($user && isset($input['is_following']) && $input['is_following'] == 1){
+                $query->whereIn('ba.id', $followingIds);
+            }
+            else{
+                if($country != 0){
+                    $query->where('ba.country', $country);
+                }
+
+                if(!empty($cities_ids)){
+                    $query->whereIn('ba.city', $cities_ids);
+                }
+            }
+
+            // Exclude those videos which are from blocked user
+            if($user){
+                if($blocked_users){
+                    $query->whereNotIn('ba.id', $blocked_users);
+                }
+            }
+
+            $query->where('ba.entity', 2);
+            $query->where('ba.status', 1);
+            $query->where('ba.is_soft_delete', 0);
+            $query->where('avg_reviews.average_rating', 5);
+            $business_accounts = $query->select(['ba.*', 'ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name'])->inRandomOrder()->get();
+        }
 
         return response()->json([
             'status' => true,
             'videos' => $videos,
+            'users' => $users,
             'business_accounts' => $business_accounts,
-            'chef_accounts' => $chef_accounts,
+            'chef_accounts' => $chef_accounts
         ], 200);
     }
     public function profile_details(Request $request){
