@@ -1332,13 +1332,13 @@ class ApiController extends Controller
                 $query->whereIn('id', $followingIds);
             }
             else{
-                if($country != 0){
-                    $query->where('country', $country);
-                }
+                // if($country != 0){
+                //     $query->where('country', $country);
+                // }
 
-                if(!empty($cities_ids)){
-                    $query->whereIn('city', $cities_ids);
-                }
+                // if(!empty($cities_ids)){
+                //     $query->whereIn('city', $cities_ids);
+                // }
             }
 
             // Exclude those videos which are from blocked user
