@@ -127,25 +127,35 @@ class NotificationsController extends Controller
         $input = $request->all();
 
         /* Push Notification Code Start */
-        $query = DB::table('front_users');
-        if($request->front_user_id){
-            $query->where('id', $request->front_user_id);
-        }
-        if($request->to_type > 0){
-            $query->where('entity', $request->to_type);
-        }
-        $deviceTokens = $query->whereNotNull('uuid')->pluck('uuid')->toArray();
+        $push_notification_text = [
+            'title' => $request->title,
+            'text' => $request->text,
+            'notification_data' => [
+                'status' => true
+            ]
+        ];
 
-        if(!empty($deviceTokens)){
-            $notification_data = [
-                'status' => true,
-            ];
-            $push_notification_text = [
-                'title' => $request->title,
-                'text' => $request->text,
-                'notification_data' => $notification_data
-            ];
-            AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+        if(empty($request->front_user_id)){
+            if((int)$request->to_type == 0){
+                AppHelper::send_push_notification_topic($push_notification_text, 'cookster');
+            }
+            else{
+                $topic = 'type_' . $request->to_type;
+                AppHelper::send_push_notification_topic($push_notification_text, $topic);
+            }
+        }
+        else{
+            $query = DB::table('front_users')->where('id', $request->front_user_id);
+
+            if($request->to_type > 0){
+                $query->where('entity', $request->to_type);
+            }
+
+            $deviceTokens = $query->whereNotNull('uuid')->pluck('uuid')->toArray();
+
+            if(!empty($deviceTokens)){
+                AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+            }
         }
         /* Push Notification Code End */
 

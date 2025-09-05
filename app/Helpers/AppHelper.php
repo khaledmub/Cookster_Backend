@@ -327,6 +327,54 @@ class AppHelper
             ->then($handleResponses)
             ->wait();
     }
+    public static function send_push_notification_topic($push_notification_text, $topic){
+        $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+        // create middleware
+        $middleware = ApplicationDefaultCredentials::getMiddleware($scopes);
+        $stack = HandlerStack::create();
+        $stack->push($middleware);
+
+        $client = new Client([
+            'handler' => $stack,
+            'auth' => 'google_auth'
+        ]);
+      
+        $messages = [];
+        $notification_data = array_map('strval', $push_notification_text['notification_data']);
+        $single_message_data = [
+            'topic' => $topic,
+            'notification' => [
+                'title' => $push_notification_text['title'],
+                'body' => $push_notification_text['text'],
+            ],
+            'data' => $notification_data,
+        ];
+        $messages[] = $single_message_data;
+
+        ### Create message request promises
+        $promises = function() use ($client, $messages) {
+            foreach ($messages as $message) {
+                yield $client->requestAsync('POST', 'https://fcm.googleapis.com/v1/projects/cockster-e477a/messages:send', [
+                    'json' => ['message' => $message],
+                ]);
+            }
+        };
+        ### Create response handler
+        $handleResponses = function (array $responses) {
+            foreach ($responses as $response) {
+                if ($response['state'] === Promise\PromiseInterface::FULFILLED) {
+                    // $response['value'] is an instance of \Psr\Http\Message\RequestInterface
+                    // echo $response['value']->getBody();
+                } elseif ($response['state'] === Promise\PromiseInterface::REJECTED) {
+                    // $response['reason'] is an exception
+                    // echo $response['reason']->getMessage();
+                }
+            }
+        };
+        Promise\Utils::settle($promises())
+            ->then($handleResponses)
+            ->wait();
+    }
     public static function call_curl_request($url){
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
