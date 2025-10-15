@@ -186,6 +186,41 @@
                         </div>
                     </div>
                 </div>
+                <div class="col-md-12">
+                    <div class="card mb-4 total_table_card">
+                        <div class="card-header" style="border-radius: 1.02rem 1.02rem 0 0;">
+                            <h5 class="mb-0">Loyalty Points</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Enable Loyalty Points</label><br>
+                                        <input type="checkbox" name="loyalty_points_status" placeholder="" class="" value="1" {{ $setting->loyalty_points_status ? 'checked' : '' }}>
+                                    </div>
+                                </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">1 {{ $setting->currency_symbol }} = How Much Points</label>
+                                        <input type="number" step="0.01" name="loyalty_points_exchange_rate" placeholder="" class="form-control" value="{{ $setting->loyalty_points_exchange_rate }}">
+                                    </div>
+                                </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">No. of Points to give for first time</label>
+                                        <input type="number" step="0.01" name="first_loyalty_points" placeholder="" class="form-control" value="{{ $setting->first_loyalty_points }}">
+                                    </div>
+                                </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">No. of Points to give</label>
+                                        <input type="number" step="0.01" name="loyalty_points" placeholder="" class="form-control" value="{{ $setting->loyalty_points }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="col-xs-12 col-sm-12 col-md-12 text-end mb-3">
                     <button type="submit" class="btn btn-primary waves-effect waves-light"><i class="fa-solid fa-floppy-disk"></i> Submit</button>
                 </div>

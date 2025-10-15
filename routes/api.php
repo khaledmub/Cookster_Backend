@@ -101,5 +101,14 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::post('/add_user_review', [ApiController::class, 'add_user_review']);
         Route::post('/update_review_status', [ApiController::class, 'update_review_status']);
         Route::post('/update_review_visibility', [ApiController::class, 'update_review_visibility']);
+
+        //User Loyalty Points
+        Route::post('/user_loyalty_points/add', [ApiController::class, 'add_user_loyalty_points']);
+        Route::get('/user_loyalty_points/history', [ApiController::class, 'user_loyalty_points_history']);
+
+        //User QR Code Scan
+        Route::post('/user_qrcode_scan_history/add', [ApiController::class, 'add_user_qrcode_scan_history']);
+        Route::get('/user_qrcode_scan_history', [ApiController::class, 'user_qrcode_scan_history']);
+        Route::get('/user_loyalty_points/settings', [ApiController::class, 'user_loyalty_points_settings']);
     });
 });

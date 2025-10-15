@@ -41,7 +41,7 @@
                         }
                         @endphp
                         <img src="{{$image}}" alt="user-img"
-                            class="img-thumbnail rounded-circle" />
+                            class="img-thumbnail rounded-circle" style="max-height: 100%;" />
                     </div>
                 </div>
                 <!--end col-->
@@ -70,6 +70,13 @@
                                         class="d-none d-md-inline-block">Info</span>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link fs-14" data-bs-toggle="tab" href="#points_history"
+                                    role="tab">
+                                    <i class="ri-airplay-fill d-inline-block d-md-none"></i> <span
+                                        class="d-none d-md-inline-block">Loyalty Points History</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                     <!-- Tab panes -->
@@ -94,6 +101,50 @@
                                                             <th class="" scope="row">City</th>
                                                             <td class="text-muted">{{$data['general_data']->city_name}}</td>
                                                         </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div><!-- end card body -->
+                                    </div><!-- end card -->
+                                </div>
+                            </div>
+                            <!--end row-->
+                        </div>
+                        <div class="tab-pane" id="points_history" role="tabpanel">
+                            <div class="row">
+                                <div class="col-xxl-12">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h4 class="mb-0">Total Loyalty Points: <b>{{ $data['general_data']->total_loyalty_points }}</b></h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Business</th>
+                                                            <th>Type</th>
+                                                            <th>Points</th>
+                                                            <th>Date</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($data['loyalty_points_history'] as $history)
+                                                        <tr>
+                                                            <td>{{ $history->business_name }}</td>
+                                                            <td>
+                                                                @if($history->type == 1)
+                                                                Points Earned
+                                                                @elseif($history->type == 2)
+                                                                Points Used
+                                                                @else
+                                                                -
+                                                                @endif
+                                                            </td>
+                                                            <td class="{{ $history->debit? 'text-danger': '' }}">{{ $history->debit? $history->debit: $history->credit }}</td>
+                                                            <td>{{ date(env('DATE_FORMAT'), strtotime($history->created_at)) }}</td>
+                                                        </tr>
+                                                        @endforeach
                                                     </tbody>
                                                 </table>
                                             </div>

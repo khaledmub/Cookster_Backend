@@ -38,6 +38,7 @@
                                          <th>Name</th>
                                          <th>Email</th>
                                          <th>DOB</th>
+                                         <th>Loyalty Points</th>
                                          <th>Is Soft Delete?</th>
                                          <th>Status</th>
                                          <th width="280px">Action</th>

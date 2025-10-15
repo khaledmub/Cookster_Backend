@@ -4,9 +4,7 @@ namespace App\Helpers;
 use Illuminate\Support\Facades\DB;
 use App\Models\Setting;
 use App\Models\User;
-use App\Models\Customer;
-use App\Models\WalletTransaction;
-use App\Models\LoyaltyPointTransaction;
+use App\Models\FrontUser;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use DateTime;
@@ -473,5 +471,59 @@ class AppHelper
         DB::table('user_payments')->insert($ins_data);
 
         return true;
+    }
+    public static function add_user_loyalty_points($customer_id, $business_id, $type, $points){
+        // $type = 1:Points Earned, 2:Points Used
+
+        $customer_user = FrontUser::where('id', $customer_id)->first();
+        $credit = 0;
+        $debit = 0;
+
+        $ins_data = array();
+        $ins_data['id'] = (string) \Str::uuid();
+        $ins_data['customer_id'] = $customer_id;
+        $ins_data['business_id'] = $business_id;
+        $ins_data['type'] = $type;
+
+        if($type == 1){
+            $credit = $points;
+        }
+        else if($type == 2){
+            $debit = $points;
+        }
+
+        $current_balance = $customer_user->total_loyalty_points + $credit - $debit;
+
+        $ins_data['credit'] = $credit;
+        $ins_data['debit'] = $debit;
+        $ins_data['balance'] = $current_balance;
+
+        DB::table('user_loyalty_points_history')->insert($ins_data);
+
+        $customer_user->total_loyalty_points = $current_balance;
+        $customer_user->save();
+
+        return $customer_user->total_loyalty_points;
+    }
+    public static function add_user_qrcode_scan_history($business_id, $customer_id, $points, $amount){
+        $business_user = FrontUser::where('id', $business_id)->first();
+
+        $ins_data = array();
+        $ins_data['id'] = (string) \Str::uuid();
+        $ins_data['business_id'] = $business_id;
+        $ins_data['customer_id'] = $customer_id;
+        $ins_data['points'] = $points;
+        $ins_data['amount'] = $amount;
+
+        $current_balance = $business_user->total_outstanding_balance + $amount;
+
+        $ins_data['balance'] = $current_balance;
+
+        DB::table('user_qrcode_scan_history')->insert($ins_data);
+
+        $business_user->total_outstanding_balance = $current_balance;
+        $business_user->save();
+
+        return $business_user->total_outstanding_balance;
     }
 }

@@ -2863,6 +2863,7 @@ class ApiController extends Controller
             )) AS distance
         "))
         ->where('u.status', 1)
+        ->where('u.is_soft_delete', 0)
         ->where('u.entity', 2)
         ->having('distance', '<=', $radius)
         ->orderBy('distance');
@@ -3232,6 +3233,119 @@ class ApiController extends Controller
             'status' => true,
             'message' => __('messages.review_visibility_updated_successfully')
         ]);
+    }
+
+    //User Loyalty Points
+    public function add_user_loyalty_points(Request $request){
+        $validator = Validator::make($request->all(), [
+            'business_id' => 'required'
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $settings = DB::table('settings')->where('id', 1)->first();
+        if($settings && $settings->loyalty_points_status == 1){
+            $user = Auth::user();
+
+            // Check if points history exists for the customer against the business. If first time then add first time loyalty points, otherwise normal
+            $history_exists = DB::table('user_loyalty_points_history')->where(['customer_id' => $user->id, 'business_id' => $request->business_id])->first();
+            $points = $history_exists? $settings->loyalty_points: $settings->first_loyalty_points;
+
+            $user_total_loyalty_points = AppHelper::add_user_loyalty_points($user->id, $request->business_id, 1, $points);
+
+            return response()->json([
+                'status' => true,
+                'message' => __('messages.loyalty_points_added_successfully'),
+                'total_loyalty_points' => $user_total_loyalty_points
+            ], 200);
+        }
+        else{
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.loyalty_points_promotion_has_been_ended')
+            ], 422);
+        }
+    }
+    public function user_loyalty_points_history(Request $request) {
+        $user = Auth::user();
+
+        $loyalty_points_history = DB::table('user_loyalty_points_history as p')
+            ->leftJoin('front_users as u', 'u.id', '=', 'p.business_id')
+            ->where('p.customer_id', $user->id)
+            ->orderBy('p.system_id', 'DESC')
+            ->select(['p.*', 'u.name as business_name'])->get();
+
+        return response()->json([
+            'status' => true,
+            'loyalty_points_history' => $loyalty_points_history
+        ], 200);
+    }
+
+    //User QR Code Scan
+    public function add_user_qrcode_scan_history(Request $request){
+        $validator = Validator::make($request->all(), [
+            'customer_id' => 'required',
+            'amount' => 'required'
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $settings = DB::table('settings')->where('id', 1)->first();
+
+        $customer_user = DB::table('front_users')->where('id', $request->customer_id)->first();
+        $requiredPoints = $request->amount * $settings->loyalty_points_exchange_rate;
+        $currentPoints = $customer_user->total_loyalty_points;
+
+        if($currentPoints < $requiredPoints){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.loyalty_points_are_insufficient')
+            ], 422);
+        }
+
+        // Add scan history for the given discount by business to the customer
+        $user_total_outstanding_balance = AppHelper::add_user_qrcode_scan_history($user->id, $request->customer_id, $requiredPoints, $request->amount);
+
+        // Deduct loyalty points from customer
+        AppHelper::add_user_loyalty_points($request->customer_id, $user->id, 2, $requiredPoints);
+
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.discount_given_successfully'),
+            'total_outstanding_balance' => $user_total_outstanding_balance
+        ], 200);
+    }
+    public function user_qrcode_scan_history(Request $request) {
+        $user = Auth::user();
+
+        $qrcode_scan_history = DB::table('user_qrcode_scan_history as h')
+            ->leftJoin('front_users as u', 'u.id', '=', 'h.customer_id')
+            ->where('h.business_id', $user->id)
+            ->orderBy('h.system_id', 'DESC')
+            ->select(['h.*', 'u.name as customer_name'])->get();
+
+        return response()->json([
+            'status' => true,
+            'qrcode_scan_history' => $qrcode_scan_history
+        ], 200);
+    }
+    public function user_loyalty_points_settings(){
+        $settings = DB::table('settings')->where('id', 1)->select(['loyalty_points_exchange_rate'])->first();
+        return response()->json([
+            'status' => true,
+            'settings' => $settings,
+        ], 200);
     }
 
     // General

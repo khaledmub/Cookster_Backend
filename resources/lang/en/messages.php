@@ -55,4 +55,8 @@ return [
     'user' => "User",
     'review_status_updated_successfully' => "Review status updated successfully.",
     'review_visibility_updated_successfully' => "Review visibility updated successfully.",
+    'loyalty_points_added_successfully' => "Loyalty points added successfully.",
+    'loyalty_points_promotion_has_been_ended' => "Loyalty points promotion has been ended.",
+    'loyalty_points_are_insufficient' => "Loyalty points are insufficient.",
+    'discount_given_successfully' => "Discount given successfully.",
 ];

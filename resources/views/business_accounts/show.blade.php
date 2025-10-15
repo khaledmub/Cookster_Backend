@@ -41,7 +41,7 @@
                         }
                         @endphp
                         <img src="{{$image}}" alt="user-img"
-                            class="img-thumbnail rounded-circle" />
+                            class="img-thumbnail rounded-circle" style="max-height: 100%;" />
                     </div>
                 </div>
                 <!--end col-->
@@ -75,6 +75,13 @@
                                     role="tab">
                                     <i class="ri-airplay-fill d-inline-block d-md-none"></i> <span
                                         class="d-none d-md-inline-block">Subscription History</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link fs-14" data-bs-toggle="tab" href="#qrcode_scan"
+                                    role="tab">
+                                    <i class="ri-airplay-fill d-inline-block d-md-none"></i> <span
+                                        class="d-none d-md-inline-block">QR Code Scan History</span>
                                 </a>
                             </li>
                         </ul>
@@ -150,6 +157,50 @@
                                                             <td>{{date(env('DATE_FORMAT'), strtotime($history->end_date))}}</td>
                                                             <td>{{$history->duration}} Month/s</td>
                                                             <td>{{\App\Helpers\AppHelper::currency_formatter($history->amount)}}</td>
+                                                        </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div><!-- end card body -->
+                                    </div><!-- end card -->
+                                </div>
+                            </div>
+                            <!--end row-->
+                        </div>
+                        <div class="tab-pane" id="qrcode_scan" role="tabpanel">
+                            <div class="row">
+                                <div class="col-xxl-12">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h4 class="mb-0">Total Outstanding Balance: <b>{{ \App\Helpers\AppHelper::currency_formatter($data['general_data']->total_outstanding_balance) }}</b></h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Customer</th>
+                                                            <th>Points Converted</th>
+                                                            <th>Discount Given</th>
+                                                            <th>Date</th>
+                                                            <th>Is Cleared?</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($data['qrcode_scan_history'] as $history)
+                                                        <tr>
+                                                            <td>{{ $history->customer_name }}</td>
+                                                            <td>{{ $history->points }}</td>
+                                                            <td>{{ \App\Helpers\AppHelper::currency_formatter($history->amount) }}</td>
+                                                            <td>{{ date(env('DATE_FORMAT'), strtotime($history->created_at)) }}</td>
+                                                            <td>
+                                                                @if($history->is_cleared == 1)
+                                                                    <span class="badge bg-success">Yes</span>
+                                                                @else
+                                                                    <span class="badge bg-danger">No</span>
+                                                                @endif
+                                                            </td>
                                                         </tr>
                                                         @endforeach
                                                     </tbody>

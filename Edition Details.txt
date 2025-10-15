@@ -268,6 +268,20 @@ Database Changes
 
 ==========================================================================
 
+Phase: 2.9
+Development Start Date: 07-October-2025
+Developer: HA
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- Create tables "user_loyalty_points_history", "user_qrcode_scan_history"
+- ALTER TABLE `front_users` ADD `total_loyalty_points` DECIMAL(8,2) NOT NULL DEFAULT '0' COMMENT 'This is for Personal accounts' AFTER `current_subscription_id`, ADD `total_outstanding_balance` DECIMAL(8,2) NOT NULL DEFAULT '0' COMMENT 'This is for Business accounts' AFTER `total_loyalty_points`;
+- ALTER TABLE `front_users` CHANGE `total_loyalty_points` `total_loyalty_points` FLOAT NOT NULL DEFAULT '0.00' COMMENT 'This is for Personal accounts', CHANGE `total_outstanding_balance` `total_outstanding_balance` FLOAT NOT NULL DEFAULT '0.00' COMMENT 'This is for Business accounts';
+- ALTER TABLE `settings` ADD `first_loyalty_points` FLOAT NOT NULL DEFAULT '0' AFTER `app_store_link`, ADD `loyalty_points` FLOAT NOT NULL DEFAULT '0' AFTER `first_loyalty_points`, ADD `loyalty_points_exchange_rate` FLOAT NOT NULL DEFAULT '0' AFTER `loyalty_points`;
+- ALTER TABLE `settings` ADD `loyalty_points_status` TINYINT(4) NOT NULL DEFAULT '1' AFTER `loyalty_points_exchange_rate`;
+
+==========================================================================
+
 
 
 Personal Account Token

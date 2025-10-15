@@ -151,4 +151,19 @@ class DashboardController extends Controller
         DB::table('user_reviews')->where('id',$input['id'])->update($data);
         return response()->json(['status' => true, 'message' => 'Visibility changed successfully!']);
     }
+    public function clear_outstanding_balance(Request $request){
+        $input = $request->all();
+
+        $user_data = array(
+            'total_outstanding_balance' => 0
+        );
+        DB::table('front_users')->where('id', $input['id'])->update($user_data);
+
+        $data = array(
+            'is_cleared' => 1
+        );
+        DB::table('user_qrcode_scan_history')->where('is_cleared', 0)->where('business_id', $input['id'])->update($data);
+
+        return response()->json(['status' => true, 'message' => 'Outstanding balance cleared successfully!']);
+    }
 }

@@ -21,6 +21,7 @@ class FrontUser extends Authenticatable
         'password',
         'dob',
         'image',
+        'cover_image',
         'country',
         'state',
         'city',
@@ -28,6 +29,10 @@ class FrontUser extends Authenticatable
         'uuid',
         'is_soft_delete',
         'sd_email',
+        'current_subscription_id',
+        'total_loyalty_points',
+        'total_outstanding_balance',
+        'status',
     ];
 
     protected $hidden = [

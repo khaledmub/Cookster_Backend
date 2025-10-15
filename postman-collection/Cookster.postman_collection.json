@@ -287,7 +287,7 @@
 								{
 									"key": "type",
 									"value": "1",
-									"description": "1 for General Search, 2 for Business Accounts, 3 for Chef Accounts, 4 for Top Rated",
+									"description": "1 for General Search, 2 for Business Accounts, 3 for Chef Accounts, 4 for Top Rated, 6 for Users, 7 for Top Rated Business Accounts",
 									"type": "text"
 								},
 								{
@@ -2060,6 +2060,228 @@
 			]
 		},
 		{
+			"name": "User Loyalty Points",
+			"item": [
+				{
+					"name": "Add User Loyalty Points",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "business_id",
+									"value": "0038bb3e-d28a-4480-ab97-57817ffaf67f",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}user_loyalty_points/add",
+							"host": [
+								"{{base_url}}user_loyalty_points"
+							],
+							"path": [
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "User Loyalty Points History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}user_loyalty_points/history",
+							"host": [
+								"{{base_url}}user_loyalty_points"
+							],
+							"path": [
+								"history"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User QR Code Scan History",
+			"item": [
+				{
+					"name": "Loyalty Points Settings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}user_loyalty_points/settings",
+							"host": [
+								"{{base_url}}user_loyalty_points"
+							],
+							"path": [
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add User QR Code Scan History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "customer_id",
+									"value": "1a0a4f3d-7671-4001-a7d3-abe90f108674",
+									"type": "text"
+								},
+								{
+									"key": "amount",
+									"value": "2",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}user_qrcode_scan_history/add",
+							"host": [
+								"{{base_url}}user_qrcode_scan_history"
+							],
+							"path": [
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "User QR Code Scan History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}user_qrcode_scan_history",
+							"host": [
+								"{{base_url}}user_qrcode_scan_history"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Videos",
 			"item": [
 				{
@@ -3176,6 +3398,7 @@
 			"script": {
 				"type": "text/javascript",
 				"packages": {},
+				"requests": {},
 				"exec": [
 					""
 				]
@@ -3186,6 +3409,7 @@
 			"script": {
 				"type": "text/javascript",
 				"packages": {},
+				"requests": {},
 				"exec": [
 					""
 				]
@@ -3195,23 +3419,19 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://192.168.1.9/cookster_admin/public/api/",
-			"type": "string"
+			"value": "http://192.168.1.9/cookster_admin/public/api/"
 		},
 		{
 			"key": "language",
-			"value": "en",
-			"type": "string"
+			"value": "en"
 		},
 		{
 			"key": "bearer_token",
-			"value": "555|CvO3CJ8OajqMwJCWiVQ3B1kh1IMY4jY3U5Wbs5Ya00020142",
-			"type": "string"
+			"value": "555|CvO3CJ8OajqMwJCWiVQ3B1kh1IMY4jY3U5Wbs5Ya00020142"
 		},
 		{
 			"key": "live_base_url",
-			"value": "https://cookster.org/api/",
-			"type": "string"
+			"value": "https://cookster.org/api/"
 		}
 	]
 }

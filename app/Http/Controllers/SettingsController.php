@@ -100,6 +100,12 @@ class SettingsController extends Controller
         else{
             $input['allow_following_videos'] = 0;
         }
+        if(isset($input['loyalty_points_status']) && $input['loyalty_points_status']==1){
+            $input['loyalty_points_status'] = 1;
+        }
+        else{
+            $input['loyalty_points_status'] = 0;
+        }
         $setting->update($input);
         return redirect()->route($this->url_path.'.edit', 1)->with('success',$this->module_title_singular.' updated successfully');
     }

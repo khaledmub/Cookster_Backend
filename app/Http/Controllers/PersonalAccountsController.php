@@ -74,6 +74,7 @@ class PersonalAccountsController extends Controller
             $sub_array[] = $sdata->name;
             $sub_array[] = $sdata->email;
             $sub_array[] = $sdata->dob? date(env('DATE_FORMAT'), strtotime($sdata->dob)): '';
+            $sub_array[] = $sdata->total_loyalty_points;
             
             if($sdata->is_soft_delete==1){
                 $sub_array[] = '<span class="badge bg-success">Yes</span>';
@@ -109,6 +110,13 @@ class PersonalAccountsController extends Controller
         
         $query = DB::table('front_users')->leftJoin('countries', 'countries.id', '=', 'front_users.country')->leftJoin('states', 'states.id', '=', 'front_users.state')->leftJoin('cities', 'cities.id', '=', 'front_users.city')->select(['front_users.*', 'countries.name as country_name', 'states.name as state_name', 'cities.name as city_name']);
         $data['general_data'] = $query->where('front_users.id', $id)->first();
+
+        // QR Code Scan History
+        $data['loyalty_points_history'] = DB::table('user_loyalty_points_history as p')
+            ->leftJoin('front_users as u', 'u.id', '=', 'p.business_id')
+            ->where('p.customer_id', $id)
+            ->orderBy('p.system_id', 'DESC')
+            ->select(['p.*', 'u.name as business_name'])->get();
 
         return view($this->view_folder_name.'.show',compact('data'));
     }

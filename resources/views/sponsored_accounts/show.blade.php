@@ -41,7 +41,7 @@
                         }
                         @endphp
                         <img src="{{$image}}" alt="user-img"
-                            class="img-thumbnail rounded-circle" />
+                            class="img-thumbnail rounded-circle" style="max-height: 100%;" />
                     </div>
                 </div>
                 <!--end col-->

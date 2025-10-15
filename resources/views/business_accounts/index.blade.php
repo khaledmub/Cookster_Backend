@@ -38,6 +38,7 @@
                                          <th>Name</th>
                                          <th>Email</th>
                                          <th>Phone</th>
+                                         <th>Outstanding Balance</th>
                                          <th>Is B2B?</th>
                                          <th>Is Soft Delete?</th>
                                          <th>Status</th>

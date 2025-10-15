@@ -76,6 +76,7 @@ class BusinessAccountsController extends Controller
             $sub_array[]=$sdata->name;
             $sub_array[]=$sdata->email;
             $sub_array[]=$sdata->phone;
+            $sub_array[]=AppHelper::currency_formatter($sdata->total_outstanding_balance);
 
             if($sdata->is_b2b==1){
                 $sub_array[]='<span class="badge bg-success">Yes</span>';
@@ -93,10 +94,16 @@ class BusinessAccountsController extends Controller
 
             $sub_array[]='<div class="form-check form-switch" dir="ltr"><input class="form-check-input userStatusChanger" data-id="'.$sdata->id.'" type="checkbox" role="switch" id="flexSwitchCheckChecked" '.$checked.'></div>';
 
-            $actionshtml="";
+            $actionshtml = '<div class="d-flex flex-wrap gap-2">';
             if(auth()->user()->can($this->permission_initial)){
-                $actionshtml.='<a href="'.route($this->url_path.'.show',$sdata->id).'" class="btn btn-primary btn-icon waves-effect waves-light"><i class="fa-light fa-eye"></i></a>';
+                $actionshtml .= '<a href="'.route($this->url_path.'.show',$sdata->id).'" class="btn btn-primary btn-icon waves-effect waves-light"><i class="fa-light fa-eye"></i></a>';
+                
+                if($sdata->total_outstanding_balance > 0){
+                    $actionshtml .= '<a type="button" class="btn btn-secondary waves-effect waves-light clearOutstandingBalanceBtn" data-id="'.$sdata->id.'" data-total_outstanding_balance="'.AppHelper::currency_formatter($sdata->total_outstanding_balance).'">Clear Balance</a>';
+                }
             }
+            $actionshtml .= '</div>';
+
             $sub_array[]=$actionshtml;
             $dataToPass[]=$sub_array;
         }
@@ -132,8 +139,16 @@ class BusinessAccountsController extends Controller
         $query->select(['business_account_additional_data.*', 'business_type_description.name as business_type_name', 'countries.name as country_name', 'states.name as state_name', 'cities.name as city_name']);
         $data['additional_data'] = $query->first();
 
+        // Subscription History
         $query = DB::table('subscription_history')->leftJoin('packages', 'packages.id', '=', 'subscription_history.package_id')->leftJoin('packages_description', 'packages_description.package_id', '=', 'packages.id')->leftJoin('site_languages', 'packages_description.language_id', '=', 'site_languages.id')->where('site_languages.is_default', 1)->select(['subscription_history.*', 'packages_description.title as package_title']);
         $data['subscription_history'] = $query->where('subscription_history.front_user_id', $id)->orderBy('subscription_history.system_id', 'DESC')->get();
+
+        // QR Code Scan History
+        $data['qrcode_scan_history'] = DB::table('user_qrcode_scan_history as h')
+            ->leftJoin('front_users as u', 'u.id', '=', 'h.customer_id')
+            ->where('h.business_id', $id)
+            ->orderBy('h.system_id', 'DESC')
+            ->select(['h.*', 'u.name as customer_name'])->get();
 
         return view($this->view_folder_name.'.show',compact('data'));
     }
