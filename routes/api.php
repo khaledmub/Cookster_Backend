@@ -35,6 +35,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     /** Without Auth **/
     Route::post('/search', [ApiController::class, 'search']);
     Route::get('/profile_details', [ApiController::class, 'profile_details']);
+    Route::get('/profile_details', [ApiController::class, 'profile_details']);
     Route::get('/followers_list', [ApiController::class, 'followers_list']);
 
     // Videos
@@ -101,6 +102,7 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::post('/add_user_review', [ApiController::class, 'add_user_review']);
         Route::post('/update_review_status', [ApiController::class, 'update_review_status']);
         Route::post('/update_review_visibility', [ApiController::class, 'update_review_visibility']);
+        Route::post('/check_user_review_exists', [ApiController::class, 'check_user_review_exists']);
 
         //User Loyalty Points
         Route::post('/user_loyalty_points/add', [ApiController::class, 'add_user_loyalty_points']);

@@ -3234,6 +3234,27 @@ class ApiController extends Controller
             'message' => __('messages.review_visibility_updated_successfully')
         ]);
     }
+    public function check_user_review_exists(Request $request){
+        $validator = Validator::make($request->all(), [
+            'reviewed_user_id' => 'required'
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $input = $request->all();
+
+        $exists = DB::table('user_reviews')->where(['reviewer_id' => $user->id, 'reviewed_user_id' => $request->reviewed_user_id])->first();
+        
+        return response()->json([
+            'status' => $exists? true: false
+        ], 200);
+    }
 
     //User Loyalty Points
     public function add_user_loyalty_points(Request $request){
@@ -3340,11 +3361,14 @@ class ApiController extends Controller
             'qrcode_scan_history' => $qrcode_scan_history
         ], 200);
     }
-    public function user_loyalty_points_settings(){
+    public function user_loyalty_points_settings(Request $request){
         $settings = DB::table('settings')->where('id', 1)->select(['loyalty_points_exchange_rate'])->first();
+        $customer = DB::table('front_users')->where('id', $request->customer_id)->select(['total_loyalty_points'])->first();
+
         return response()->json([
             'status' => true,
             'settings' => $settings,
+            'customer' => $customer
         ], 200);
     }
 

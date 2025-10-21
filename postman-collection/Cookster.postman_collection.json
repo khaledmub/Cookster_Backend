@@ -2180,12 +2180,18 @@
 							}
 						],
 						"url": {
-							"raw": "{{base_url}}user_loyalty_points/settings",
+							"raw": "{{base_url}}user_loyalty_points/settings?customer_id=0ef612c9-07ff-4a6d-984b-7e26b96a1282",
 							"host": [
 								"{{base_url}}user_loyalty_points"
 							],
 							"path": [
 								"settings"
+							],
+							"query": [
+								{
+									"key": "customer_id",
+									"value": "0ef612c9-07ff-4a6d-984b-7e26b96a1282"
+								}
 							]
 						}
 					},
@@ -3432,6 +3438,14 @@
 		{
 			"key": "live_base_url",
 			"value": "https://cookster.org/api/"
+		},
+		{
+			"key": "test_base_url",
+			"value": ""
+		},
+		{
+			"key": "local_base_url",
+			"value": ""
 		}
 	]
 }

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Redirect to App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+  <p>Opening the app...</p>
+  <script>
+    // Function to detect device type
+    function getStoreUrl() {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      if (/android/i.test(userAgent)) {
+        return "https://play.google.com/store/apps/details?id=com.cookster.cooksterapp";
+      } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+        return "https://apps.apple.com/us/app/cookster-كوكستر/id674680473333";
+      } else {
+        return "https://cookster.35-gl.com/public"; 
+      }
+    }
+
+    // Attempt to open the app
+    function tryOpenApp() {
+      window.location.href = getStoreUrl();
+    }
+
+    // Run on page load
+    window.onload = tryOpenApp;
+  </script>
+</body>
+</html>
