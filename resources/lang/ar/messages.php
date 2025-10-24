@@ -55,4 +55,8 @@ return [
     'user' => "المستخدم",
     'review_status_updated_successfully' => "تم تحديث حالة المراجعة بنجاح.",
     'review_visibility_updated_successfully' => "تم تحديث ظهور المراجعة بنجاح.",
+    'loyalty_points_added_successfully' => "تمت إضافة نقاط الولاء بنجاح.",
+    'loyalty_points_promotion_has_been_ended' => "انتهى عرض نقاط الولاء.",
+    'loyalty_points_are_insufficient' => "نقاط الولاء غير كافية.",
+    'discount_given_successfully' => "تم منح الخصم بنجاح.",
 ];
