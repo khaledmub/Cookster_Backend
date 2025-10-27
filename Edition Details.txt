@@ -279,6 +279,7 @@ Database Changes
 - ALTER TABLE `front_users` CHANGE `total_loyalty_points` `total_loyalty_points` FLOAT NOT NULL DEFAULT '0.00' COMMENT 'This is for Personal accounts', CHANGE `total_outstanding_balance` `total_outstanding_balance` FLOAT NOT NULL DEFAULT '0.00' COMMENT 'This is for Business accounts';
 - ALTER TABLE `settings` ADD `first_loyalty_points` FLOAT NOT NULL DEFAULT '0' AFTER `app_store_link`, ADD `loyalty_points` FLOAT NOT NULL DEFAULT '0' AFTER `first_loyalty_points`, ADD `loyalty_points_exchange_rate` FLOAT NOT NULL DEFAULT '0' AFTER `loyalty_points`;
 - ALTER TABLE `settings` ADD `loyalty_points_status` TINYINT(4) NOT NULL DEFAULT '1' AFTER `loyalty_points_exchange_rate`;
+- ALTER TABLE `user_reviews` ADD `food_quality_review` TEXT NULL AFTER `review`, ADD `service_review` TEXT NULL AFTER `food_quality_review`, ADD `staff_review` TEXT NULL AFTER `service_review`, ADD `recommendation_review` TEXT NULL AFTER `staff_review`;
 
 ==========================================================================
 

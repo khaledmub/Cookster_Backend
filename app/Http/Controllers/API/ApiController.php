@@ -3066,6 +3066,10 @@ class ApiController extends Controller
             $data['reviewed_user_id'] = $request->reviewed_user_id;
             $data['rating'] = $request->rating;
             $data['review'] = $request->review;
+            $data['food_quality_review'] = $request->food_quality_review;
+            $data['service_review'] = $request->service_review;
+            $data['staff_review'] = $request->staff_review;
+            $data['recommendation_review'] = $request->recommendation_review;
             $data['human_utc_date'] = Carbon::now()->format('F j, Y \a\t g:i:s A \U\T\C+3');
             DB::table('user_reviews')->insert($data);
 

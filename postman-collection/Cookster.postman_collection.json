@@ -1902,6 +1902,34 @@
 									"key": "review",
 									"value": "Test",
 									"type": "text"
+								},
+								{
+									"key": "food_quality_review",
+									"value": "Test",
+									"description": "Optional",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "service_review",
+									"value": "Test",
+									"description": "Optional",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "staff_review",
+									"value": "Test",
+									"description": "Optional",
+									"type": "text",
+									"disabled": true
+								},
+								{
+									"key": "recommendation_review",
+									"value": "Test",
+									"description": "Optional",
+									"type": "text",
+									"disabled": true
 								}
 							]
 						},
@@ -2153,6 +2181,44 @@
 		{
 			"name": "User QR Code Scan History",
 			"item": [
+				{
+					"name": "Check User Review Exists",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "reviewed_user_id",
+									"value": "0ef612c9-07ff-4a6d-984b-7e26b96a1282",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}check_user_review_exists",
+							"host": [
+								"{{base_url}}check_user_review_exists"
+							]
+						}
+					},
+					"response": []
+				},
 				{
 					"name": "Loyalty Points Settings",
 					"request": {
