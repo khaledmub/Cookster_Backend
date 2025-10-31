@@ -3286,7 +3286,8 @@ class ApiController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => __('messages.loyalty_points_added_successfully'),
-                'total_loyalty_points' => $user_total_loyalty_points
+                'total_loyalty_points' => $user_total_loyalty_points,
+                'points_added' => $points
             ], 200);
         }
         else{
