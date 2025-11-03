@@ -20,6 +20,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
+use Mpdf\Mpdf;
 
 class ApiController extends Controller
 {
@@ -3375,6 +3376,22 @@ class ApiController extends Controller
             'settings' => $settings,
             'customer' => $customer
         ], 200);
+    }
+    public function download_qrcode_pdf(Request $request){
+        $language = App::getLocale();
+        $settings = DB::table('settings')->where('id', 1)->first();
+        $qrcode_image = $request->qrcode;
+
+        $mpdf = new Mpdf([
+            'format' => [100, 200]
+        ]);
+        $htmlContent = view('qrcode-pdf', compact('language', 'settings', 'qrcode_image'))->render();
+        $mpdf->WriteHTML($htmlContent);
+        $pdfOutput = $mpdf->Output('', 'S');
+
+        return response($pdfOutput, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="qr_code.pdf"');
     }
 
     // General

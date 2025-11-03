@@ -112,5 +112,6 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::post('/user_qrcode_scan_history/add', [ApiController::class, 'add_user_qrcode_scan_history']);
         Route::get('/user_qrcode_scan_history', [ApiController::class, 'user_qrcode_scan_history']);
         Route::get('/user_loyalty_points/settings', [ApiController::class, 'user_loyalty_points_settings']);
+        Route::post('/user_qrcode_scan_history/download_qrcode_pdf', [ApiController::class, 'download_qrcode_pdf']);
     });
 });
