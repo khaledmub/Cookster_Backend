@@ -84,6 +84,13 @@
                                         class="d-none d-md-inline-block">QR Code Scan History</span>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link fs-14" data-bs-toggle="tab" href="#one_time_discount_history"
+                                    role="tab">
+                                    <i class="ri-airplay-fill d-inline-block d-md-none"></i> <span
+                                        class="d-none d-md-inline-block">One-Time QR Reward History</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                     <!-- Tab panes -->
@@ -192,6 +199,48 @@
                                                         <tr>
                                                             <td>{{ $history->customer_name }}</td>
                                                             <td>{{ $history->points }}</td>
+                                                            <td>{{ \App\Helpers\AppHelper::currency_formatter($history->amount) }}</td>
+                                                            <td>{{ date(env('DATE_FORMAT'), strtotime($history->created_at)) }}</td>
+                                                            <td>
+                                                                @if($history->is_cleared == 1)
+                                                                    <span class="badge bg-success">Yes</span>
+                                                                @else
+                                                                    <span class="badge bg-danger">No</span>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div><!-- end card body -->
+                                    </div><!-- end card -->
+                                </div>
+                            </div>
+                            <!--end row-->
+                        </div>
+                        <div class="tab-pane" id="one_time_discount_history" role="tabpanel">
+                            <div class="row">
+                                <div class="col-xxl-12">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h4 class="mb-0">Total Outstanding Balance: <b>{{ \App\Helpers\AppHelper::currency_formatter($data['additional_data']->one_time_discount_outstanding_balance) }}</b></h4>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Customer</th>
+                                                            <th>Discount Given</th>
+                                                            <th>Date</th>
+                                                            <th>Is Cleared?</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($data['one_time_discount_history'] as $history)
+                                                        <tr>
+                                                            <td>{{ $history->customer_name }}</td>
                                                             <td>{{ \App\Helpers\AppHelper::currency_formatter($history->amount) }}</td>
                                                             <td>{{ date(env('DATE_FORMAT'), strtotime($history->created_at)) }}</td>
                                                             <td>

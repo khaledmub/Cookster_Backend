@@ -106,6 +106,12 @@ class SettingsController extends Controller
         else{
             $input['loyalty_points_status'] = 0;
         }
+        if(isset($input['allow_one_time_qr_reward']) && $input['allow_one_time_qr_reward']==1){
+            $input['allow_one_time_qr_reward'] = 1;
+        }
+        else{
+            $input['allow_one_time_qr_reward'] = 0;
+        }
         $setting->update($input);
         return redirect()->route($this->url_path.'.edit', 1)->with('success',$this->module_title_singular.' updated successfully');
     }

@@ -59,4 +59,9 @@ return [
     'loyalty_points_promotion_has_been_ended' => "Loyalty points promotion has been ended.",
     'loyalty_points_are_insufficient' => "Loyalty points are insufficient.",
     'discount_given_successfully' => "Discount given successfully.",
+    'this_promotion_has_ended' => "This promotion has ended.",
+    'user_does_not_exist' => "User does not exist.",
+    'already_availed_the_discount' => "Already availed the discount.",
+    'your_limit_has_been_reached' => "Your limit has been reached.",
+    'max_discount_error' => "Discount cannot be given more than :discount.",
 ];

@@ -87,7 +87,8 @@ class ApiController extends Controller
             ], 422);
         }
         $input = $request->all();
-        $user = FrontUser::create([
+
+        $front_user_data = [
             'id' => (string) \Str::uuid(),
             'name' => $input['name'],
             'email' => $input['email'],
@@ -99,11 +100,17 @@ class ApiController extends Controller
             'city' => $input['city']? $input['city']: 0,
             'uuid' => $input['uuid'],
             'entity' => $input['entity'],
-        ]);
+        ];
 
+        $settings = DB::table('settings')->where('id', 1)->first();
+        if($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1){
+            $front_user_data['is_one_time_discount_given'] = 0;
+        }
+
+        $user = FrontUser::create($front_user_data);
         $user = FrontUser::where('email', $request->email)->first();
 
-        if($request->entity==2){
+        if($request->entity == 2){
             $additional_data = array();
             $additional_data['front_user_id'] = $user->id;
             $additional_data['business_type'] = $request->business_type;
@@ -115,7 +122,7 @@ class ApiController extends Controller
             $additional_data['longitude'] = $request->longitude;
             DB::table('business_account_additional_data')->insert($additional_data);
         }
-        if($request->entity==3){
+        if($request->entity == 3){
             $additional_data = array();
             $additional_data['front_user_id'] = $user->id;
             $additional_data['country'] = 194;
@@ -125,7 +132,7 @@ class ApiController extends Controller
             $additional_data['contact_email'] = $request->contact_email;
             DB::table('chef_account_additional_data')->insert($additional_data);
         }
-        if($request->entity==8){
+        if($request->entity == 8){
             $additional_data = array();
             $additional_data['front_user_id'] = $user->id;
             $additional_data['type_of_account'] = $request->type_of_account;
@@ -3274,6 +3281,15 @@ class ApiController extends Controller
             ], 422);
         }
 
+        $business_user = DB::table('front_users')->where('id', $request->business_id)->first();
+
+        if(!$business_user){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_does_not_exist')
+            ], 422);
+        }
+
         $settings = DB::table('settings')->where('id', 1)->first();
         if($settings && $settings->loyalty_points_status == 1){
             $user = Auth::user();
@@ -3327,10 +3343,18 @@ class ApiController extends Controller
             ], 422);
         }
 
+        $customer_user = DB::table('front_users')->where('id', $request->customer_id)->first();
+
+        if(!$customer_user){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_does_not_exist')
+            ], 422);
+        }
+
         $user = Auth::user();
         $settings = DB::table('settings')->where('id', 1)->first();
 
-        $customer_user = DB::table('front_users')->where('id', $request->customer_id)->first();
         $requiredPoints = $request->amount * $settings->loyalty_points_exchange_rate;
         $currentPoints = $customer_user->total_loyalty_points;
 
@@ -3392,6 +3416,137 @@ class ApiController extends Controller
         return response($pdfOutput, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'inline; filename="qr_code.pdf"');
+    }
+
+    //One-Time QR Reward
+    public function add_one_time_discount_history(Request $request){
+        $validator = Validator::make($request->all(), [
+            'customer_id' => 'required',
+            'amount' => 'required'
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $customer_user = DB::table('front_users')->where('id', $request->customer_id)->first();
+
+        if(!$customer_user){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_does_not_exist')
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $settings = DB::table('settings')->where('id', 1)->first();
+
+        if($settings && $settings->allow_one_time_qr_reward != 1){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.this_promotion_has_ended')
+            ], 422);
+        }
+        
+        if($customer_user->is_one_time_discount_given != 0){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.already_availed_the_discount')
+            ], 422);
+        }
+
+        $business_account_additional_data = DB::table('business_account_additional_data')->where('front_user_id', $user->id)->first();
+        $availed_no_of_discounts = DB::table('one_time_discount_history')->where('business_id', $user->id)->count();
+        $remaining_no_of_discounts = $business_account_additional_data->no_of_one_time_discounts - $availed_no_of_discounts;
+
+        if($remaining_no_of_discounts <= 0){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.your_limit_has_been_reached')
+            ], 422);
+        }
+
+        if($request->amount > $business_account_additional_data->one_time_max_discount){
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.max_discount_error', ['discount' => AppHelper::currency_formatter($business_account_additional_data->one_time_max_discount)])
+            ], 422);
+        }
+
+        $user_total_outstanding_balance = AppHelper::add_one_time_discount_history($user->id, $request->customer_id, $request->amount);
+
+        DB::table('front_users')->where('id', $request->customer_id)->update([
+            'is_one_time_discount_given' => 1
+        ]);
+
+        /* Business Push Notification */
+        if($user->uuid){
+            $deviceTokens = array($user->uuid);
+            $notification_data = [
+                'status' => true,
+            ];
+            $push_notification_text = [
+                'title' => 'One-Time QR Reward',
+                'text' => 'User ' . $customer_user->name . ' has availed the one-time QR reward.',
+                'notification_data' => $notification_data
+            ];
+            AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+        }
+
+        /* Customer Push Notification */
+        if($customer_user->uuid){
+            $deviceTokens = array($customer_user->uuid);
+            $notification_data = [
+                'status' => true,
+            ];
+            $push_notification_text = [
+                'title' => 'One-Time QR Reward',
+                'text' => 'You have availed the one-time QR reward.',
+                'notification_data' => $notification_data
+            ];
+            AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => __('messages.discount_given_successfully'),
+            'total_outstanding_balance' => $user_total_outstanding_balance
+        ], 200);
+    }
+    public function one_time_discount_history(Request $request) {
+        $user = Auth::user();
+        $business_account_additional_data = DB::table('business_account_additional_data')->where('front_user_id', $user->id)->first();
+
+        $one_time_discount_history = DB::table('one_time_discount_history as h')
+            ->leftJoin('front_users as u', 'u.id', '=', 'h.customer_id')
+            ->where('h.business_id', $user->id)
+            ->orderBy('h.system_id', 'DESC')
+            ->select(['h.*', 'u.name as customer_name'])->get();
+
+        $availed_no_of_discounts = DB::table('one_time_discount_history')->where('business_id', $user->id)->count();
+        $remaining_no_of_discounts = $business_account_additional_data->no_of_one_time_discounts - $availed_no_of_discounts;
+
+        return response()->json([
+            'status' => true,
+            'one_time_discount_history' => $one_time_discount_history,
+            'one_time_discount_outstanding_balance' => $business_account_additional_data->one_time_discount_outstanding_balance,
+            'remaining_no_of_discounts' => $remaining_no_of_discounts >= 0? $remaining_no_of_discounts: 0
+        ], 200);
+    }
+    public function one_time_discount_history_settings(Request $request) {
+        $user = Auth::user();
+        $additional_data = DB::table('business_account_additional_data')->where('front_user_id', $user->id)->first();
+        $settings = DB::table('settings')->where('id', 1)->first();
+
+        return response()->json([
+            'status' => true,
+            'allow_one_time_qr_discount' => $additional_data->allow_one_time_qr_discount,
+            'one_time_max_discount' => $additional_data->one_time_max_discount,
+            'allow_one_time_qr_reward' => $settings->allow_one_time_qr_reward
+        ], 200);
     }
 
     // General

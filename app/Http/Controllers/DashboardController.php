@@ -166,4 +166,19 @@ class DashboardController extends Controller
 
         return response()->json(['status' => true, 'message' => 'Outstanding balance cleared successfully!']);
     }
+    public function clear_one_time_qr_outstanding_balance(Request $request){
+        $input = $request->all();
+
+        $user_data = array(
+            'one_time_discount_outstanding_balance' => 0
+        );
+        DB::table('business_account_additional_data')->where('front_user_id', $input['id'])->update($user_data);
+
+        $data = array(
+            'is_cleared' => 1
+        );
+        DB::table('one_time_discount_history')->where('is_cleared', 0)->where('business_id', $input['id'])->update($data);
+
+        return response()->json(['status' => true, 'message' => 'One-Time QR Reward outstanding balance cleared successfully!']);
+    }
 }

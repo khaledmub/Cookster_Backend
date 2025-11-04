@@ -182,6 +182,12 @@
                                         <input type="checkbox" name="allow_following_videos" placeholder="" class="" value="1" {{ $setting->allow_following_videos ? 'checked' : '' }}>
                                     </div>
                                 </div>
+                                <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Allow One-Time QR Reward</label><br>
+                                        <input type="checkbox" name="allow_one_time_qr_reward" placeholder="" class="" value="1" {{ $setting->allow_one_time_qr_reward ? 'checked' : '' }}>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

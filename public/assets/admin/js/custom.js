@@ -757,6 +757,39 @@ $(document).ready(function () {
             }
         });
     });
+    $('body').on('click', '.clearOneTimeQROutstandingBalanceBtn', function() {
+        var id = $(this).data('id');
+        var one_time_discount_outstanding_balance = $(this).attr('data-one_time_discount_outstanding_balance');
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "The one-time QR reward outstanding balance for this business account is: " + one_time_discount_outstanding_balance,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, clear it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showLoader();
+                $.ajax({
+                    url: baseurl + "admin/ajax/clear_one_time_qr_outstanding_balance",
+                    type: 'POST',
+                    data: {
+                        id: id,
+                        _token: $('meta[name="csrf-token"]').attr('content')
+                    },
+                    dataType: "json",
+                    success: function (data) {
+                        hideLoader();
+                        if(data.status == true){
+                            displaySuccesMessage(data.message);
+                            $('.dynamicTable').DataTable().ajax.reload();
+                        }
+                    }
+                });
+            }
+        });
+    });
     function videoStatusChanger(id, status) {
         showLoader();
         $.ajax({

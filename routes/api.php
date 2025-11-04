@@ -113,5 +113,10 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::get('/user_qrcode_scan_history', [ApiController::class, 'user_qrcode_scan_history']);
         Route::get('/user_loyalty_points/settings', [ApiController::class, 'user_loyalty_points_settings']);
         Route::post('/user_qrcode_scan_history/download_qrcode_pdf', [ApiController::class, 'download_qrcode_pdf']);
+
+        //One-Time QR Reward
+        Route::get('/one_time_discount_history', [ApiController::class, 'one_time_discount_history']);
+        Route::get('/one_time_discount_history/settings', [ApiController::class, 'one_time_discount_history_settings']);
+        Route::post('/one_time_discount_history/add', [ApiController::class, 'add_one_time_discount_history']);
     });
 });

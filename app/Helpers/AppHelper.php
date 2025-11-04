@@ -526,4 +526,25 @@ class AppHelper
 
         return $business_user->total_outstanding_balance;
     }
+    public static function add_one_time_discount_history($business_id, $customer_id, $amount){
+        $business_account_additional_data = DB::table('business_account_additional_data')->where('front_user_id', $business_id)->first();
+
+        $ins_data = array();
+        $ins_data['id'] = (string) \Str::uuid();
+        $ins_data['business_id'] = $business_id;
+        $ins_data['customer_id'] = $customer_id;
+        $ins_data['amount'] = $amount;
+
+        $current_balance = $business_account_additional_data->one_time_discount_outstanding_balance + $amount;
+
+        $ins_data['balance'] = $current_balance;
+
+        DB::table('one_time_discount_history')->insert($ins_data);
+
+        DB::table('business_account_additional_data')->where('id', $business_account_additional_data->id)->update([
+            'one_time_discount_outstanding_balance' => $current_balance
+        ]);
+
+        return $current_balance;
+    }
 }

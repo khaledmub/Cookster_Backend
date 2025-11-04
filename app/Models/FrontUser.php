@@ -32,6 +32,7 @@ class FrontUser extends Authenticatable
         'current_subscription_id',
         'total_loyalty_points',
         'total_outstanding_balance',
+        'is_one_time_discount_given',
         'status',
     ];
 

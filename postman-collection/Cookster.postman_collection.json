@@ -2402,6 +2402,46 @@
 			]
 		},
 		{
+			"name": "One-Time QR Reward",
+			"item": [
+				{
+					"name": "One-Time QR Reward History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}one_time_discount_history",
+							"host": [
+								"{{base_url}}one_time_discount_history"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Videos",
 			"item": [
 				{

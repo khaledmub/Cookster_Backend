@@ -42,6 +42,7 @@ class BusinessAccountsController extends Controller
     public function get_data_ajax(Request $request){
         $csrfToken = csrf_token();
         $input=$request->all();
+        $settings = DB::table('settings')->where('id', 1)->first();
 
         $query=DB::table('front_users as business_account');
         $query->join('business_account_additional_data as b', 'b.front_user_id', '=', 'business_account.id');
@@ -62,7 +63,7 @@ class BusinessAccountsController extends Controller
             $query2->offset($input['start'])->limit($input['length']);
         }
         $query2->orderBy('business_account.system_id', 'ASC');
-        $data = $query2->select(['business_account.*', 'b.is_b2b'])->get();
+        $data = $query2->select(['business_account.*', 'b.is_b2b', 'b.one_time_discount_outstanding_balance', 'b.allow_one_time_qr_discount'])->get();
         $dataToPass=array();
         foreach($data as $sdata){
             if($sdata->status==1){
@@ -77,6 +78,7 @@ class BusinessAccountsController extends Controller
             $sub_array[]=$sdata->email;
             $sub_array[]=$sdata->phone;
             $sub_array[]=AppHelper::currency_formatter($sdata->total_outstanding_balance);
+            $sub_array[]=AppHelper::currency_formatter($sdata->one_time_discount_outstanding_balance);
 
             if($sdata->is_b2b==1){
                 $sub_array[]='<span class="badge bg-success">Yes</span>';
@@ -92,14 +94,29 @@ class BusinessAccountsController extends Controller
                 $sub_array[]='<span class="badge bg-danger">No</span>';
             }
 
+            if($sdata->allow_one_time_qr_discount==1){
+                $one_time_qr_checked = "checked";
+            }
+            else{
+                $one_time_qr_checked = "";
+            }
+
             $sub_array[]='<div class="form-check form-switch" dir="ltr"><input class="form-check-input userStatusChanger" data-id="'.$sdata->id.'" type="checkbox" role="switch" id="flexSwitchCheckChecked" '.$checked.'></div>';
 
             $actionshtml = '<div class="d-flex flex-wrap gap-2">';
             if(auth()->user()->can($this->permission_initial)){
                 $actionshtml .= '<a href="'.route($this->url_path.'.show',$sdata->id).'" class="btn btn-primary btn-icon waves-effect waves-light"><i class="fa-light fa-eye"></i></a>';
+
+                if($settings->allow_one_time_qr_reward == 1){
+                    $actionshtml .= '<a type="button" class="btn btn-info waves-effect waves-light oneTimeQRRewardModalBtn" data-id="'.$sdata->id.'">One-Time QR Reward</a>';
+                }
                 
                 if($sdata->total_outstanding_balance > 0){
                     $actionshtml .= '<a type="button" class="btn btn-secondary waves-effect waves-light clearOutstandingBalanceBtn" data-id="'.$sdata->id.'" data-total_outstanding_balance="'.AppHelper::currency_formatter($sdata->total_outstanding_balance).'">Clear Balance</a>';
+                }
+
+                if($sdata->one_time_discount_outstanding_balance > 0){
+                    $actionshtml .= '<a type="button" class="btn btn-secondary waves-effect waves-light clearOneTimeQROutstandingBalanceBtn" data-id="'.$sdata->id.'" data-one_time_discount_outstanding_balance="'.AppHelper::currency_formatter($sdata->one_time_discount_outstanding_balance).'">Clear One-Time QR Reward Balance</a>';
                 }
             }
             $actionshtml .= '</div>';
@@ -145,6 +162,13 @@ class BusinessAccountsController extends Controller
 
         // QR Code Scan History
         $data['qrcode_scan_history'] = DB::table('user_qrcode_scan_history as h')
+            ->leftJoin('front_users as u', 'u.id', '=', 'h.customer_id')
+            ->where('h.business_id', $id)
+            ->orderBy('h.system_id', 'DESC')
+            ->select(['h.*', 'u.name as customer_name'])->get();
+
+        // One-Time QR Reward History
+        $data['one_time_discount_history'] = DB::table('one_time_discount_history as h')
             ->leftJoin('front_users as u', 'u.id', '=', 'h.customer_id')
             ->where('h.business_id', $id)
             ->orderBy('h.system_id', 'DESC')
