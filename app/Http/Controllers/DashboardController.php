@@ -181,4 +181,22 @@ class DashboardController extends Controller
 
         return response()->json(['status' => true, 'message' => 'One-Time QR Reward outstanding balance cleared successfully!']);
     }
+    public function get_business_account_details(Request $request){
+        $input = $request->all();
+        $additional_data = DB::table('business_account_additional_data')->where('front_user_id', $input['id'])->first();
+
+        return response()->json(['status' => true, 'additional_data' => $additional_data]);
+    }
+    public function update_one_time_qr_data(Request $request){
+        $input = $request->all();
+
+        $user_data = array(
+            'allow_one_time_qr_discount' => $request->allow_one_time_qr_discount,
+            'no_of_one_time_discounts' => $request->no_of_one_time_discounts,
+            'one_time_max_discount' => $request->one_time_max_discount
+        );
+        DB::table('business_account_additional_data')->where('front_user_id', $input['id'])->update($user_data);
+
+        return response()->json(['status' => true, 'message' => 'One-Time QR Reward data updated successfully!']);
+    }
 }

@@ -145,6 +145,8 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::post('ajax/get_front_users_list', [DashboardController::class, 'get_front_users_list']);
     Route::post('ajax/clear_outstanding_balance', [DashboardController::class, 'clear_outstanding_balance']);
     Route::post('ajax/clear_one_time_qr_outstanding_balance', [DashboardController::class, 'clear_one_time_qr_outstanding_balance']);
+    Route::post('ajax/get_business_account_details', [DashboardController::class, 'get_business_account_details']);
+    Route::post('ajax/update_one_time_qr_data', [DashboardController::class, 'update_one_time_qr_data']);
 });
 
 // Cronjob Scripts

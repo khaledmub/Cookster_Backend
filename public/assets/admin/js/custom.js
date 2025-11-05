@@ -722,7 +722,7 @@ $(document).ready(function () {
                     displaySuccesMessage(data.message);
                 }
             }
-        });  
+        });
     });
     $('body').on('click', '.clearOutstandingBalanceBtn', function() {
         var id = $(this).data('id');
@@ -860,7 +860,76 @@ $(document).ready(function () {
             }
         });  
     });
+    $('body').on('click', '.oneTimeQRRewardModalBtn', function() {
+        var id = $(this).data('id');
+        showLoader();
+        $.ajax({
+            url: baseurl + "admin/ajax/get_business_account_details",
+            type: 'POST',
+            data: {
+                id: id,
+                _token: $('meta[name="csrf-token"]').attr('content')
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoader();
+                if(data.status == true){
+                    var modal = $('#oneTimeQRRewardModal');
+                    modal.find('#business_account_id').val(id);
+                    modal.find('#no_of_one_time_discounts').val(data.additional_data?.no_of_one_time_discounts);
+                    modal.find('#one_time_max_discount').val(data.additional_data?.one_time_max_discount);
+                    
+                    if(data.additional_data?.allow_one_time_qr_discount == 1){
+                        modal.find('#allow_one_time_qr_discount').prop('checked', true);
+                    }
+                    else{
+                        modal.find('#allow_one_time_qr_discount').prop('checked', false);
+                    }
 
+                    modal.modal('show');
+                }
+            }
+        });
+    });
+    $('body').on('click', '.oneTimeQRRewardSaveBtn', function() {
+        var modal = $('#oneTimeQRRewardModal');
+        var id = modal.find('#business_account_id').val();
+        var no_of_one_time_discounts = modal.find('#no_of_one_time_discounts').val();
+        var one_time_max_discount = modal.find('#one_time_max_discount').val();
+        var allow_one_time_qr_discount = 0;
+
+        if(modal.find('#allow_one_time_qr_discount').is(':checked')){
+            allow_one_time_qr_discount = 1;
+        }
+        else{
+            allow_one_time_qr_discount = 0;
+        }
+
+        showLoader();
+        $.ajax({
+            url: baseurl + "admin/ajax/update_one_time_qr_data",
+            type: 'POST',
+            data: {
+                id: id,
+                no_of_one_time_discounts: no_of_one_time_discounts,
+                one_time_max_discount: one_time_max_discount,
+                allow_one_time_qr_discount: allow_one_time_qr_discount,
+                _token: $('meta[name="csrf-token"]').attr('content')
+            },
+            dataType: "json",
+            success: function (data) {
+                hideLoader();
+                if(data.status == true){
+                    modal.find('#business_account_id').val('');
+                    modal.find('#no_of_one_time_discounts').val('');
+                    modal.find('#one_time_max_discount').val('');
+                    modal.find('#allow_one_time_qr_discount').prop('checked', false);
+                    modal.modal('hide');
+                    displaySuccesMessage(data.message);
+                }
+            }
+        });
+    });
     
     // var lati = $('#latitude').val();
     // var longi = $('#longitude').val();

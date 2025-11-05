@@ -57,4 +57,36 @@
     <!-- container-fluid -->
 </div>
 <!-- End Page-content -->
+
+<!-- One-Time QR Reward Modal -->
+<div class="modal fade themeModal" id="oneTimeQRRewardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">One-Time QR Reward</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input id="business_account_id" type="hidden" name="business_account_id" class="form-control" value="">
+                <div class="mb-3">
+                    <label class="form-label">Enable</label>
+                    <div class="form-check form-switch" dir="ltr">
+                        <input id="allow_one_time_qr_discount" name="allow_one_time_qr_discount" class="form-check-input" type="checkbox" role="switch">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="no_of_one_time_discounts" class="form-label">No. of Discounts</label>
+                    <input id="no_of_one_time_discounts" type="number" name="no_of_one_time_discounts" class="form-control" value="">
+                </div>
+                <div class="mb-3">
+                    <label for="one_time_max_discount" class="form-label">Max. Discount</label>
+                    <input id="one_time_max_discount" type="number" step="0.01" name="one_time_max_discount" class="form-control" value="">
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-primary waves-effect waves-light oneTimeQRRewardSaveBtn"><i class="fa-solid fa-floppy-disk"></i> Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
