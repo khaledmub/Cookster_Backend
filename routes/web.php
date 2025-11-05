@@ -16,6 +16,8 @@ use App\Http\Controllers\UserPaymentsController;
 use App\Http\Controllers\UserReviewsController;
 use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\BannersController;
+use App\Http\Controllers\BlogcategoriesController;
+use App\Http\Controllers\BlogsController;
 use App\Http\Controllers\WorksController;
 use App\Http\Controllers\PersonalAccountsController;
 use App\Http\Controllers\SponsoredAccountsController;
@@ -39,6 +41,8 @@ Route::get('change/lang', [LocalizationController::class, 'lang_change'])->name(
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/about_us', [HomeController::class, 'about_us'])->name('about_us');
+Route::get('/blog/{category?}', [HomeController::class, 'blog'])->name('blog');
+Route::get('/blog/{category}/{post}', [HomeController::class, 'blog_post'])->name('blog.post');
 Route::get('/privacy_policy', [HomeController::class, 'privacy_policy'])->name('privacy_policy');
 Route::get('/terms_of_use', [HomeController::class, 'terms_of_use'])->name('terms_of_use');
 Route::get('/contact_us', [HomeController::class, 'contact_us'])->name('contact_us');
@@ -91,6 +95,14 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     // Banners
     Route::resource('banners', BannersController::class);
     Route::post('ajax/get_banners', [BannersController::class, 'get_data_ajax']);
+
+    // Blog Categories
+    Route::resource('blogcategories', BlogcategoriesController::class);
+    Route::post('ajax/get_blogcategories', [BlogcategoriesController::class, 'get_data_ajax']);
+
+    // Blogs
+    Route::resource('blogs', BlogsController::class);
+    Route::post('ajax/get_blogs', [BlogsController::class, 'get_data_ajax']);
 
     // Screens
     Route::resource('screens', ScreensController::class);

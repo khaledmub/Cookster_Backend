@@ -42,5 +42,9 @@ return [
     'success' => 'Success!',
     'error' => 'Error!',
     'ok' => 'OK',
-    'please_fill_all_the_fields' => 'Please fill all the fields.'
+    'please_fill_all_the_fields' => 'Please fill all the fields.',
+    'blog' => 'Blog',
+    'all_blogs' => 'All Blogs',
+    'filter_by_category' => 'Filter by Category',
+    'no_blogs_found' => 'No blogs found.'
 ];

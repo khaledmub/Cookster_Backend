@@ -107,7 +107,7 @@ $works=\App\Helpers\AppHelper::get_works();
                                                 <li><a class="nav-link {{ request()->is('/') || request()->is('home') ? 'active' : '' }}" href="{{ url('/') }}">{{ __('general.home') }}</a></li>
                                                 <li><a class="nav-link {{ request()->is('about_us') ? 'active' : '' }}" href="{{ url('/about_us') }}">{{ __('general.about_us') }}</a></li>
                                                 <li><a class="nav-link {{ request()->is('contact_us') ? 'active' : '' }}" href="{{ url('/contact_us') }}">{{ __('general.contact_us') }}</a></li>
-
+                                                <li><a class="nav-link {{ request()->is('blog') ? 'active' : '' }}" href="{{ url('/blog') }}">{{ __('general.blog') }}</a></li>
                                             </ul>
                                           </div>
                                     </div>
@@ -195,6 +195,7 @@ $works=\App\Helpers\AppHelper::get_works();
                         <ul>
                             <li><a href="{{ url('/') }}">{{ __('general.home') }}</a></li>
                             <li><a href="{{ url('/about_us') }}">{{ __('general.about_us') }}</a></li>
+                            <li><a href="{{ url('/blog') }}">{{ __('general.blog') }}</a></li>
                         </ul>
                     </div>
                     <div class="col-sm-3">

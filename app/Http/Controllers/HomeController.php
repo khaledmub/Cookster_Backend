@@ -98,4 +98,42 @@ class HomeController extends Controller
         AppHelper::send_email($allrequestdata['email'], $email_to, $subject, $html);
         return response()->json(['status'=>true, 'message'=>trans('general.contactus_success')]);
     }
+    public function blog($category = null){
+        $data = array();
+        $language = App::getLocale();
+
+        $query = DB::table('blogcategories');
+        $query->join('blogcategories_description', 'blogcategories_description.blogcategory_id', '=', 'blogcategories.id');
+        $query->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id');
+        $query->where('site_languages.code', $language);
+        $data['blogcategories'] = $query->select(['blogcategories.*', 'blogcategories_description.title'])->orderBy('blogcategories_description.title', 'ASC')->get();
+
+        $query = DB::table('blogs');
+        $query->join('blogs_description', 'blogs_description.blog_id', '=', 'blogs.id');
+        $query->join('site_languages', 'blogs_description.language_id', '=', 'site_languages.id');
+        $query->join('blogcategories', 'blogs.blogcategory_id', '=', 'blogcategories.id');
+        $query->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id');
+        $query->join('site_languages as category_language', 'blogcategories_description.language_id', '=', 'category_language.id');
+        $query->where('site_languages.code', $language);
+        $query->where('category_language.code', $language);
+
+        $data['category_details'] = [];
+        if($category){
+            $data['category_details'] = DB::table('blogcategories')
+                ->join('blogcategories_description', 'blogcategories_description.blogcategory_id', '=', 'blogcategories.id')
+                ->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id')
+                ->where('site_languages.code', $language)
+                ->whereRaw('LOWER(REPLACE(blogcategories_description.title, " ", "-")) = ?', [strtolower($category)])
+                ->select('blogcategories.*', 'blogcategories_description.title')
+                ->first();
+
+            if($data['category_details']){
+                $query->where('blogs.blogcategory_id', $data['category_details']->id);
+            }
+        }
+
+        $data['blogs'] = $query->select(['blogs.*', 'blogs_description.title', 'blogs_description.short_description', 'blogcategories_description.title as category_title'])->orderBy('blogs.date', 'DESC')->get();
+
+        return view('frontend.blog',compact('data'));
+    }
 }

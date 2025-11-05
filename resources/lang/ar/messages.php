@@ -59,4 +59,9 @@ return [
     'loyalty_points_promotion_has_been_ended' => "انتهى عرض نقاط الولاء.",
     'loyalty_points_are_insufficient' => "نقاط الولاء غير كافية.",
     'discount_given_successfully' => "تم منح الخصم بنجاح.",
+    'this_promotion_has_ended' => "انتهى هذا العرض الترويجي.",
+    'user_does_not_exist' => "المستخدم غير موجود.",
+    'already_availed_the_discount' => "تم الاستفادة من الخصم بالفعل.",
+    'your_limit_has_been_reached' => "لقد وصلت إلى الحد المسموح.",
+    'max_discount_error' => "لا يمكن تقديم خصم يزيد عن :discount.",
 ];

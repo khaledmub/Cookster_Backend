@@ -392,7 +392,7 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ $screensActive ? '' : 'collapsed' }} {{ $screensActive ? 'active' : '' }}" href="#sidebarLayouts7" data-bs-toggle="collapse" role="button"
                                 aria-expanded="false" aria-controls="sidebarLayouts7">
-                                <i class="fa-solid fa-mobile-screen"></i> <span data-key="t-layouts">Screens</span>
+                                <i class="fa-regular fa-mobile-screen"></i> <span data-key="t-layouts">Screens</span>
                             </a>
                             <div class="collapse menu-dropdown custom-menu-dropdown {{ $screensActive ? 'show' : '' }}" id="sidebarLayouts7">
                                 <ul class="nav nav-sm flex-column">
@@ -513,21 +513,21 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                         @if(auth()->user()->can('videos-list'))
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ request()->is('admin/videos') || request()->is('admin/videos/*') ? 'active' : '' }}" href="{{ route('videos.index') }}">
-                                <i class="fa-solid fa-camcorder"></i> <span data-key="t-dashboards">Videos</span>
+                                <i class="fa-regular fa-camcorder"></i> <span data-key="t-dashboards">Videos</span>
                             </a>
                         </li>
                         @endif
                         @if(auth()->user()->can('user-payments-list'))
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ request()->is('admin/user_payments') || request()->is('admin/user_payments/*') ? 'active' : '' }}" href="{{ route('user_payments.index') }}">
-                                <i class="fa-solid fa-money-bill"></i> <span data-key="t-dashboards">User Payments</span>
+                                <i class="fa-regular fa-money-bill"></i> <span data-key="t-dashboards">User Payments</span>
                             </a>
                         </li>
                         @endif
                         @if(auth()->user()->can('user-reviews-list'))
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ request()->is('admin/user_reviews') || request()->is('admin/user_reviews/*') ? 'active' : '' }}" href="{{ route('user_reviews.index') }}">
-                                <i class="fa-solid fa-star"></i> <span data-key="t-dashboards">User Reviews</span>
+                                <i class="fa-regular fa-star"></i> <span data-key="t-dashboards">User Reviews</span>
                             </a>
                         </li>
                         @endif
@@ -547,6 +547,56 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                         @endif
 
                         <li class="menu-title"><span data-key="t-menu">Website</span></li>
+                        @if(auth()->user()->can('blogcategories-list') || auth()->user()->can('blogcategories-create'))
+                        @php
+                        $blogcategoriesActive = request()->is('admin/blogcategories*');
+                        @endphp
+                        <li class="nav-item">
+                            <a class="nav-link menu-link {{ $blogcategoriesActive ? '' : 'collapsed' }} {{ $blogcategoriesActive ? 'active' : '' }}" href="#sidebarLayouts14" data-bs-toggle="collapse" role="button"
+                                aria-expanded="false" aria-controls="sidebarLayouts14">
+                                <i class="fa-regular fa-grid-2"></i> <span data-key="t-layouts">Blog Categories</span>
+                            </a>
+                            <div class="collapse menu-dropdown custom-menu-dropdown {{ $blogcategoriesActive ? 'show' : '' }}" id="sidebarLayouts14">
+                                <ul class="nav nav-sm flex-column">
+                                    @if(auth()->user()->can('blogcategories-list'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('blogcategories.index') }}" class="nav-link {{ request()->is('admin/blogcategories') ? 'active' : '' }}" data-key="t-detached"><span>All Blog Categories</span></a>
+                                    </li>
+                                    @endif
+                                    @if(auth()->user()->can('blogcategories-create'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('blogcategories.create') }}" class="nav-link {{ request()->is('admin/blogcategories/create') ? 'active' : '' }}" data-key="t-detached"><span>Create Blog Category</span></a>
+                                    </li>
+                                    @endif
+                                </ul>
+                            </div>
+                        </li>
+                        @endif
+                        @if(auth()->user()->can('blogs-list') || auth()->user()->can('blogs-create'))
+                        @php
+                        $blogsActive = request()->is('admin/blogs*');
+                        @endphp
+                        <li class="nav-item">
+                            <a class="nav-link menu-link {{ $blogsActive ? '' : 'collapsed' }} {{ $blogsActive ? 'active' : '' }}" href="#sidebarLayouts15" data-bs-toggle="collapse" role="button"
+                                aria-expanded="false" aria-controls="sidebarLayouts15">
+                                <i class="fa-regular fa-file-lines"></i> <span data-key="t-layouts">Blogs</span>
+                            </a>
+                            <div class="collapse menu-dropdown custom-menu-dropdown {{ $blogsActive ? 'show' : '' }}" id="sidebarLayouts15">
+                                <ul class="nav nav-sm flex-column">
+                                    @if(auth()->user()->can('blogs-list'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('blogs.index') }}" class="nav-link {{ request()->is('admin/blogs') ? 'active' : '' }}" data-key="t-detached"><span>All Blogs</span></a>
+                                    </li>
+                                    @endif
+                                    @if(auth()->user()->can('blogs-create'))
+                                    <li class="nav-item">
+                                        <a href="{{ route('blogs.create') }}" class="nav-link {{ request()->is('admin/blogs/create') ? 'active' : '' }}" data-key="t-detached"><span>Create Blog</span></a>
+                                    </li>
+                                    @endif
+                                </ul>
+                            </div>
+                        </li>
+                        @endif
                         @if(auth()->user()->can('banners-list') || auth()->user()->can('banners-create'))
                         @php
                         $bannersActive = request()->is('admin/banners*');
@@ -588,11 +638,11 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                                         <a href="{{ route('pages.index') }}" class="nav-link {{ request()->is('admin/pages') ? 'active' : '' }}" data-key="t-detached"><span>All Pages</span></a>
                                     </li>
                                     @endif
-                                    @if(auth()->user()->can('pages-create'))
+                                    <!-- @if(auth()->user()->can('pages-create'))
                                     <li class="nav-item">
                                         <a href="{{ route('pages.create') }}" class="nav-link {{ request()->is('admin/pages/create') ? 'active' : '' }}" data-key="t-detached"><span>Create Page</span></a>
                                     </li>
-                                    @endif
+                                    @endif -->
                                 </ul>
                             </div>
                         </li>
