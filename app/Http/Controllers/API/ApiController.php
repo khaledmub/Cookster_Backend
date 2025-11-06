@@ -3538,15 +3538,24 @@ class ApiController extends Controller
     }
     public function one_time_discount_history_settings(Request $request) {
         $user = Auth::user();
-        $additional_data = DB::table('business_account_additional_data')->where('front_user_id', $user->id)->first();
         $settings = DB::table('settings')->where('id', 1)->first();
 
-        return response()->json([
-            'status' => true,
-            'allow_one_time_qr_discount' => $additional_data->allow_one_time_qr_discount,
-            'one_time_max_discount' => $additional_data->one_time_max_discount,
-            'allow_one_time_qr_reward' => $settings->allow_one_time_qr_reward
-        ], 200);
+        if($user->entity == 2){
+            $additional_data = DB::table('business_account_additional_data')->where('front_user_id', $user->id)->first();
+
+            return response()->json([
+                'status' => true,
+                'allow_one_time_qr_discount' => $additional_data->allow_one_time_qr_discount,
+                'one_time_max_discount' => $additional_data->one_time_max_discount,
+                'allow_one_time_qr_reward' => $settings->allow_one_time_qr_reward
+            ], 200);
+        }
+        else{
+            return response()->json([
+                'status' => true,
+                'allow_one_time_qr_reward' => $settings->allow_one_time_qr_reward
+            ], 200);
+        }
     }
 
     // General
