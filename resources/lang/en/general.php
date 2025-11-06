@@ -46,5 +46,12 @@ return [
     'blog' => 'Blog',
     'all_blogs' => 'All Blogs',
     'filter_by_category' => 'Filter by Category',
-    'no_blogs_found' => 'No blogs found.'
+    'no_blogs_found' => 'No blogs found.',
+    'related_blogs' => 'Related Blogs',
+    'date' => 'Date',
+    'category' => 'Category',
+    'share' => 'Share',
+    'twitter_x' => 'Twitter/X',
+    'facebook' => 'Facebook',
+    'whatsapp' => 'WhatsApp',
 ];

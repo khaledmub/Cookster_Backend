@@ -42,5 +42,16 @@ return [
     'success' => 'تم بنجاح!',
     'error' => 'خطأ!',
     'ok' => 'حسناً',
-    'please_fill_all_the_fields' => 'يرجى ملء جميع الحقول.'
+    'please_fill_all_the_fields' => 'يرجى ملء جميع الحقول.',
+    'blog' => 'المدونة',
+    'all_blogs' => 'جميع المدونات',
+    'filter_by_category' => 'تصفية حسب الفئة',
+    'no_blogs_found' => 'لم يتم العثور على مدونات.',
+    'related_blogs' => 'مدونات ذات صلة',
+    'date' => 'التاريخ',
+    'category' => 'الفئة',
+    'share' => 'مشاركة',
+    'twitter_x' => 'تويتر/X',
+    'facebook' => 'فيسبوك',
+    'whatsapp' => 'واتساب',
 ];

@@ -80,6 +80,27 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                            <div class="form-group">
+                                                <label class="form-label">Meta Title</label>
+                                                <input type="text" name="meta_title[{{$s_language->id}}]" placeholder="" class="form-control" value="{{ old('meta_title.'.$s_language->id) }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-12 mb-3">
+                                            <div class="form-group">
+                                                <label class="form-label">Meta Description</label>
+                                                <textarea rows="4" class="form-control" name="meta_description[{{$s_language->id}}]">{{ old('meta_description.'.$s_language->id) }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 mb-3">
+                                            <div class="form-group">
+                                                <label class="form-label">Meta Keywords (Comma Seperated)</label>
+                                                <textarea rows="4" class="form-control" name="meta_keywords[{{$s_language->id}}]">{{ old('meta_keywords.'.$s_language->id) }}</textarea>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-12 text-end">
                                             <button type="button" class="btn btn-soft-info waves-effect waves-light custom_copy_to_all copyToAll" data-language-id="{{$s_language->id}}"><i class="fa-light fa-copy"></i></button>

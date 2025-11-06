@@ -144,7 +144,10 @@ class BlogcategoriesController extends Controller
             $description_data = array(
                 'blogcategory_id' => $record->id,
                 'language_id' => $language->id,
-                'title' => $input['title'][$language->id]
+                'title' => $input['title'][$language->id],
+                'meta_title' => $input['meta_title'][$language->id],
+                'meta_description' => $input['meta_description'][$language->id],
+                'meta_keywords' => $input['meta_keywords'][$language->id]
             );
             DB::table($this->description_table_name)->insert($description_data);
         }
@@ -211,7 +214,10 @@ class BlogcategoriesController extends Controller
             $description_data = array(
                 'blogcategory_id' => $id,
                 'language_id' => $language->id,
-                'title' => $input['title'][$language->id]
+                'title' => $input['title'][$language->id],
+                'meta_title' => $input['meta_title'][$language->id],
+                'meta_description' => $input['meta_description'][$language->id],
+                'meta_keywords' => $input['meta_keywords'][$language->id]
             );
             $validate = DB::table($this->description_table_name)->where('blogcategory_id',$id)->where('language_id', $language->id)->first();
             if(empty($validate)){

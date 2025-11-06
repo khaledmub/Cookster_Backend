@@ -163,6 +163,9 @@ class PagesController extends Controller
                 'sub_title' => $input['sub_title'][$language->id],
                 'short_description' => $input['short_description'][$language->id],
                 'description' => $input['description'][$language->id],
+                'meta_title' => $input['meta_title'][$language->id],
+                'meta_description' => $input['meta_description'][$language->id],
+                'meta_keywords' => $input['meta_keywords'][$language->id]
             );
             DB::table($this->description_table_name)->insert($description_data);
         }
@@ -244,6 +247,9 @@ class PagesController extends Controller
                 'sub_title' => $input['sub_title'][$language->id],
                 'short_description' => $input['short_description'][$language->id],
                 'description' => $input['description'][$language->id],
+                'meta_title' => $input['meta_title'][$language->id],
+                'meta_description' => $input['meta_description'][$language->id],
+                'meta_keywords' => $input['meta_keywords'][$language->id]
             );
             $validate = DB::table($this->description_table_name)->where('page_id',$id)->where('language_id', $language->id)->first();
             if(empty($validate)){

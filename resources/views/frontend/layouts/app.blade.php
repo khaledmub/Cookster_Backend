@@ -33,7 +33,11 @@ $works=\App\Helpers\AppHelper::get_works();
 
     <!-- Favicon -->
     <link rel="icon" type="image/icon" href="{{ asset('assets/frontend/images/favicon.ico') }}"/>
-    <title>Cookster</title>
+
+    <title>@yield('meta_title', 'Cookster')</title>
+    <meta name="description" content="@yield('meta_description', 'Cookster')">
+    <meta name="keywords" content="@yield('meta_keywords', 'Cookster,cookster')">
+
 </head>
 <body dir="<?php if(app()->getLocale()=='ar'){ echo 'rtl'; }else{ echo 'ltr'; } ?>">
     <input type="hidden" id="baseurl" value="<?php echo config('app.url'); ?>">
@@ -266,6 +270,7 @@ $works=\App\Helpers\AppHelper::get_works();
     <script src="{{ asset('assets/frontend/js/swiper-bundle.min.js') }}"></script>
     <script src="{{ asset('assets/frontend/js/wow.min.js') }}"></script>
     <script src="{{ asset('assets/frontend/js/sweetalert.js') }}"></script>
+    <script src="{{ asset('assets/frontend/js/sharer.min.js') }}"></script>
     <script src="{{ asset('assets/frontend/js/custom.js') }}"></script>
 
     <script>

@@ -307,5 +307,6 @@ Database Changes
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'blogs-create', 'web', '59', '2025-01-20 12:59:31', '2025-01-20 12:59:31');
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'blogs-edit', 'web', '59', '2025-01-20 12:59:31', '2025-01-20 12:59:31');
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'blogs-delete', 'web', '59', '2025-01-20 12:59:31', '2025-01-20 12:59:31');
+- ALTER TABLE `pages_description` ADD `meta_title` VARCHAR(255) NULL AFTER `description`, ADD `meta_description` TEXT NULL AFTER `meta_title`, ADD `meta_keywords` TEXT NULL AFTER `meta_description`;
 
 ==========================================================================

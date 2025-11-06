@@ -1,4 +1,9 @@
 @extends('frontend.layouts.app')
+
+@section('meta_title', $data['page']->meta_title)
+@section('meta_description', $data['page']->meta_description)
+@section('meta_keywords', $data['page']->meta_keywords)
+
 @section('content')
 @php
 $settings=\App\Helpers\AppHelper::get_site_settings();
@@ -13,11 +18,11 @@ $settings=\App\Helpers\AppHelper::get_site_settings();
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb">
                               <li class="breadcrumb-item"><a href="{{ url('/') }}">{{ __('general.home') }}</a></li>
-                              <li class="breadcrumb-item" aria-current="page">{{ __('general.contact_us') }}</li>
+                              <li class="breadcrumb-item" aria-current="page">{{$data['page']->title}}</li>
                             </ol>
                           </nav>
                           
-                        <h1 class="text-center">{{ __('general.contact_us') }}</h1>
+                        <h1 class="text-center">{{$data['page']->title}}</h1>
                     </div>
                 </div>
             </div>
