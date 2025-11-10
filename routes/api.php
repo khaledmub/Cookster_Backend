@@ -91,6 +91,7 @@ Route::middleware([SetLanguage::class])->group(function () {
 
         // Notifications
         Route::get('/notifications/list', [ApiController::class, 'notifications_list']);
+        Route::get('/notifications/update_status', [ApiController::class, 'notifications_update_status']);
 
         // Subscription
         Route::post('/packages/subscribe', [ApiController::class, 'subscribe_package']);

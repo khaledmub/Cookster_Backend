@@ -286,7 +286,7 @@ Database Changes
 Phase: 3.0
 Development Start Date: 04-November-2025
 Developer: HA
-Upload Status: N/A
+Upload Status: Done
 -----------------------------------
 Database Changes
 - Create table "one_time_discount_history", "blogcategories", "blogcategories_description", "blogs", "blogs_description"
@@ -294,9 +294,6 @@ Database Changes
 - ALTER TABLE `front_users` ADD `is_one_time_discount_given` TINYINT(4) NOT NULL DEFAULT '2' COMMENT 'This is for Personal accounts' AFTER `total_outstanding_balance`;
 - ALTER TABLE `business_account_additional_data` ADD `allow_one_time_qr_discount` TINYINT(4) NOT NULL DEFAULT '0' AFTER `is_b2b`, ADD `no_of_one_time_discounts` INT(11) NOT NULL DEFAULT '0' AFTER `allow_one_time_qr_discount`, ADD `one_time_discount_value` INT(11) NOT NULL DEFAULT '0' COMMENT 'Percentage' AFTER `no_of_one_time_discounts`, ADD `one_time_discount_outstanding_balance` FLOAT NOT NULL DEFAULT '0' AFTER `one_time_discount_value`;
 - ALTER TABLE `business_account_additional_data` CHANGE `one_time_discount_value` `one_time_max_discount` FLOAT NOT NULL DEFAULT '0';
-
-
-
 - INSERT INTO `permission_categories` (`id`, `name`, `sort_order`, `status`, `created_date`) VALUES (NULL, 'Blog Categories', '23', '1', '2025-05-14 15:20:04');
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'blogcategories-list', 'web', '58', '2025-01-20 12:59:31', '2025-01-20 12:59:31');
 - INSERT INTO `permissions` (`id`, `name`, `guard_name`, `category`, `created_at`, `updated_at`) VALUES (NULL, 'blogcategories-create', 'web', '58', '2025-01-20 12:59:31', '2025-01-20 12:59:31');

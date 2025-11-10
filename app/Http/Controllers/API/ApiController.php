@@ -717,6 +717,16 @@ class ApiController extends Controller
             'notifications' => $notifications,
         ], 200);
     }
+    public function notifications_update_status(){
+        $user = Auth::user();
+        DB::table('notifications')->where('front_user_id', $user->id)->where('read_status', 0)->update([
+            'read_status' => 1
+        ]);
+
+        return response()->json([
+            'status' => true
+        ], 200);
+    }
     public function registration_settings(){
         $language = App::getLocale();
 
