@@ -1468,6 +1468,12 @@ class ApiController extends Controller
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of followers
         $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of following
 
+        $total_amount = 0;
+        $settings = DB::table('settings')->where('id', 1)->select(['loyalty_points_exchange_rate'])->first();
+        if($user && $settings){
+            $total_amount = $user->total_loyalty_points / $settings->loyalty_points_exchange_rate;
+        }
+
         return response()->json([
             'status' => true,
             'user' => $user,
@@ -1475,6 +1481,7 @@ class ApiController extends Controller
             'video_types' => $video_types,
             'followers' => $followers,
             'following' => $following,
+            'total_amount' => number_format($total_amount, 2)
         ], 200);
     }
 
@@ -3310,11 +3317,18 @@ class ApiController extends Controller
 
             $user_total_loyalty_points = AppHelper::add_user_loyalty_points($user->id, $request->business_id, 1, $points);
 
+            $total_amount = 0;
+            $customer = DB::table('front_users')->where('id', $user->id)->first();
+            if($customer){
+                $total_amount = $customer->total_loyalty_points / $settings->loyalty_points_exchange_rate;
+            }
+
             return response()->json([
                 'status' => true,
                 'message' => __('messages.loyalty_points_added_successfully'),
                 'total_loyalty_points' => $user_total_loyalty_points,
-                'points_added' => $points
+                'points_added' => $points,
+                'total_amount' => number_format($total_amount, 2)
             ], 200);
         }
         else{
@@ -3405,10 +3419,16 @@ class ApiController extends Controller
         $settings = DB::table('settings')->where('id', 1)->select(['loyalty_points_exchange_rate'])->first();
         $customer = DB::table('front_users')->where('id', $request->customer_id)->select(['total_loyalty_points'])->first();
 
+        $total_amount = 0;
+        if($customer && $settings){
+            $total_amount = $customer->total_loyalty_points / $settings->loyalty_points_exchange_rate;
+        }
+
         return response()->json([
             'status' => true,
             'settings' => $settings,
-            'customer' => $customer
+            'customer' => $customer,
+            'total_amount' => number_format($total_amount, 2)
         ], 200);
     }
     public function download_qrcode_pdf(Request $request){
