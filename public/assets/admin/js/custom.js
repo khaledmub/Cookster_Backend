@@ -1151,6 +1151,18 @@ $(document).ready(function () {
             }
         });
     });
+
+    CKEDITOR.replace('editor1', {
+        extraPlugins: 'image2, uploadimage',
+        filebrowserUploadUrl: baseurl + "admin/ajax/upload_editor_picture?_token=" + $('meta[name="csrf-token"]').attr('content'),
+        filebrowserUploadMethod: 'form'
+    });
+
+    CKEDITOR.replace('editor2', {
+    	extraPlugins: 'image2, uploadimage',
+      	filebrowserUploadUrl: baseurl+"admin/ajax/upload_editor_picture?_token={{ csrf_token() }}",
+        filebrowserUploadMethod: 'form'
+    });
     
     // count
     $('.count').each(function () {

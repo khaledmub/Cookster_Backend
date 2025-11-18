@@ -77,7 +77,7 @@
                                         <div class="col-12 mb-3">
                                             <div class="form-group">
                                                 <label class="form-label">Description</label>
-                                                <textarea class="form-control ckeditor-classic" name="description[{{$s_language->id}}]" id="ckeditor{{$s_language->id}}">{{ $m_data_descriptions[$s_language->id]->description }}</textarea>
+                                                <textarea class="form-control" name="description[{{$s_language->id}}]" id="editor{{$s_language->id}}">{{ $m_data_descriptions[$s_language->id]->description }}</textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -126,7 +126,10 @@
                                         <select name="blogcategory_id" class="form-select select2">
                                             <option value="">Please select option</option>
                                             @foreach($data['blogcategories'] as $category)
-                                            <option {{ $m_data->blogcategory_id && $m_data->blogcategory_id==$category->id ? 'selected' : '' }} value="{{ $category->id }}">{{ $category->title }}</option>
+                                            <option value="{{ $category->id }}" {{ $m_data->blogcategory_id && $m_data->blogcategory_id==$category->id ? 'selected' : '' }} >
+                                                {{ $category->en_title }} @if($category->ar_title) ({{ $category->ar_title }}) @endif
+                                            </option>
+                                            <!-- <option {{ $m_data->blogcategory_id && $m_data->blogcategory_id==$category->id ? 'selected' : '' }} value="{{ $category->id }}">{{ $category->en_title }}</option> -->
                                             @endforeach
                                         </select>
                                     </div>
@@ -145,6 +148,13 @@
                                         @endif
                                         </label>
                                         <input type="file" name="image" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-xs-12 col-sm-12 col-md-12 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Custom Url (i.e creamy-chicken) <span class="text-danger">*</span></label> <br/>
+                                        <small class="text-muted">Note: Enter only the slug (e.g. <b>creamy-chicken</b>). Do not include https:// or domain.</small>
+                                        <input type="text" name="custom_url" value="{{ $m_data->custom_url }}" class="form-control">
                                     </div>
                                 </div>
                                 <div class="col-xs-12 col-sm-12 col-md-12 mb-3">

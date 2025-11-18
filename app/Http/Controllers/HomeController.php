@@ -173,7 +173,8 @@ class HomeController extends Controller
                 ->join('site_languages as category_language', 'blogcategories_description.language_id', '=', 'category_language.id')
                 ->where('site_languages.code', $language)
                 ->where('category_language.code', $language)
-                ->whereRaw('LOWER(REPLACE(blogs_description.title, " ", "-")) = ?', [strtolower($post)])
+                // ->whereRaw('LOWER(REPLACE(blogs_description.title, " ", "-")) = ?', [strtolower($post)])
+                ->whereRaw('LOWER(REPLACE(blogs.custom_url, " ", "-")) = ?', [strtolower($post)])
                 ->select('blogs.*', 'blogs_description.title', 'blogs_description.short_description', 'blogs_description.description', 'blogs_description.meta_title', 'blogs_description.meta_description', 'blogs_description.meta_keywords', 'blogcategories_description.title as category_title')
                 ->first();
 

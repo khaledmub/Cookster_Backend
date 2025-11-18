@@ -76,7 +76,7 @@
                                         <div class="col-12 mb-3">
                                             <div class="form-group">
                                                 <label class="form-label">Description</label>
-                                                <textarea class="form-control ckeditor-classic" name="description[{{$s_language->id}}]" id="ckeditor{{$s_language->id}}">{{ old('description.'.$s_language->id) }}</textarea>
+                                                <textarea class="form-control" id="editor{{$s_language->id}}" name="description[{{$s_language->id}}]" id="ckeditor{{$s_language->id}}">{{ old('description.'.$s_language->id) }}</textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -124,9 +124,12 @@
                                         <label class="form-label">Category <span class="text-danger">*</span></label>
                                         <select name="blogcategory_id" class="form-select select2">
                                             <option value="">Please select option</option>
-                                            @foreach($data['blogcategories'] as $category)
-                                            <option {{ (old('blogcategory_id') && old('blogcategory_id')==$category->id || request()->blogcategory_id && request()->blogcategory_id==$category->id) ? 'selected' : '' }} value="{{ $category->id }}">{{ $category->title }}</option>
-                                            @endforeach
+                                             @foreach($data['blogcategories'] as $category)
+                                            <option value="{{ $category->id }}" {{ old('blogcategory_id', request()->blogcategory_id) == $category->id ? 'selected' : '' }}>
+                                                {{ $category->en_title }} @if($category->ar_title) ({{ $category->ar_title }}) @endif
+                                            </option>
+                                            @endforeach 
+                                            <!-- <option {{ (old('blogcategory_id') && old('blogcategory_id')==$category->id || request()->blogcategory_id && request()->blogcategory_id==$category->id) ? 'selected' : '' }} value="{{ $category->id }}">{{ $category->en_title }}</option> -->
                                         </select>
                                     </div>
                                 </div>
@@ -140,6 +143,14 @@
                                     <div class="form-group">
                                         <label class="form-label">Image <span class="text-danger">*</span></label>
                                         <input type="file" name="image" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-xs-12 col-sm-12 col-md-12 mb-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Custom Url(i.e creamy-chicken) <span class="text-danger">*</span></label>
+                                        <br/>
+                                        <small class="text-muted">Note: Enter only the slug (e.g. <b>creamy-chicken</b>). Do not include https:// or domain.</small>
+                                        <input type="text" name="custom_url" class="form-control">
                                     </div>
                                 </div>
                                 <div class="col-xs-12 col-sm-12 col-md-12 mb-3">

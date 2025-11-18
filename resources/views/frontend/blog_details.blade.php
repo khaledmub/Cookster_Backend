@@ -61,7 +61,7 @@
                     <div class="row">
                         @foreach($data['related_blogs'] as $blog)
                         <div class="col-lg-4 col-md-6">
-                            <a href="{{ url('/blog/' . \Illuminate\Support\Str::slug($blog->category_title) . '/' . \Illuminate\Support\Str::slug($blog->title)) }}" class="blog_card">
+                            <a href="{{ url('/blog/' . \Illuminate\Support\Str::slug($blog->category_title) . '/' . \Illuminate\Support\Str::slug($blog->custom_url)) }}" class="blog_card">
                                 <div class="blog_card_img">
                                     <img src="{{ asset('storage/blogs/'.$blog->image) }}" alt="">
                                     <div class="blog_date">{{ date('d M, Y', strtotime($blog->date)) }}</div>

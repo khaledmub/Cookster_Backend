@@ -307,3 +307,11 @@ Database Changes
 - ALTER TABLE `pages_description` ADD `meta_title` VARCHAR(255) NULL AFTER `description`, ADD `meta_description` TEXT NULL AFTER `meta_title`, ADD `meta_keywords` TEXT NULL AFTER `meta_description`;
 
 ==========================================================================
+
+Phase: 3.0
+Development Start Date: 18-November-2025
+Developer: HAMZA
+Upload Status: 
+-----------------------------------
+Database Changes
+ALTER TABLE `blogs` ADD `custom_url` VARCHAR(255) NULL AFTER `blogcategory_id`; 

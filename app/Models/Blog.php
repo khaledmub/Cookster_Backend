@@ -14,6 +14,6 @@ class Blog extends Model
      * @var array
      */
     protected $fillable = [
-        'blogcategory_id', 'image', 'date', 'status'
+        'blogcategory_id','custom_url', 'image', 'date', 'status'
     ];
 }

@@ -780,6 +780,7 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
     <script type="text/javascript" src="https://cdn.datatables.net/v/bs5/jszip-2.5.0/dt-1.13.1/b-2.3.3/b-colvis-2.3.3/b-html5-2.3.3/b-print-2.3.3/datatables.min.js"></script>
     <script src="{{ asset('assets/admin/js/sweetalert.js') }}"></script><script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js"></script>
+    <script src="{{ asset('assets/admin/js/ckeditor/ckeditor.js') }}"></script>
     <script src="{{ asset('assets/admin/libs/@ckeditor/ckeditor5-build-classic/build/ckeditor.js') }}"></script>
     <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=true&libraries=places&key=AIzaSyBxMeZhnLJfK4ax7_GOGDd00OS5-jBFc4M"></script>
     <script src="{{ asset('assets/admin/js/locationpicker.jquery.min.js') }}"></script>

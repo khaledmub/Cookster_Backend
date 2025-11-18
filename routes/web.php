@@ -48,6 +48,8 @@ Route::get('/terms_of_use', [HomeController::class, 'terms_of_use'])->name('term
 Route::get('/contact_us', [HomeController::class, 'contact_us'])->name('contact_us');
 Route::post('ajax/submit_contact_us', [HomeController::class, 'submit_contact_us'])->name('contact.submit_contact_us.ajax');
 
+
+
 Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -58,31 +60,31 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     // Users
     Route::resource('users', UserController::class);
     Route::post('ajax/get_users', [UserController::class, 'get_users_ajax']);
-
+    
     // Pages
     Route::resource('pages', PagesController::class);
     Route::post('ajax/get_pages', [PagesController::class, 'get_data_ajax']);
-
+    
     // Generic Keys
     Route::resource('generickeys', GenerickeyController::class);
     Route::post('ajax/get_generic_keys', [GenerickeyController::class, 'get_data_ajax']);
-
+    
     // Generic Key Values
     Route::resource('generickeyvalues', GenerickeyvalueController::class);
     Route::post('ajax/get_generic_key_values', [GenerickeyvalueController::class, 'get_data_ajax']);
-
+    
     // Categories
     Route::resource('categories', CategoriesController::class);
     Route::post('ajax/get_categories', [CategoriesController::class, 'get_data_ajax']);
-
+    
     // Videos
     Route::resource('videos', VideosController::class);
     Route::post('ajax/get_videos', [VideosController::class, 'get_data_ajax']);
-
+    
     // User Payments
     Route::resource('user_payments', UserPaymentsController::class);
     Route::post('ajax/get_user_payments', [UserPaymentsController::class, 'get_data_ajax']);
-
+    
     // User Reviews
     Route::resource('user_reviews', UserReviewsController::class);
     Route::post('ajax/get_user_reviews', [UserReviewsController::class, 'get_data_ajax']);
@@ -91,14 +93,16 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     // Notifications
     Route::resource('notifications', NotificationsController::class);
     Route::post('ajax/get_notifications', [NotificationsController::class, 'get_data_ajax']);
-
+    
     // Banners
     Route::resource('banners', BannersController::class);
     Route::post('ajax/get_banners', [BannersController::class, 'get_data_ajax']);
-
+    
     // Blog Categories
     Route::resource('blogcategories', BlogcategoriesController::class);
     Route::post('ajax/get_blogcategories', [BlogcategoriesController::class, 'get_data_ajax']);
+    // Route::post('/ckeditor-upload-image', [BlogsController::class, 'upload_editor_picture']);
+    Route::post('ajax/upload_editor_picture', [BlogsController::class, 'upload_editor_picture']);
 
     // Blogs
     Route::resource('blogs', BlogsController::class);

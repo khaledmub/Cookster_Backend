@@ -119,13 +119,33 @@ class BlogsController extends Controller
         $data['url_path'] = $this->url_path;
         $data['site_languages'] = DB::table('site_languages')->where('status',1)->orderBy('sort_order', 'ASC')->get();
 
-        $query=DB::table('blogcategories');
-        $query->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id');
-        $query->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id');
-        $query->where('site_languages.is_default', 1);
-        $query->where('blogcategories.status', 1);
-        $query->select(['blogcategories.*', 'blogcategories_description.title'])->get();
-        $data['blogcategories'] = $query->get();
+        $query = DB::table('blogcategories')
+            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+            ->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id')
+            ->where('blogcategories.status', 1)
+            ->select(
+                'blogcategories.id',
+                DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 1 THEN blogcategories_description.title END) AS en_title"),
+                DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 2 THEN blogcategories_description.title END) AS ar_title")
+            )
+            ->groupBy('blogcategories.id')
+            ->get();
+
+        $data['blogcategories'] = $query;
+
+        // $query=DB::table('blogcategories');
+        // $query->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id');
+        // $query->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id');
+        // // $query->where('site_languages.is_default', 1);
+        // $query->select(
+        //     'blogcategories.id',
+        //     DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 1 THEN blogcategories_description.title END) AS en_title"),
+        //     DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 2 THEN blogcategories_description.title END) AS ar_title")
+        // );
+        // $query->groupBy('blogcategories.id');
+        // $query->where('blogcategories.status', 1);
+        // $query->select(['blogcategories.*', 'blogcategories_description.title'])->get();
+        // $data['blogcategories'] = $query->get();
 
         return view($this->view_folder_name.'.create',compact('data'));
     }
@@ -147,6 +167,7 @@ class BlogsController extends Controller
             'title.*' => 'required',
             'blogcategory_id' => 'required',
             'date' => 'required',
+            'custom_url' => 'required',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|dimensions:max_width=2000,max_height=2000|max:2048',
             'status' => 'required'
         ], $customMessages);
@@ -172,6 +193,7 @@ class BlogsController extends Controller
         else{
             $input['status']=0;
         }
+
         $record = Blog::create($input);
 
         foreach ($site_languages as $language) {
@@ -215,13 +237,27 @@ class BlogsController extends Controller
         $data['url_path'] = $this->url_path;
         $data['site_languages'] = DB::table('site_languages')->where('status',1)->orderBy('sort_order', 'ASC')->get();
 
-        $query=DB::table('blogcategories');
-        $query->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id');
-        $query->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id');
-        $query->where('site_languages.is_default', 1);
-        $query->where('blogcategories.status', 1);
-        $query->select(['blogcategories.*', 'blogcategories_description.title'])->get();
-        $data['blogcategories'] = $query->get();
+        $query = DB::table('blogcategories')
+        ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+        ->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id')
+        ->where('blogcategories.status', 1)
+        ->select(
+            'blogcategories.id',
+            DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 1 THEN blogcategories_description.title END) AS en_title"),
+            DB::raw("GROUP_CONCAT(CASE WHEN blogcategories_description.language_id = 2 THEN blogcategories_description.title END) AS ar_title")
+        )
+        ->groupBy('blogcategories.id')
+        ->get();
+
+        $data['blogcategories'] = $query;
+
+        // $query=DB::table('blogcategories');
+        // $query->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id');
+        // $query->join('site_languages', 'blogcategories_description.language_id', '=', 'site_languages.id');
+        // $query->where('site_languages.is_default', 1);
+        // $query->where('blogcategories.status', 1);
+        // $query->select(['blogcategories.*', 'blogcategories_description.title'])->get();
+        // $data['blogcategories'] = $query->get();
 
         return view($this->view_folder_name.'.edit',compact('m_data', 'm_data_descriptions', 'data'));
     }
@@ -317,4 +353,37 @@ class BlogsController extends Controller
         DB::table($this->description_table_name)->where('blog_id',$id)->delete();
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' deleted successfully');
     }
+
+    public function upload_editor_picture(Request $request){
+        // echo '1324';
+        // exit;
+        $input=$request->all();
+        
+        if($request->file('upload')){
+            $CKEditorFuncNum = $input['CKEditorFuncNum'];
+            $image = $request->file('upload');
+            
+            $input['imagename'] = time().'.'.$image->extension();
+            $fileresponse=$request->file('upload')->storeAs('public/ckeditor',$input['imagename']);
+            // $destinationPath = storage_path('app/public/ckeditor/thumbnail');
+            // $img = Image::make($image->path());
+            // $img->resize(100, 100, function ($constraint) {
+            //     $constraint->aspectRatio();
+            // })->save($destinationPath.'/'.$input['imagename']);
+            $image_name=$input['imagename'];
+            $url=asset('storage/ckeditor/'.$image_name);
+            $response=array();
+            $response['CKEditorFuncNum']=$CKEditorFuncNum;
+            $response['url']=$url;
+            echo "<script>window.parent.CKEDITOR.tools.callFunction('".$CKEditorFuncNum."', '".$url."', 'Image uploaded successfully')</script>";
+//            $re = "<script>window.parent.CKEDITOR.tools.callFunction(".$CKEditorFuncNum.", '".$url."', '".$msg."')</script>"; 
+        }
+//        else{
+//            $re = '<script>alert("Unable to upload the file")</script>';
+//        }
+//        echo "<pre>".$image_name;
+//        var_dump($_FILES);
+//        exit;
+    }
+
 }
