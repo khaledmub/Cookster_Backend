@@ -79,6 +79,7 @@ class BlogsController extends Controller
             $sub_array=array();
             $sub_array[]=$sdata->title;
             $sub_array[]=$sdata->category_title;
+            $sub_array[]=$sdata->custom_url;
             $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.asset('storage/'.$this->uploads_folder_name.'/'.$sdata->image).'">';
             $sub_array[]=date('d M, Y', strtotime($sdata->date));
             $sub_array[]=$status_label;

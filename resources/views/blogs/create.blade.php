@@ -76,7 +76,7 @@
                                         <div class="col-12 mb-3">
                                             <div class="form-group">
                                                 <label class="form-label">Description</label>
-                                                <textarea class="form-control" id="editor{{$s_language->id}}" name="description[{{$s_language->id}}]" id="ckeditor{{$s_language->id}}">{{ old('description.'.$s_language->id) }}</textarea>
+                                                <textarea class="form-control" id="editor{{$s_language->id}}" name="description[{{$s_language->id}}]">{{ old('description.'.$s_language->id) }}</textarea>
                                             </div>
                                         </div>
                                     </div>

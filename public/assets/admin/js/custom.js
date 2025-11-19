@@ -1155,13 +1155,25 @@ $(document).ready(function () {
     CKEDITOR.replace('editor1', {
         extraPlugins: 'image2, uploadimage',
         filebrowserUploadUrl: baseurl + "admin/ajax/upload_editor_picture?_token=" + $('meta[name="csrf-token"]').attr('content'),
-        filebrowserUploadMethod: 'form'
+        filebrowserUploadMethod: 'form',
+        toolbar: [
+            { name: 'basicstyles', items: ['Bold', 'Italic'] },
+            { name: 'paragraph', items: ['NumberedList', 'BulletedList'] },
+            { name: 'insert', items: ['Image'] },
+            { name: 'links', items: ['Link', 'Unlink'] }
+        ]
     });
 
     CKEDITOR.replace('editor2', {
     	extraPlugins: 'image2, uploadimage',
       	filebrowserUploadUrl: baseurl+"admin/ajax/upload_editor_picture?_token={{ csrf_token() }}",
-        filebrowserUploadMethod: 'form'
+        filebrowserUploadMethod: 'form',
+        toolbar: [
+            { name: 'basicstyles', items: ['Bold', 'Italic'] },
+            { name: 'paragraph', items: ['NumberedList', 'BulletedList'] },
+            { name: 'insert', items: ['Image'] },
+            { name: 'links', items: ['Link', 'Unlink'] }
+        ]
     });
     
     // count
