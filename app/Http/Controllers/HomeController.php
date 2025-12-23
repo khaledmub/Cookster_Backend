@@ -138,6 +138,7 @@ class HomeController extends Controller
         $query->join('site_languages as category_language', 'blogcategories_description.language_id', '=', 'category_language.id');
         $query->where('site_languages.code', $language);
         $query->where('category_language.code', $language);
+        $query->where('blogs.status', 1);
 
         $data['category_details'] = [];
         if($category){
