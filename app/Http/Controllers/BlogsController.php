@@ -210,6 +210,42 @@ class BlogsController extends Controller
             );
             DB::table($this->description_table_name)->insert($description_data);
         }
+
+        // Build blog URL (adjust path if needed)
+        $category = DB::table('blogcategories')
+            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+            ->where('blogcategories.id', $input['blogcategory_id'])
+            ->where('blogcategories_description.language_id', 1) // English
+            ->select('blogcategories_description.title')
+            ->first();
+        $categorySlug = \Str::slug($category->title); // adjust if you store slug separately
+        $newUrl = url('/blog/' . $categorySlug . '/' . $input['custom_url']);
+
+        // Path to sitemap
+        $sitemapPath = public_path('sitemap.xml');
+
+        // Load sitemap
+        if(file_exists($sitemapPath)){
+            $xml = simplexml_load_file($sitemapPath);
+
+            $exists = false;
+            foreach($xml->url as $u){
+                if((string)$u->loc === $newUrl){
+                    $exists = true;
+                    break;
+                }
+            }
+            if(!$exists){
+                // Create new <url> entry
+                $url = $xml->addChild('url');
+                $url->addChild('loc', $newUrl);
+                $url->addChild('lastmod', now()->toAtomString()); // ISO 8601 format
+                $url->addChild('priority', '0.64'); // optional, adjust as needed
+
+                // Save back
+                $xml->asXML($sitemapPath);
+            }
+        }
     
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' created successfully');
     }
@@ -325,6 +361,43 @@ class BlogsController extends Controller
                 DB::table($this->description_table_name)->where('id',$validate->id)->update($description_data);
             }
         }
+
+        // === Sitemap update ===
+        $category = DB::table('blogcategories')
+            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+            ->where('blogcategories.id', $input['blogcategory_id'])
+            ->where('blogcategories_description.language_id', 1) // English
+            ->select('blogcategories_description.title')
+            ->first();
+
+        $categorySlug = \Str::slug($category->title);
+        $newUrl = url('/blog/' . $categorySlug . '/' . $input['custom_url']);
+
+        $sitemapPath = public_path('sitemap.xml');
+        if(file_exists($sitemapPath)){
+            $xml = simplexml_load_file($sitemapPath);
+
+            $found = false;
+            foreach($xml->url as $u){
+                if((string)$u->loc === $newUrl){
+                    // Update lastmod if same URL exists
+                    $u->lastmod = now()->toAtomString();
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (!$found) {
+                // Add new entry if not found at all
+                $url = $xml->addChild('url');
+                $url->addChild('loc', $newUrl);
+                $url->addChild('lastmod', now()->toAtomString());
+                $url->addChild('priority', '0.64');
+            }
+
+            $xml->asXML($sitemapPath);
+        }
+
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' updated successfully');
     }
     
@@ -349,9 +422,42 @@ class BlogsController extends Controller
                 unlink($thumbnailPath); // Delete the thumbnail
             }
         }
+
+        // Build blog URL (category + custom_url) before deleting
+        $category = DB::table('blogcategories')
+            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+            ->where('blogcategories.id', $record->blogcategory_id)
+            ->where('blogcategories_description.language_id', 1) // English
+            ->select('blogcategories_description.title')
+            ->first();
+
+        $categorySlug = \Str::slug($category->title);
+        $blogUrl = url('/blog/' . $categorySlug . '/' . $record->custom_url);
+
+        // Delete blog record
         $record->delete();
-        
-        DB::table($this->description_table_name)->where('blog_id',$id)->delete();
+        DB::table($this->description_table_name)->where('blog_id', $id)->delete();
+
+        // === Remove from sitemap ===
+        $sitemapPath = public_path('sitemap.xml');
+        if(file_exists($sitemapPath)){
+            $xml = new \DOMDocument();
+            $xml->preserveWhiteSpace = false;
+            $xml->formatOutput = true;
+            $xml->load($sitemapPath);
+
+            $urls = $xml->getElementsByTagName('url');
+            foreach($urls as $url){
+                $loc = $url->getElementsByTagName('loc')->item(0)->nodeValue;
+                if($loc === $blogUrl){
+                    $url->parentNode->removeChild($url); // remove the <url> node
+                    break;
+                }
+            }
+
+            $xml->save($sitemapPath); // overwrite file
+        }
+
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' deleted successfully');
     }
 
