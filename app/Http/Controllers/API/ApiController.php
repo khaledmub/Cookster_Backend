@@ -708,7 +708,7 @@ class ApiController extends Controller
         });
         $query->whereDate('notifications.created_at', '>=', $user->created_at);
         $query->where('to_type', 2)->where('read_status', 0);
-        $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'user_review_id', 'read_status', 'status', 'created_at'])->get();
+        $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_id', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'user_review_id', 'read_status', 'status', 'created_at'])->get();
         foreach($notifications as $key => $notification){
             $notifications[$key]->details = AppHelper::get_notification_subject_text($notification);
         }
@@ -3586,6 +3586,41 @@ class ApiController extends Controller
                 'allow_one_time_qr_reward' => $settings->allow_one_time_qr_reward
             ], 200);
         }
+    }
+
+    public function send_liked_video_notification(Request $request) {
+        $user = DB::table('front_users')->where('id', $request->user_id)->first();
+        $video = DB::table('videos')->where('id', $request->video_id)->first();
+        if($user && $video){
+            $video_user = DB::table('front_users')->where('id', $video->front_user_id)->first();
+            if($video_user && $video_user->uuid){
+                $deviceTokens = array($video_user->uuid);
+                $notification_data = [
+                    'status' => true,
+                    'video_id' => $video->id
+                ];
+                $push_notification_text = [
+                    'title' => 'User liked a video',
+                    'text' => 'User ('.$user->name.') has liked your video ('.$video->title.').',
+                    'notification_data' => $notification_data
+                ];
+                AppHelper::send_push_notification($push_notification_text, $deviceTokens);
+
+                /* Create Notification Start */
+                $notification_data = array();
+                $notification_data['to_type'] = 2;
+                $notification_data['front_user_id'] = $video_user->id;
+                $notification_data['front_user_category'] = 0;
+                $notification_data['type'] = 5;
+                $notification_data['video_id'] = $video->id;
+                DB::table('notifications')->insert($notification_data);
+                /* Create Notification End */
+            }
+        }
+
+        return response()->json([
+            'status' => true
+        ], 200);
     }
 
     // General

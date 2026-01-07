@@ -2438,6 +2438,97 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "One-Time QR Reward Settings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}one_time_discount_history/settings",
+							"host": [
+								"{{base_url}}one_time_discount_history"
+							],
+							"path": [
+								"settings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add One-Time QR Reward History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{bearer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "customer_id",
+									"value": "1a0a4f3d-7671-4001-a7d3-abe90f108674",
+									"type": "text"
+								},
+								{
+									"key": "amount",
+									"value": "2",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}one_time_discount_history/add",
+							"host": [
+								"{{base_url}}one_time_discount_history"
+							],
+							"path": [
+								"add"
+							]
+						}
+					},
+					"response": []
 				}
 			]
 		},
@@ -3112,6 +3203,53 @@
 							],
 							"path": [
 								"liked_videos_list"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Notification for Liked Video",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept-Language",
+								"value": "{{language}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "video_id",
+									"value": "005c2afd-8865-4dfb-b47d-02e2b7a814da",
+									"description": "Comma Seperated",
+									"type": "text"
+								},
+								{
+									"key": "user_id",
+									"value": "0038bb3e-d28a-4480-ab97-57817ffaf67f",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}videos/send_liked_video_notification",
+							"host": [
+								"{{base_url}}videos"
+							],
+							"path": [
+								"send_liked_video_notification"
 							]
 						}
 					},

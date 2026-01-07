@@ -64,4 +64,6 @@ return [
     'already_availed_the_discount' => "تم الاستفادة من الخصم بالفعل.",
     'your_limit_has_been_reached' => "لقد وصلت إلى الحد المسموح.",
     'max_discount_error' => "لا يمكن تقديم خصم يزيد عن :discount.",
+    'user_liked_a_video' => "قام المستخدم بالإعجاب بفيديو",
+    'has_liked_your_video' => "قام بالإعجاب بفيديوك",
 ];

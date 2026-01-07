@@ -64,4 +64,6 @@ return [
     'already_availed_the_discount' => "Already availed the discount.",
     'your_limit_has_been_reached' => "Your limit has been reached.",
     'max_discount_error' => "Discount cannot be given more than :discount.",
+    'user_liked_a_video' => "User liked a video",
+    'has_liked_your_video' => "has liked your video",
 ];

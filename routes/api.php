@@ -42,6 +42,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/videos/settings', [ApiController::class, 'video_settings']);
     Route::post('/videos/list', [ApiController::class, 'videos_list']);
     Route::get('/videos/details', [ApiController::class, 'video_details']);
+    Route::post('/videos/send_liked_video_notification', [ApiController::class, 'send_liked_video_notification']);
 
     // Nearest Business Accounts/Restaurants
     Route::post('/business_accounts/nearest', [ApiController::class, 'nearest_business_accounts']);

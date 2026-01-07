@@ -272,6 +272,21 @@ class AppHelper
             $details['text'] = __('messages.user') . ' (' . $user_reviews_details->reviewer_name . ') ' . __('messages.new_user_review_msg');
             $details['date_time'] = date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
         }
+        else if($notification->type==5){
+            // Notification for front user when other user liked a video
+            $user_details = DB::table('front_users')->where('id', $notification->front_user_id)->first();
+            $video_details = DB::table('videos')->where('id', $notification->video_id)->first();
+            $details['title']=__('messages.user_liked_a_video');
+            
+            if($video_details){
+                $details['text']=__('messages.user') . ' ('.$user_details->name.') ' . __('messages.has_liked_your_video') . ' ('.$video_details->title.').';
+            }
+            else{
+                $details['text']=__('messages.video_not_found_msg');
+            }
+
+            $details['date_time']=date(env('DATE_TIME_FORMAT') ,strtotime($notification->created_at));
+        }
         return $details;
     }
     public static function send_push_notification($push_notification_text, $deviceTokens){
