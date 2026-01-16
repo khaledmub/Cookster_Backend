@@ -37,6 +37,8 @@ $works=\App\Helpers\AppHelper::get_works();
     <title>@yield('meta_title', 'Cookster')</title>
     <meta name="description" content="@yield('meta_description', 'Cookster')">
     <meta name="keywords" content="@yield('meta_keywords', 'Cookster,cookster')">
+    <meta name="robots" content="@yield('meta_robots', 'index, follow')">
+    <link rel="canonical" href="{{ url()->current() }}">
 
 </head>
 <body dir="<?php if(app()->getLocale()=='ar'){ echo 'rtl'; }else{ echo 'ltr'; } ?>">

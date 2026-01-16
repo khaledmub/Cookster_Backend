@@ -4,6 +4,7 @@
     @section('meta_title', $data['blog_details']->meta_title)
     @section('meta_description', $data['blog_details']->meta_description)
     @section('meta_keywords', $data['blog_details']->meta_keywords)
+    @section('meta_robots', 'index, follow')
 @endif
 
 @section('content')
