@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use \App\Helpers\AppHelper;
 use App;
 
@@ -25,9 +26,6 @@ class HomeController extends Controller
      */
     public function index(){
         $data = array();
-        // echo App::getLocale();
-        // exit;
-        // if(App::getLocale()=='ar'){}
         $language = App::getLocale();
 
         $query = DB::table('banners');
@@ -155,12 +153,13 @@ class HomeController extends Controller
             }
         }
 
-        $data['blogs'] = $query->select(['blogs.*', 'blogs_description.title', 'blogs_description.short_description', 'blogcategories_description.title as category_title'])->orderBy('blogs.date', 'DESC')->paginate(6);
+        $data['blogs'] = $query->select(['blogs.*', 'blogs_description.custom_url', 'blogs_description.title', 'blogs_description.short_description', 'blogcategories_description.title as category_title'])->orderBy('blogs.date', 'DESC')->paginate(6);
 
         return view('frontend.blog',compact('data'));
     }
-    public function blog_post($category, $post){
+    public function blog_post($locale, $category, $post){
         $data = array();
+        App::setLocale($locale);
         $language = App::getLocale();
         $data['blog_details'] = [];
         $data['related_blogs'] = [];
@@ -174,8 +173,7 @@ class HomeController extends Controller
                 ->join('site_languages as category_language', 'blogcategories_description.language_id', '=', 'category_language.id')
                 ->where('site_languages.code', $language)
                 ->where('category_language.code', $language)
-                // ->whereRaw('LOWER(REPLACE(blogs_description.title, " ", "-")) = ?', [strtolower($post)])
-                ->whereRaw('LOWER(REPLACE(blogs.custom_url, " ", "-")) = ?', [strtolower($post)])
+                ->whereRaw('LOWER(REPLACE(blogs_description.custom_url, " ", "-")) = ?', [strtolower($post)])
                 ->select('blogs.*', 'blogs_description.title', 'blogs_description.short_description', 'blogs_description.description', 'blogs_description.meta_title', 'blogs_description.meta_description', 'blogs_description.meta_keywords', 'blogcategories_description.title as category_title')
                 ->first();
 
@@ -190,10 +188,61 @@ class HomeController extends Controller
                 $query->where('category_language.code', $language);
                 $query->where('blogs.id', '!=', $data['blog_details']->id);
 
-                $data['related_blogs'] = $query->select(['blogs.*', 'blogs_description.title', 'blogs_description.short_description', 'blogcategories_description.title as category_title'])->inRandomOrder()->limit(3)->get();
+                $data['related_blogs'] = $query->select(['blogs.*', 'blogs_description.custom_url', 'blogs_description.title', 'blogs_description.short_description', 'blogcategories_description.title as category_title'])->inRandomOrder()->limit(3)->get();
             }
         }
 
         return view('frontend.blog_details',compact('data'));
+    }
+
+    public function rebuildSitemap()
+    {
+        $sitemapPath = public_path('sitemap.xml');
+
+        // Create new sitemap XML
+        $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?>'
+            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+
+        // Get all blogs with matching category descriptions per language
+        $blogs = DB::table('blogs')
+            ->join('blogs_description', 'blogs.id', '=', 'blogs_description.blog_id')
+            ->join('blogcategories', 'blogs.blogcategory_id', '=', 'blogcategories.id')
+            ->join('blogcategories_description', function ($join) {
+                $join->on('blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+                     ->on('blogs_description.language_id', '=', 'blogcategories_description.language_id');
+            })
+            ->join('site_languages', 'blogs_description.language_id', '=', 'site_languages.id')
+            ->select(
+                'blogs.id as blog_id',
+                'blogs.date',
+                'blogs_description.language_id',
+                'blogs_description.custom_url',
+                'blogcategories_description.title as category_title',
+                'site_languages.code as lang_code'
+            )
+            ->where('blogs_description.custom_url', '!=', '') // ✅ only non-empty slugs
+            ->get();
+
+        foreach ($blogs as $blog) {
+            // Arabic: keep native characters, English: slugify
+            $categorySlug = $blog->lang_code === 'ar'
+                ? str_replace(' ', '-', $blog->category_title)   // keep Arabic script
+                : Str::slug($blog->category_title);              // normal slug for English
+
+            $customUrl = $blog->custom_url;
+            $prefix    = $blog->lang_code === 'ar' ? '/ar' : '/en';
+
+            $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
+
+            $url = $xml->addChild('url');
+            $url->addChild('loc', $newUrl);
+            $url->addChild('lastmod', now()->toAtomString());
+            $url->addChild('priority', '0.64');
+        }
+
+        // Save sitemap
+        $xml->asXML($sitemapPath);
+
+        return response()->json(['message' => 'Sitemap rebuilt successfully']);
     }
 }

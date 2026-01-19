@@ -62,7 +62,6 @@
                             <tr>
                                  <th>Title</th>
                                  <th>Category</th>
-                                 <th>URL</th>
                                  <th>Image</th>
                                  <th>date</th>
                                  <th>Status</th>

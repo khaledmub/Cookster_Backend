@@ -42,13 +42,18 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/about_us', [HomeController::class, 'about_us'])->name('about_us');
 Route::get('/blog/{category?}', [HomeController::class, 'blog'])->name('blog');
-Route::get('/blog/{category}/{post}', [HomeController::class, 'blog_post'])->name('blog.post');
 Route::get('/privacy_policy', [HomeController::class, 'privacy_policy'])->name('privacy_policy');
 Route::get('/terms_of_use', [HomeController::class, 'terms_of_use'])->name('terms_of_use');
 Route::get('/contact_us', [HomeController::class, 'contact_us'])->name('contact_us');
 Route::post('ajax/submit_contact_us', [HomeController::class, 'submit_contact_us'])->name('contact.submit_contact_us.ajax');
 
+Route::get('/migrate-sitemap', [HomeController::class, 'rebuildSitemap'])->name('admin.migrate.sitemap');
 
+/* Blog Post */
+Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|ar']], function () {
+    Route::get('/blog/{category}/{post}', [HomeController::class, 'blog_post'])->name('blog.post');
+});
+/* Blog Post */
 
 Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

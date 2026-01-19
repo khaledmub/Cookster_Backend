@@ -58,11 +58,22 @@
                 </div>
 
                 @if(count($data['related_blogs']) > 0)
+                @php $locale = app()->getLocale(); @endphp
                     <h4 class="fw-bold mt-5 mb-4">{{ __('general.related_blogs') }}</h4>
                     <div class="row">
                         @foreach($data['related_blogs'] as $blog)
                         <div class="col-lg-4 col-md-6">
-                            <a href="{{ url('/blog/' . \Illuminate\Support\Str::slug($blog->category_title) . '/' . \Illuminate\Support\Str::slug($blog->custom_url)) }}" class="blog_card">
+                            <a href="{{ url(
+                                ($locale === 'ar' ? 'ar/' : 'en/') .
+                                'blog/' .
+                                ($locale === 'ar'
+                                    ? str_replace(' ', '-', $blog->category_title)   // keep Arabic script
+                                    : \Illuminate\Support\Str::slug($blog->category_title)) .
+                                '/' .
+                                ($locale === 'ar'
+                                    ? str_replace(' ', '-', $blog->custom_url)       // keep Arabic script
+                                    : \Illuminate\Support\Str::slug($blog->custom_url))
+                            ) }}" class="blog_card">
                                 <div class="blog_card_img">
                                     <img src="{{ asset('storage/blogs/'.$blog->image) }}" alt="">
                                     <div class="blog_date">{{ date('d M, Y', strtotime($blog->date)) }}</div>

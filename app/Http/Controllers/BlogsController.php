@@ -79,7 +79,6 @@ class BlogsController extends Controller
             $sub_array=array();
             $sub_array[]=$sdata->title;
             $sub_array[]=$sdata->category_title;
-            $sub_array[]=$sdata->custom_url;
             $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.asset('storage/'.$this->uploads_folder_name.'/'.$sdata->image).'">';
             $sub_array[]=date('d M, Y', strtotime($sdata->date));
             $sub_array[]=$status_label;
@@ -162,13 +161,15 @@ class BlogsController extends Controller
         $site_languages = DB::table('site_languages')->where('status',1)->orderBy('sort_order', 'ASC')->get();
         foreach ($site_languages as $language) {
             $customMessages['title.' . $language->id . '.required'] = 'The ' . $language->name . ' title is required.';
+            $customMessages['custom_url.' . $language->id . '.required'] = 'The ' . $language->name . ' custom url is required.';
         }
         $this->validate($request, [
             'title' => 'required|array',
             'title.*' => 'required',
+            'custom_url' => 'required|array',
+            'custom_url.*' => 'required',
             'blogcategory_id' => 'required',
             'date' => 'required',
-            'custom_url' => 'required',
             'image' => 'required|image|mimes:jpeg,png,jpg,gif,svg|dimensions:max_width=2000,max_height=2000|max:2048',
             'status' => 'required'
         ], $customMessages);
@@ -201,6 +202,7 @@ class BlogsController extends Controller
             $description_data = array(
                 'blog_id' => $record->id,
                 'language_id' => $language->id,
+                'custom_url' => $input['custom_url'][$language->id],
                 'title' => $input['title'][$language->id],
                 'short_description' => $input['short_description'][$language->id],
                 'description' => $input['description'][$language->id],
@@ -211,40 +213,61 @@ class BlogsController extends Controller
             DB::table($this->description_table_name)->insert($description_data);
         }
 
-        // Build blog URL (adjust path if needed)
-        $category = DB::table('blogcategories')
-            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
-            ->where('blogcategories.id', $input['blogcategory_id'])
-            ->where('blogcategories_description.language_id', 1) // English
-            ->select('blogcategories_description.title')
-            ->first();
-        $categorySlug = \Str::slug($category->title); // adjust if you store slug separately
-        $newUrl = url('/blog/' . $categorySlug . '/' . $input['custom_url']);
-
         // Path to sitemap
         $sitemapPath = public_path('sitemap.xml');
 
-        // Load sitemap
         if(file_exists($sitemapPath)){
             $xml = simplexml_load_file($sitemapPath);
 
-            $exists = false;
-            foreach($xml->url as $u){
-                if((string)$u->loc === $newUrl){
-                    $exists = true;
-                    break;
+            foreach($site_languages as $language){
+                // Get category title in this language
+                $category = DB::table('blogcategories')
+                    ->join('blogcategories_description', function ($join) use ($language) {
+                        $join->on('blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+                            ->where('blogcategories_description.language_id', $language->id);
+                    })
+                    ->where('blogcategories.id', $input['blogcategory_id'])
+                    ->select('blogcategories_description.title')
+                    ->first();
+
+                if(!$category){
+                    continue;
+                }
+
+                // Skip if custom_url is empty
+                if(empty($input['custom_url'][$language->id])){
+                    continue;
+                }
+
+                // Arabic: keep native characters, English: slugify
+                $categorySlug = $language->code === 'ar'
+                    ? str_replace(' ', '-', $category->title)
+                    : \Str::slug($category->title);
+
+                $customUrl = $input['custom_url'][$language->id];
+                $prefix    = $language->code === 'ar' ? '/ar' : '/en';
+
+                $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
+
+                // Check if already exists
+                $exists = false;
+                foreach($xml->url as $u){
+                    if((string)$u->loc === $newUrl){
+                        $exists = true;
+                        break;
+                    }
+                }
+
+                if(!$exists){
+                    $url = $xml->addChild('url');
+                    $url->addChild('loc', $newUrl);
+                    $url->addChild('lastmod', now()->toAtomString());
+                    $url->addChild('priority', '0.64');
                 }
             }
-            if(!$exists){
-                // Create new <url> entry
-                $url = $xml->addChild('url');
-                $url->addChild('loc', $newUrl);
-                $url->addChild('lastmod', now()->toAtomString()); // ISO 8601 format
-                $url->addChild('priority', '0.64'); // optional, adjust as needed
 
-                // Save back
-                $xml->asXML($sitemapPath);
-            }
+            // Save back once after loop
+            $xml->asXML($sitemapPath);
         }
     
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' created successfully');
@@ -311,10 +334,13 @@ class BlogsController extends Controller
         $site_languages = DB::table('site_languages')->where('status',1)->orderBy('sort_order', 'ASC')->get();
         foreach ($site_languages as $language) {
             $customMessages['title.' . $language->id . '.required'] = 'The ' . $language->name . ' title is required.';
+            $customMessages['custom_url.' . $language->id . '.required'] = 'The ' . $language->name . ' custom url is required.';
         }
         $this->validate($request, [
             'title' => 'required|array',
             'title.*' => 'required',
+            'custom_url' => 'required|array',
+            'custom_url.*' => 'required',
             'blogcategory_id' => 'required',
             'date' => 'required',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|dimensions:max_width=2000,max_height=2000|max:2048',
@@ -346,6 +372,7 @@ class BlogsController extends Controller
             $description_data = array(
                 'blog_id' => $id,
                 'language_id' => $language->id,
+                'custom_url' => $input['custom_url'][$language->id],
                 'title' => $input['title'][$language->id],
                 'short_description' => $input['short_description'][$language->id],
                 'description' => $input['description'][$language->id],
@@ -363,38 +390,60 @@ class BlogsController extends Controller
         }
 
         // === Sitemap update ===
-        $category = DB::table('blogcategories')
-            ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
-            ->where('blogcategories.id', $input['blogcategory_id'])
-            ->where('blogcategories_description.language_id', 1) // English
-            ->select('blogcategories_description.title')
-            ->first();
-
-        $categorySlug = \Str::slug($category->title);
-        $newUrl = url('/blog/' . $categorySlug . '/' . $input['custom_url']);
-
         $sitemapPath = public_path('sitemap.xml');
         if(file_exists($sitemapPath)){
             $xml = simplexml_load_file($sitemapPath);
 
-            $found = false;
-            foreach($xml->url as $u){
-                if((string)$u->loc === $newUrl){
-                    // Update lastmod if same URL exists
-                    $u->lastmod = now()->toAtomString();
-                    $found = true;
-                    break;
+            foreach($site_languages as $language){
+                // Get category title in this language
+                $category = DB::table('blogcategories')
+                    ->join('blogcategories_description', function ($join) use ($language) {
+                        $join->on('blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
+                            ->where('blogcategories_description.language_id', $language->id);
+                    })
+                    ->where('blogcategories.id', $input['blogcategory_id'])
+                    ->select('blogcategories_description.title')
+                    ->first();
+
+                if(!$category){
+                    continue;
+                }
+
+                // Skip if custom_url is empty
+                if(empty($input['custom_url'][$language->id])){
+                    continue;
+                }
+
+                // Arabic: keep native characters, English: slugify
+                $categorySlug = $language->code === 'ar'
+                    ? str_replace(' ', '-', $category->title)
+                    : \Str::slug($category->title);
+
+                $customUrl = $input['custom_url'][$language->id];
+                $prefix    = $language->code === 'ar' ? '/ar' : '/en';
+
+                $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
+
+                $found = false;
+                foreach($xml->url as $u){
+                    if((string)$u->loc === $newUrl){
+                        // Update lastmod if same URL exists
+                        $u->lastmod = now()->toAtomString();
+                        $found = true;
+                        break;
+                    }
+                }
+
+                if(!$found){
+                    // Add new entry if not found at all
+                    $url = $xml->addChild('url');
+                    $url->addChild('loc', $newUrl);
+                    $url->addChild('lastmod', now()->toAtomString());
+                    $url->addChild('priority', '0.64');
                 }
             }
 
-            if (!$found) {
-                // Add new entry if not found at all
-                $url = $xml->addChild('url');
-                $url->addChild('loc', $newUrl);
-                $url->addChild('lastmod', now()->toAtomString());
-                $url->addChild('priority', '0.64');
-            }
-
+            // Save back once after loop
             $xml->asXML($sitemapPath);
         }
 
@@ -423,16 +472,23 @@ class BlogsController extends Controller
             }
         }
 
-        // Build blog URL (category + custom_url) before deleting
-        $category = DB::table('blogcategories')
+        // Get all site languages
+        $site_languages = DB::table('site_languages')->where('status',1)->orderBy('sort_order','ASC')->get();
+
+        // Collect category titles per language before deleting
+        $categoryTitles = DB::table('blogcategories')
             ->join('blogcategories_description', 'blogcategories.id', '=', 'blogcategories_description.blogcategory_id')
             ->where('blogcategories.id', $record->blogcategory_id)
-            ->where('blogcategories_description.language_id', 1) // English
-            ->select('blogcategories_description.title')
-            ->first();
+            ->whereIn('blogcategories_description.language_id', $site_languages->pluck('id'))
+            ->select('blogcategories_description.language_id','blogcategories_description.title')
+            ->get()
+            ->keyBy('language_id');
 
-        $categorySlug = \Str::slug($category->title);
-        $blogUrl = url('/blog/' . $categorySlug . '/' . $record->custom_url);
+        // Collect custom_urls per language before deleting
+        $blogDescriptions = DB::table($this->description_table_name)
+            ->where('blog_id',$id)
+            ->get()
+            ->keyBy('language_id');
 
         // Delete blog record
         $record->delete();
@@ -447,23 +503,43 @@ class BlogsController extends Controller
             $xml->load($sitemapPath);
 
             $urls = $xml->getElementsByTagName('url');
-            foreach($urls as $url){
-                $loc = $url->getElementsByTagName('loc')->item(0)->nodeValue;
-                if($loc === $blogUrl){
-                    $url->parentNode->removeChild($url); // remove the <url> node
-                    break;
+
+            foreach($site_languages as $language){
+                // Ensure we have both category and blog description for this language
+                if(!isset($categoryTitles[$language->id]) || !isset($blogDescriptions[$language->id])){
+                    continue;
+                }
+
+                $customUrl = $blogDescriptions[$language->id]->custom_url;
+                if(empty($customUrl)){
+                    continue; // ✅ skip empty slugs
+                }
+
+                // Arabic: keep native characters, English: slugify
+                $categorySlug = $language->code === 'ar'
+                    ? str_replace(' ', '-', $categoryTitles[$language->id]->title)
+                    : \Str::slug($categoryTitles[$language->id]->title);
+
+                $prefix  = $language->code === 'ar' ? '/ar' : '/en';
+                $blogUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
+
+                // Loop through sitemap URLs and remove matches
+                foreach($urls as $url){
+                    $loc = $url->getElementsByTagName('loc')->item(0)->nodeValue;
+                    if($loc === $blogUrl){
+                        $url->parentNode->removeChild($url);
+                        break;
+                    }
                 }
             }
 
-            $xml->save($sitemapPath); // overwrite file
+            $xml->save($sitemapPath);
         }
 
         return redirect()->route($this->url_path.'.index')->with('success',$this->module_title_singular.' deleted successfully');
     }
 
     public function upload_editor_picture(Request $request){
-        // echo '1324';
-        // exit;
         $input=$request->all();
         
         if($request->file('upload')){
@@ -483,14 +559,11 @@ class BlogsController extends Controller
             $response['CKEditorFuncNum']=$CKEditorFuncNum;
             $response['url']=$url;
             echo "<script>window.parent.CKEDITOR.tools.callFunction('".$CKEditorFuncNum."', '".$url."', 'Image uploaded successfully')</script>";
-//            $re = "<script>window.parent.CKEDITOR.tools.callFunction(".$CKEditorFuncNum.", '".$url."', '".$msg."')</script>"; 
+        //    $re = "<script>window.parent.CKEDITOR.tools.callFunction(".$CKEditorFuncNum.", '".$url."', '".$msg."')</script>"; 
         }
-//        else{
-//            $re = '<script>alert("Unable to upload the file")</script>';
-//        }
-//        echo "<pre>".$image_name;
-//        var_dump($_FILES);
-//        exit;
+        // else{
+        //     $re = '<script>alert("Unable to upload the file")</script>';
+        // }
     }
 
 }

@@ -68,6 +68,12 @@
                                                 <input type="text" name="title[{{$s_language->id}}]" placeholder="" class="form-control" value="{{ $m_data_descriptions[$s_language->id]->title }}">
                                             </div>
                                         </div>
+                                        <div class="col-xs-3 col-sm-3 col-md-3 mb-3">
+                                            <div class="form-group">
+                                                <label class="form-label">Custom URL (i.e creamy-chicken) <span class="text-danger">*</span> <i class="fa-solid fa-circle-info" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Note: Enter only the slug (e.g. creamy-chicken). Do not include https:// or domain."></i></label>
+                                                <input type="text" name="custom_url[{{$s_language->id}}]" placeholder="" class="form-control" value="{{ $m_data_descriptions[$s_language->id]->custom_url }}">
+                                            </div>
+                                        </div>
                                         <div class="col-12 mb-3">
                                             <div class="form-group">
                                                 <label class="form-label">Short Description</label>
@@ -148,13 +154,6 @@
                                         @endif
                                         </label>
                                         <input type="file" name="image" class="form-control">
-                                    </div>
-                                </div>
-                                <div class="col-xs-12 col-sm-12 col-md-12 mb-3">
-                                    <div class="form-group">
-                                        <label class="form-label">Custom Url (i.e creamy-chicken) <span class="text-danger">*</span></label> <br/>
-                                        <small class="text-muted">Note: Enter only the slug (e.g. <b>creamy-chicken</b>). Do not include https:// or domain.</small>
-                                        <input type="text" name="custom_url" value="{{ $m_data->custom_url }}" class="form-control">
                                     </div>
                                 </div>
                                 <div class="col-xs-12 col-sm-12 col-md-12 mb-3">

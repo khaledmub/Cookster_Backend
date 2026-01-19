@@ -325,3 +325,32 @@ Upload Status: Done
 -----------------------------------
 Database Changes
 - 
+
+==========================================================================
+
+Phase: 3.2
+Development Start Date: 19-January-2026
+Developer: HA
+Upload Status: N/A
+-----------------------------------
+Database Changes
+- Drop "custom_url" column from "blogs" table manually
+- ALTER TABLE `blogs_description` ADD `custom_url` VARCHAR(255) NULL AFTER `language_id`;
+
+
+
+===================================================
+
+-- Copy blogs.custom_url into blogs_description for English
+UPDATE blogs_description bd
+JOIN blogs b ON bd.blog_id = b.id
+JOIN site_languages sl ON bd.language_id = sl.id
+SET bd.custom_url = b.custom_url
+WHERE sl.code = 'en';
+
+-- Copy blogs.custom_url into blogs_description for Arabic
+UPDATE blogs_description bd
+JOIN blogs b ON bd.blog_id = b.id
+JOIN site_languages sl ON bd.language_id = sl.id
+SET bd.custom_url = b.custom_url
+WHERE sl.code = 'ar';
