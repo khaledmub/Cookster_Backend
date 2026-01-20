@@ -244,7 +244,10 @@ class BlogsController extends Controller
                     ? str_replace(' ', '-', $category->title)
                     : \Str::slug($category->title);
 
-                $customUrl = $input['custom_url'][$language->id];
+                $customUrl = $language->code === 'ar'
+                    ? str_replace(' ', '-', $input['custom_url'][$language->id])       // keep Arabic script
+                    : \Str::slug($input['custom_url'][$language->id]);                 // normal slug for English
+
                 $prefix    = $language->code === 'ar' ? '/ar' : '/en';
 
                 $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
@@ -419,7 +422,10 @@ class BlogsController extends Controller
                     ? str_replace(' ', '-', $category->title)
                     : \Str::slug($category->title);
 
-                $customUrl = $input['custom_url'][$language->id];
+                $customUrl = $language->code === 'ar'
+                    ? str_replace(' ', '-', $input['custom_url'][$language->id])       // keep Arabic script
+                    : \Str::slug($input['custom_url'][$language->id]);                 // normal slug for English
+
                 $prefix    = $language->code === 'ar' ? '/ar' : '/en';
 
                 $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
@@ -519,6 +525,10 @@ class BlogsController extends Controller
                 $categorySlug = $language->code === 'ar'
                     ? str_replace(' ', '-', $categoryTitles[$language->id]->title)
                     : \Str::slug($categoryTitles[$language->id]->title);
+
+                $customUrl = $language->code === 'ar'
+                    ? str_replace(' ', '-', $customUrl)       // keep Arabic script
+                    : \Str::slug($customUrl);                 // normal slug for English
 
                 $prefix  = $language->code === 'ar' ? '/ar' : '/en';
                 $blogUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);

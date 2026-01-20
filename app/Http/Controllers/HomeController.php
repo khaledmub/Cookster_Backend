@@ -229,7 +229,10 @@ class HomeController extends Controller
                 ? str_replace(' ', '-', $blog->category_title)   // keep Arabic script
                 : Str::slug($blog->category_title);              // normal slug for English
 
-            $customUrl = $blog->custom_url;
+            $customUrl = $blog->lang_code === 'ar'
+                ? str_replace(' ', '-', $blog->custom_url)       // keep Arabic script
+                : Str::slug($blog->custom_url);                  // normal slug for English
+
             $prefix    = $blog->lang_code === 'ar' ? '/ar' : '/en';
 
             $newUrl = url($prefix . '/blog/' . $categorySlug . '/' . $customUrl);
