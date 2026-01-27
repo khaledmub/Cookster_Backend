@@ -110,6 +110,12 @@ class ApiController extends Controller
         $user = FrontUser::create($front_user_data);
         $user = FrontUser::where('email', $request->email)->first();
 
+        if($request->entity == 1){
+            $additional_data = array();
+            $additional_data['front_user_id'] = $user->id;
+            $additional_data['website'] = $request->website;
+            DB::table('personal_account_additional_data')->insert($additional_data);
+        }
         if($request->entity == 2){
             $additional_data = array();
             $additional_data['front_user_id'] = $user->id;
@@ -461,7 +467,10 @@ class ApiController extends Controller
         
         $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
 
-        if($user->entity==2){
+        if($user->entity==1){
+            $additional_data = DB::table('personal_account_additional_data')->where('front_user_id', $user->id)->first();
+        }
+        else if($user->entity==2){
             $form_settings['business_types'] = AppHelper::get_key_values(1);
             $additional_data = DB::table('business_account_additional_data as b')->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type')->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id')->where('key_language.code', $language)->where('b.front_user_id', $user->id)->select('b.*', 'bt.name as business_type_name')->first();
         }
@@ -601,7 +610,23 @@ class ApiController extends Controller
             $user->cover_image = $image_input['imagename'];
         }
         $user->save();
-        if($user->entity==2){
+        if($user->entity==1){
+            $additional_data = array();
+            if($request->input('website')){
+                $additional_data['website'] = $request->input('website');
+            }
+            if(!empty($additional_data)){
+                $validate_additional_data = DB::table('personal_account_additional_data')->where('front_user_id', $user->id)->first();
+                if(empty($validate_additional_data)){
+                    $additional_data['front_user_id'] = $user->id;
+                    DB::table('personal_account_additional_data')->insert($additional_data);
+                }
+                else{
+                    DB::table('personal_account_additional_data')->where('id',$validate_additional_data->id)->update($additional_data);
+                }
+            }
+        }
+        else if($user->entity==2){
             $additional_data = array();
             if($request->input('business_type')){
                 $additional_data['business_type'] = $request->input('business_type');

@@ -336,3 +336,13 @@ Upload Status: Done
 Database Changes
 - Drop "custom_url" column from "blogs" table manually
 - ALTER TABLE `blogs_description` ADD `custom_url` VARCHAR(255) NULL AFTER `language_id`;
+
+==========================================================================
+
+Phase: 3.3
+Development Start Date: 27-January-2026
+Developer: HA
+Upload Status: Done
+-----------------------------------
+Database Changes
+- Create table "personal_account_additional_data"
