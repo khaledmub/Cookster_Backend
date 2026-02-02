@@ -1457,6 +1457,36 @@ class ApiController extends Controller
         ], 200);
     }
     public function profile_details(Request $request){
+        $userAgent = $request->header('User-Agent');
+        $isAndroid = Str::contains($userAgent, 'Android');
+        $isIos = Str::contains($userAgent, ['iPhone', 'iPad', 'iPod']);
+
+        // Check if the request expects JSON (from the app) or HTML (from a browser link)
+        if(!$request->expectsJson()){
+            // if($isAndroid){
+            //     // Replace with your Android Intent or Play Store link
+            //     return redirect()->away('intent://profile_details#Intent;scheme=' . env('MOBILE_APP_ANDROID_SCHEME') . ';package=' . env('MOBILE_APP_PACKAGE') . ';end');
+            // }
+            // elseif($isIos){
+            //     // Replace with your iOS Custom Scheme or Universal Link
+            //     return redirect()->away(env('MOBILE_APP_IOS_SCHEME') . '://profile_details');
+            // }
+            // else{
+            //     return response()->noContent();
+            // }
+            if($isAndroid || $isIos){
+                // Return a view that executes your JS logic
+                return view('app-redirect', [
+                    'isAndroid' => $isAndroid,
+                    'isIos' => $isIos,
+                    'id' => $request->id
+                ]);
+            }
+            
+            // For desktop/web case, show nothing
+            return response()->noContent();
+        }
+
         $input = $request->all();
         $language = App::getLocale();
         $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();

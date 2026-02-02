@@ -35,7 +35,6 @@ Route::middleware([SetLanguage::class])->group(function () {
     /** Without Auth **/
     Route::post('/search', [ApiController::class, 'search']);
     Route::get('/profile_details', [ApiController::class, 'profile_details']);
-    Route::get('/profile_details', [ApiController::class, 'profile_details']);
     Route::get('/followers_list', [ApiController::class, 'followers_list']);
 
     // Videos
