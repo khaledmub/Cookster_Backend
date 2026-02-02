@@ -8,13 +8,14 @@
     <script>
         var isAndroid = {{ $isAndroid ? 'true' : 'false' }};
         var isIOS = {{ $isIos ? 'true' : 'false' }};
+        var id = {{ $id }};
 
         if (isAndroid) {
             // Your logic for Android
-            window.location.href = "intent://profile_details#Intent;scheme=https;package=com.cookster.cooksterapp;end";
+            window.location.href = "intent://api/profile_details?id=" + id + "#Intent;scheme=cookster;package=com.cookster.cooksterapp;end";
         } else if (isIOS) {
             // Your logic for iOS (Fixed quotes)
-            window.location.href = "cookster://profile_details";
+            window.location.href = "cookster://api/profile_details?id=" + id;
         }
         
         // Optional: Close the tab or go back if nothing happens after a few seconds
