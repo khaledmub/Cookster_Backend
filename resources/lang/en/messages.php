@@ -26,6 +26,7 @@ return [
     'video_saved_success' => "Video saved successfully.",
     'video_unsaved_success' => "Video unsaved successfully.",
     'forgot_code_email_sent' => "Verification email sent, Please check your email inbox for a message containing your verification code. Enter the code below to continue resetting your password.",
+    'forgot_code_email_failed' => "Unable to send verification email right now. Please try again shortly.",
     'invalid_verification_code' => "Invalid verification code",
     'verified_verification_code' => "Verified verification code successfully",
     'password_update_success' => "Password updated successfully",

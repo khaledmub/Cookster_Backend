@@ -49,15 +49,26 @@ class AwsSecretsProvider extends ServiceProvider
                 if (isset($s3_result['SecretString'])) {
                     $secrets = json_decode($s3_result['SecretString'], true);
 
-                    // Dynamically override config values
+                    // Keys + bucket/region; bucket must never be null (Flysystem AwsS3V3Adapter type-hints string).
+                    $bucket = $secrets['AWS_BUCKET'] ?? $secrets['bucket'] ?? config('services.s3.bucket');
+                    $bucket = is_string($bucket) ? $bucket : '';
                     config([
-                        'filesystems.disks.s3.key'      => $secrets['AWS_ACCESS_KEY_ID'] ?? '',
-                        'filesystems.disks.s3.secret'   => $secrets['AWS_SECRET_ACCESS_KEY'] ?? ''
+                        'services.s3.key' => $secrets['AWS_ACCESS_KEY_ID'] ?? config('services.s3.key'),
+                        'services.s3.secret' => $secrets['AWS_SECRET_ACCESS_KEY'] ?? config('services.s3.secret'),
+                        'services.s3.bucket' => $bucket,
+                        'services.s3.region' => $secrets['AWS_DEFAULT_REGION'] ?? $secrets['region'] ?? config('services.s3.region'),
+                        'services.s3.endpoint' => $secrets['AWS_ENDPOINT'] ?? $secrets['endpoint'] ?? config('services.s3.endpoint'),
+                        'services.s3.url' => $secrets['AWS_URL'] ?? $secrets['public_url'] ?? config('services.s3.url'),
                     ]);
 
                     config([
-                        'services.s3.key'    => $secrets['AWS_ACCESS_KEY_ID'] ?? '',
-                        'services.s3.secret' => $secrets['AWS_SECRET_ACCESS_KEY'] ?? ''
+                        'filesystems.disks.s3.key' => $secrets['AWS_ACCESS_KEY_ID'] ?? config('filesystems.disks.s3.key'),
+                        'filesystems.disks.s3.secret' => $secrets['AWS_SECRET_ACCESS_KEY'] ?? config('filesystems.disks.s3.secret'),
+                        'filesystems.disks.s3.bucket' => $bucket,
+                        'filesystems.disks.s3.region' => $secrets['AWS_DEFAULT_REGION'] ?? $secrets['region'] ?? config('filesystems.disks.s3.region'),
+                        'filesystems.disks.s3.endpoint' => $secrets['AWS_ENDPOINT'] ?? $secrets['endpoint'] ?? config('filesystems.disks.s3.endpoint'),
+                        'filesystems.disks.s3.url' => $secrets['AWS_URL'] ?? $secrets['public_url'] ?? config('filesystems.disks.s3.url'),
+                        'filesystems.disks.s3.cloudfront_path' => $secrets['AWS_CLOUD_FRONT_PATH'] ?? $secrets['cloudfront_path'] ?? config('filesystems.disks.s3.cloudfront_path'),
                     ]);
                 }
             } catch (\Exception $e) {

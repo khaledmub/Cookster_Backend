@@ -9,6 +9,8 @@ use DB;
 use Illuminate\Support\Arr;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use \App\Helpers\AppHelper;
 use Image;
     
@@ -138,8 +140,16 @@ class ScreensController extends Controller
         if($request->file('image')){
             $image = $request->file('image');
             $image_input['imagename'] = time().'.'.$image->extension();
-            $fileresponse=$request->file('image')->storeAs('public/'.$this->uploads_folder_name,$image_input['imagename']);
+            $stored = Storage::disk('public')->putFileAs($this->uploads_folder_name, $image, $image_input['imagename']);
+            if ($stored === false) {
+                return redirect()->back()->withInput()->withErrors([
+                    'image' => 'Unable to store screen image.',
+                ]);
+            }
             $destinationPath = storage_path('app/public/'.$this->uploads_folder_name.'/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();
@@ -221,8 +231,16 @@ class ScreensController extends Controller
         if($request->file('image')){
             $image = $request->file('image');
             $image_input['imagename'] = time().'.'.$image->extension();
-            $fileresponse=$request->file('image')->storeAs('public/'.$this->uploads_folder_name,$image_input['imagename']);
+            $stored = Storage::disk('public')->putFileAs($this->uploads_folder_name, $image, $image_input['imagename']);
+            if ($stored === false) {
+                return redirect()->back()->withInput()->withErrors([
+                    'image' => 'Unable to store screen image.',
+                ]);
+            }
             $destinationPath = storage_path('app/public/'.$this->uploads_folder_name.'/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();

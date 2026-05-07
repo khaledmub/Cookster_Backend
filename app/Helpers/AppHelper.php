@@ -17,42 +17,115 @@ use Google\Auth\ApplicationDefaultCredentials;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise;
+use Illuminate\Support\Facades\Log;
 
 class AppHelper
 {
     private static $userids=array();
 
 	public static function send_email($from_email, $to_email, $subject, $message){
-        return true;
-        $from_email = 'info@cookster.org';
-        Mail::send([], [], function ($inner_message) use ($to_email, $subject, $from_email, $message){
-          $inner_message->to($to_email)
-            ->subject($subject)
-            ->from($from_email)
-            ->html($message);
-        });
-        return true;
+        $dispatch_mode = 'sync';
+        $provider_message_id = null;
+        $mailer = (string) config('mail.default');
+        $nonDeliverableMailers = ['log', 'array'];
+
+        if (in_array($mailer, $nonDeliverableMailers, true)) {
+            $errorMessage = 'Configured mailer does not deliver externally: '.$mailer;
+            Log::warning('Email dispatch skipped due to non-deliverable mailer', [
+                'mailer' => $mailer,
+                'to_email' => $to_email,
+                'subject' => $subject,
+            ]);
+
+            return [
+                'success' => false,
+                'mail_dispatched' => false,
+                'dispatch_mode' => $dispatch_mode,
+                'provider_message_id' => $provider_message_id,
+                'queue_job_id' => null,
+                'error_code' => 'MAILER_NOT_DELIVERABLE',
+                'error_message' => $errorMessage,
+            ];
+        }
+
+        try {
+            $resolved_from_email = $from_email ?: config('mail.from.address');
+            $resolved_from_name = config('mail.from.name');
+
+            Mail::send([], [], function ($inner_message) use ($to_email, $subject, $resolved_from_email, $resolved_from_name, $message) {
+                $inner_message->to($to_email)
+                    ->subject($subject)
+                    ->from($resolved_from_email, $resolved_from_name)
+                    ->html($message);
+            });
+
+            return [
+                'success' => true,
+                'mail_dispatched' => true,
+                'dispatch_mode' => $dispatch_mode,
+                'provider_message_id' => $provider_message_id,
+                'queue_job_id' => null,
+                'error_code' => null,
+                'error_message' => null,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Email dispatch failed', [
+                'to_email' => $to_email,
+                'subject' => $subject,
+                'error_code' => (string) $e->getCode(),
+                'error_message' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'mail_dispatched' => false,
+                'dispatch_mode' => $dispatch_mode,
+                'provider_message_id' => $provider_message_id,
+                'queue_job_id' => null,
+                'error_code' => (string) $e->getCode(),
+                'error_message' => $e->getMessage(),
+            ];
+        }
 	}
 	public static function get_site_settings(){
 		$data = Setting::where('id', 1)->first();
 		return $data;
 	}
-    public static function send_verification_code($medium, $user){
+    public static function send_verification_code($medium, $user, $type = 'reset'){
         // Medium 1 for email, 2 for phone
-        $data = array();
-        $data['medium'] = $medium;
-        $data['front_user_id'] = $user->id;
         $verfication_code = self::generateVerificationCode(5);
-        $data['code'] = $verfication_code;
-        DB::table('verification_codes')->insert($data);
+        $result = [
+            'success' => false,
+            'mail_dispatched' => false,
+            'dispatch_mode' => 'sync',
+            'provider_message_id' => null,
+            'queue_job_id' => null,
+            'error_code' => null,
+            'error_message' => null,
+            'verification_code' => $verfication_code,
+        ];
 
         if($medium==1){
             $email_to = $user->email;
-            $html = view('email_templates.front_user.verification_code', compact('user', 'verfication_code'))->render();
-            $subject="Email Verification";
-            self::send_email(env('MAIL_FROM_ADDRESS'), $email_to, $subject, $html);
+            $view_name = $type === 'register' ? 'email_templates.front_user.welcome_verification_code' : 'email_templates.front_user.verification_code';
+            $html = view($view_name, compact('user', 'verfication_code'))->render();
+            $subject = $type === 'register' ? 'Welcome Verification' : 'Email Verification';
+            $result = array_merge($result, self::send_email(env('MAIL_FROM_ADDRESS'), $email_to, $subject, $html));
+
+            if (!$result['success']) {
+                return $result;
+            }
         }
-        return true;
+
+        DB::table('verification_codes')->where('medium', $medium)->where('front_user_id', $user->id)->delete();
+        DB::table('verification_codes')->insert([
+            'medium' => $medium,
+            'front_user_id' => $user->id,
+            'code' => $verfication_code,
+        ]);
+
+        $result['success'] = true;
+        return $result;
     }
     public static function generateVerificationCode($length = 5) {
         $characters = '0123456789';
@@ -72,6 +145,119 @@ class AppHelper
         $works = $query->select(['works.*', 'works_description.title', 'works_description.number', 'works_description.description'])->get();
         return $works;
     }
+
+    /**
+     * Public base URL for objects on the S3/GCS disk (trailing slash).
+     * Prefer AWS_CLOUD_FRONT_PATH; fall back to AWS_URL (matches admin + API).
+     */
+    public static function mediaPublicBaseUrl(): string
+    {
+        // Must use config(): env() is empty at runtime when config is cached (breaks mobile video URLs).
+        $base = rtrim((string) (config('filesystems.disks.s3.cloudfront_path') ?? ''), '/');
+        if ($base === '') {
+            $base = rtrim((string) (config('filesystems.disks.s3.url') ?? ''), '/');
+        }
+
+        $bucket = (string) (config('filesystems.disks.s3.bucket') ?? '');
+        // Common misconfig: AWS_URL copied from AWS_ENDPOINT → https://storage.googleapis.com with no bucket segment.
+        // Public object URLs must be …/BUCKET/videos/… (path-style) or https://BUCKET.storage.googleapis.com/…
+        if ($bucket !== '' && preg_match('#^https?://storage\.googleapis\.com/?$#i', $base)) {
+            $base = rtrim($base, '/').'/'.$bucket;
+        }
+
+        return $base === '' ? '' : $base.'/';
+    }
+
+    /**
+     * @param  non-empty-string  $baseWithSlash  From mediaPublicBaseUrl()
+     */
+    private static function absoluteUrlForStoredObject(string $baseWithSlash, string $stored, string $defaultPrefix): ?string
+    {
+        $stored = trim($stored);
+        if ($stored === '') {
+            return null;
+        }
+        if (str_starts_with($stored, 'http://') || str_starts_with($stored, 'https://')) {
+            return $stored;
+        }
+
+        $stored = ltrim(str_replace('\\', '/', $stored), '/');
+        if (str_starts_with($stored, 'videos/')) {
+            return rtrim($baseWithSlash, '/').'/'.$stored;
+        }
+
+        return rtrim($baseWithSlash, '/').'/'.ltrim($defaultPrefix, '/').$stored;
+    }
+
+    /**
+     * Add video_url / image_url / thumbnail_url and optionally rewrite video & image to absolute URLs
+     * so mobile players that pass the field straight to VideoPlayer/Image.network work with GCS.
+     *
+     * Set API_MEDIA_USE_ABSOLUTE_VIDEO_URL=false to only add * _url fields and keep legacy filenames.
+     */
+    public static function decorateVideoRow(object $v): void
+    {
+        $base = self::mediaPublicBaseUrl();
+        $pathVideo = isset($v->video) ? (string) $v->video : '';
+        $pathImage = isset($v->image) ? (string) $v->image : '';
+
+        if ($base === '') {
+            $v->video_url = null;
+            $v->image_url = null;
+            $v->thumbnail_url = null;
+
+            return;
+        }
+
+        $v->video_url = self::absoluteUrlForStoredObject($base, $pathVideo, 'videos/');
+
+        $v->image_url = self::absoluteUrlForStoredObject($base, $pathImage, 'videos/');
+
+        $v->thumbnail_url = null;
+        if ($pathImage !== '') {
+            if (str_starts_with($pathImage, 'http://') || str_starts_with($pathImage, 'https://')) {
+                $pathPart = parse_url($pathImage, PHP_URL_PATH);
+                $thumbKey = $pathPart ? basename($pathPart) : '';
+            } else {
+                $thumbKey = basename(str_replace('\\', '/', $pathImage));
+            }
+            if ($thumbKey !== '') {
+                $v->thumbnail_url = rtrim($base, '/').'/videos/thumbnail/'.$thumbKey;
+            }
+        }
+
+        $useAbsolute = (bool) config('filesystems.disks.s3.api_media_absolute_urls', true);
+        if (! $useAbsolute) {
+            return;
+        }
+
+        if ($pathVideo !== '' && ! str_starts_with($pathVideo, 'http://') && ! str_starts_with($pathVideo, 'https://')) {
+            $v->video = $v->video_url;
+        }
+        if ($pathImage !== '' && ! str_starts_with($pathImage, 'http://') && ! str_starts_with($pathImage, 'https://')) {
+            $v->image = $v->image_url;
+        }
+    }
+
+    /** @param \Illuminate\Support\Collection|array<int, object> $videos */
+    public static function decorateVideoIterable($videos): void
+    {
+        if ($videos instanceof \Illuminate\Support\Collection) {
+            foreach ($videos as $v) {
+                self::decorateVideoRow($v);
+            }
+
+            return;
+        }
+        if (is_array($videos)) {
+            foreach ($videos as $v) {
+                if (is_object($v)) {
+                    self::decorateVideoRow($v);
+                }
+            }
+        }
+    }
+
     public static function custom_number_format($number, $decimals){
         return number_format($number, $decimals, '.', ',');
     }

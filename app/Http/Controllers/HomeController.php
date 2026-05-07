@@ -10,6 +10,9 @@ use App;
 
 class HomeController extends Controller
 {
+    private string $androidPackageName = 'com.cookster.cooksterapp';
+    private string $androidSha256 = '29:EA:D4:28:4B:EB:5A:11:DC:F7:F9:C0:25:CC:F5:36:63:72:4C:C3:85:7D:6A:5A:9E:EB:04:E5:29:2D:80:FF';
+
     /**
      * Create a new controller instance.
      *
@@ -110,6 +113,87 @@ class HomeController extends Controller
         // ]);
         AppHelper::send_email($allrequestdata['email'], $email_to, $subject, $html);
         return response()->json(['status'=>true, 'message'=>trans('general.contactus_success')]);
+    }
+    public function assetlinks()
+    {
+        $payload = [[
+            'relation' => [
+                'delegate_permission/common.handle_all_urls',
+                'delegate_permission/common.get_login_creds',
+            ],
+            'target' => [
+                'namespace' => 'android_app',
+                'package_name' => env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+                'sha256_cert_fingerprints' => [
+                    env('ANDROID_APP_SHA256', $this->androidSha256),
+                ],
+            ],
+        ]];
+
+        return response()->json($payload, 200, [
+            'Content-Type' => 'application/json',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+    public function appleAppSiteAssociation()
+    {
+        $teamId = trim((string) env('IOS_TEAM_ID', ''));
+        $bundleId = trim((string) env('IOS_APP_BUNDLE_ID', ''));
+        $details = [];
+
+        if ($teamId !== '' && $bundleId !== '') {
+            $details[] = [
+                'appID' => $teamId.'.'.$bundleId,
+                'paths' => [
+                    '/web/visitSingleVideo',
+                    '/web/visitSingleVideo/*',
+                ],
+            ];
+        }
+
+        $payload = [
+            'applinks' => [
+                'apps' => [],
+                'details' => $details,
+            ],
+        ];
+
+        return response()->json($payload, 200, [
+            'Content-Type' => 'application/json',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+    public function visitSingleVideo(Request $request)
+    {
+        $videoId = (string) $request->query('id', '');
+        abort_if($videoId === '', 404);
+
+        $video = DB::table('videos as v')
+            ->leftJoin('front_users as u', 'u.id', '=', 'v.front_user_id')
+            ->where('v.id', $videoId)
+            ->where('v.is_soft_delete', 0)
+            ->select([
+                'v.id',
+                'v.title',
+                'v.description',
+                'v.video',
+                'v.image',
+                'v.status',
+                'u.name as user_name',
+            ])
+            ->first();
+
+        abort_if(!$video, 404);
+
+        AppHelper::decorateVideoRow($video);
+
+        return view('frontend.video_deeplink', [
+            'video' => $video,
+            'androidPackageName' => env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+            'iosAppStoreUrl' => 'https://apps.apple.com/us/app/cookster-كوكستر/id6746804733',
+            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+            'appSchemeUrl' => 'cookster://api/video_details?id='.$video->id,
+        ]);
     }
     public function blog($category = null){
         $data = array();

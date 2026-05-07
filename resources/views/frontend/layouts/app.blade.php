@@ -1,6 +1,8 @@
 @php
-$settings=\App\Helpers\AppHelper::get_site_settings();
-$works=\App\Helpers\AppHelper::get_works();
+$settings = \App\Helpers\AppHelper::get_site_settings();
+$app_store_link = $settings?->app_store_link ?? '#';
+$play_store_link = $settings?->play_store_link ?? '#';
+$works = \App\Helpers\AppHelper::get_works();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -42,7 +44,7 @@ $works=\App\Helpers\AppHelper::get_works();
 
 </head>
 <body dir="<?php if(app()->getLocale()=='ar'){ echo 'rtl'; }else{ echo 'ltr'; } ?>">
-    <input type="hidden" id="baseurl" value="<?php echo config('app.url'); ?>">
+    <input type="hidden" id="baseurl" value="{{ rtrim(config('app.url'), '/') }}/">
     <input type="hidden" id="language" value="<?php echo App::getLocale(); ?>">
     <input type="hidden" id="pageName" value="{{ Route::currentRouteName() }}">
 
@@ -71,7 +73,7 @@ $works=\App\Helpers\AppHelper::get_works();
                                 <img src="{{ asset('assets/frontend/images/app_store_qr.svg') }}" alt="">
                             </div>
                             <div class="storebtns mt-4">
-                                <a target="_blank" href="{{ $settings->app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
+                                <a target="_blank" href="{{ $app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
                             </div>
                         </div>
                         <div class="col-sm-6">
@@ -80,7 +82,7 @@ $works=\App\Helpers\AppHelper::get_works();
                                 <img src="{{ asset('assets/frontend/images/play_store_qr.svg') }}" alt="">
                             </div>
                             <div class="storebtns mt-4">
-                                <a target="_blank" href="{{ $settings->play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
+                                <a target="_blank" href="{{ $play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
                             </div>
                         </div>
                     </div>
@@ -156,8 +158,8 @@ $works=\App\Helpers\AppHelper::get_works();
                     </div>
                     <div class="col-sm-6 text-end">
                         <div class="storebtns">
-                            <a target="_blank" href="{{ $settings->app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
-                            <a target="_blank" href="{{ $settings->play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
+                            <a target="_blank" href="{{ $app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
+                            <a target="_blank" href="{{ $play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
                         </div>
                     </div>
                 </div>
@@ -188,8 +190,8 @@ $works=\App\Helpers\AppHelper::get_works();
                 </div>
                 <div class="title_right">
                     <div class="storebtns">
-                        <a target="_blank" href="{{ $settings->app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
-                        <a target="_blank" href="{{ $settings->play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
+                        <a target="_blank" href="{{ $app_store_link }}"><img src="{{ asset('assets/frontend/images/appstore_btn.png') }}" alt=""></a>
+                        <a target="_blank" href="{{ $play_store_link }}"><img src="{{ asset('assets/frontend/images/playstore_btn.png') }}" alt=""></a>
                     </div>
                 </div>
             </div>
@@ -224,22 +226,22 @@ $works=\App\Helpers\AppHelper::get_works();
                     <div class="col-sm-3">
                         <h4>{{ __('general.social_links') }}</h4>
                         <div class="f_socail_icons">
-                            @if($settings->facebook)
+                            @if(!empty($settings?->facebook))
                             <a target="_blank" href="{{ $settings->facebook }}"><img src="{{ asset('assets/frontend/images/facebook.png') }}" alt=""></a>
                             @endif
-                            @if($settings->twitter)
+                            @if(!empty($settings?->twitter))
                             <a target="_blank" href="{{ $settings->twitter }}"><img src="{{ asset('assets/frontend/images/twitter.png') }}" alt=""></a>
                             @endif
-                            @if($settings->instagram)
+                            @if(!empty($settings?->instagram))
                             <a target="_blank" href="{{ $settings->instagram }}"><img src="{{ asset('assets/frontend/images/instagram.png') }}" alt=""></a>
                             @endif
-                            @if($settings->linkedin)
+                            @if(!empty($settings?->linkedin))
                             <a target="_blank" href="{{ $settings->linkedin }}"><img src="{{ asset('assets/frontend/images/linkedin.png') }}" alt=""></a>
                             @endif
-                            @if($settings->tiktok)
+                            @if(!empty($settings?->tiktok))
                             <a target="_blank" href="{{ $settings->tiktok }}"><img src="{{ asset('assets/frontend/images/tiktok.png') }}" alt=""></a>
                             @endif
-                            @if($settings->snapchat)
+                            @if(!empty($settings?->snapchat))
                             <a target="_blank" href="{{ $settings->snapchat }}"><img src="{{ asset('assets/frontend/images/snapchat.png') }}" alt=""></a>
                             @endif
                         </div>

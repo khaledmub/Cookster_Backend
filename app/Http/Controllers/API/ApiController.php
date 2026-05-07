@@ -18,6 +18,9 @@ use DateInterval;
 use Image;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
 use Mpdf\Mpdf;
@@ -144,7 +147,9 @@ class ApiController extends Controller
             $additional_data['type_of_account'] = $request->type_of_account;
             DB::table('sponsored_account_additional_data')->insert($additional_data);
         }
-        $token = $user->createToken('FrontUserToken')->plainTextToken;
+        // Send registration OTP
+        $dispatch = AppHelper::send_verification_code(1, $user, 'register');
+
         $language = App::getLocale();
 
         if($language == 'ar'){
@@ -169,13 +174,146 @@ class ApiController extends Controller
             AppHelper::subscribe_user_to_package($user->id, $input['package_id'], $payment_data);
         }
 
+        $response = [
+            'status' => true,
+            'message' => __('messages.user_registered_please_verify', ['default' => 'User registered successfully. Please verify your email.']),
+            'user' => $user,
+        ];
+
+        $isStagingLike = !app()->environment('production');
+        $testModeRequested = (bool) $request->boolean('test_mode');
+        if ($isStagingLike && $testModeRequested) {
+            $response['otp_code'] = $dispatch['verification_code'] ?? null;
+        }
+
+        return response()->json($response, 201);
+    }
+
+    public function verify_registration_otp(Request $request) {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required',
+            'code' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $verify_code = DB::table('verification_codes')
+            ->where('medium', 1)
+            ->where('front_user_id', $request->user_id)
+            ->where('code', $request->code)
+            ->first();
+
+        if (empty($verify_code)) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.invalid_verification_code'),
+            ], 401);
+        }
+
+        // OTP is valid
+        DB::table('verification_codes')
+            ->where('medium', 1)
+            ->where('front_user_id', $request->user_id)
+            ->delete();
+
+        $user = FrontUser::find($request->user_id);
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_not_found'),
+            ], 404);
+        }
+
+        $user->email_verified_at = Carbon::now();
+        $user->save();
+
+        $language = App::getLocale();
+        $token = $user->createToken('FrontUserToken')->plainTextToken;
+
+        if($language == 'ar'){
+            $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
+        }
+        else{
+            $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
+        }
+
+        $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
+
         return response()->json([
             'status' => true,
-            'message' => __('messages.user_registered'),
+            'message' => __('messages.email_verified_successfully', ['default' => 'Email verified successfully.']),
             'user' => $user,
             'token' => $token,
-        ], 201);
+        ], 200);
     }
+
+    public function resend_registration_otp(Request $request) {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required_without:email',
+            'email' => 'required_without:user_id|email',
+            'test_mode' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $query = FrontUser::query();
+        if ($request->has('user_id')) {
+            $query->where('id', $request->user_id);
+        } else {
+            $query->where('email', $request->email);
+        }
+
+        $user = $query->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_not_found'),
+            ], 404);
+        }
+
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.email_already_verified', ['default' => 'Email is already verified.']),
+            ], 400);
+        }
+
+        $dispatch = AppHelper::send_verification_code(1, $user, 'register');
+
+        if (!$dispatch['success']) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.forgot_code_email_failed'),
+            ], 500);
+        }
+
+        $response = [
+            'status' => true,
+            'message' => __('messages.verification_code_sent', ['default' => 'Verification code sent successfully.']),
+        ];
+
+        $isStagingLike = !app()->environment('production');
+        $testModeRequested = (bool) $request->boolean('test_mode');
+        if ($isStagingLike && $testModeRequested) {
+            $response['otp_code'] = $dispatch['verification_code'] ?? null;
+        }
+
+        return response()->json($response, 200);
+    }
+
     public function login(Request $request) {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
@@ -298,6 +436,8 @@ class ApiController extends Controller
     public function forgot_password_verify_email(Request $request){
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
+            'medium' => 'nullable|in:1',
+            'test_mode' => 'nullable|boolean',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -323,13 +463,60 @@ class ApiController extends Controller
                 ], 403);
             }
             else{
-                AppHelper::send_verification_code(1,$user);
-                return response()->json([
+                $dispatch = AppHelper::send_verification_code(1, $user);
+                $isStagingLike = !app()->environment('production');
+                $testModeRequested = (bool) $request->boolean('test_mode');
+                $allowedTestEmails = collect(explode(',', (string) env('FORGOT_PASSWORD_TEST_EMAILS', '')))
+                    ->map(fn($email) => strtolower(trim($email)))
+                    ->filter();
+                $isAllowedTestEmail = $allowedTestEmails->contains(strtolower(trim((string) $user->email)));
+                $canExposeOtpForQa = $isStagingLike && $testModeRequested && $isAllowedTestEmail;
+
+                if (!$dispatch['success']) {
+                    $response = [
+                        'status' => false,
+                        'message' => __('messages.forgot_code_email_failed'),
+                        'error_code' => $dispatch['error_code'] ?: 'EMAIL_DISPATCH_FAILED',
+                        'error_message' => $dispatch['error_message'] ?: 'Unable to dispatch verification email.',
+                    ];
+
+                    if ($isStagingLike) {
+                        $response['debug'] = [
+                            'mail_dispatched' => (bool) ($dispatch['mail_dispatched'] ?? false),
+                            'dispatch_mode' => $dispatch['dispatch_mode'] ?? 'sync',
+                            'provider_message_id' => $dispatch['provider_message_id'] ?? null,
+                            'queue_job_id' => $dispatch['queue_job_id'] ?? null,
+                            'error_code' => $dispatch['error_code'] ?? null,
+                            'error_message' => $dispatch['error_message'] ?? null,
+                        ];
+                    }
+
+                    return response()->json($response, 500);
+                }
+
+                $response = [
                     'status' => true,
                     'message' => __('messages.forgot_code_email_sent'),
                     'user' => $user,
                     'medium' => 1,
-                ], 200);
+                ];
+
+                if ($canExposeOtpForQa) {
+                    $response['otp_code'] = $dispatch['verification_code'] ?? null;
+                }
+
+                if ($isStagingLike) {
+                    $response['debug'] = [
+                        'mail_dispatched' => (bool) ($dispatch['mail_dispatched'] ?? false),
+                        'dispatch_mode' => $dispatch['dispatch_mode'] ?? 'sync',
+                        'provider_message_id' => $dispatch['provider_message_id'] ?? null,
+                        'queue_job_id' => $dispatch['queue_job_id'] ?? null,
+                        'error_code' => $dispatch['error_code'] ?? null,
+                        'error_message' => $dispatch['error_message'] ?? null,
+                    ];
+                }
+
+                return response()->json($response, 200);
             }
         }
     }
@@ -522,6 +709,7 @@ class ApiController extends Controller
                 }
             }
 
+            AppHelper::decorateVideoIterable($videos);
             $video_types[$key]->videos = $videos;
         }
 
@@ -587,22 +775,63 @@ class ApiController extends Controller
             $user->phone = $request->input('phone');
         }
 
-        if($request->file('image')){
-            $image = $request->file('image');
+        $receivedFileKeys = array_keys($request->allFiles());
+        $profileImageFile = $this->resolveUploadedFile($request, [
+            'image',
+            'profile_image',
+            'profileImage',
+            'avatar',
+            'photo',
+        ]);
+        $coverImageFile = $this->resolveUploadedFile($request, [
+            'cover_image',
+            'coverImage',
+            'cover',
+            'cover_photo',
+            'coverPhoto',
+            'banner',
+            'header_image',
+            'headerImage',
+            'background_image',
+            'backgroundImage',
+        ]);
+
+        if($profileImageFile){
+            $image = $profileImageFile;
             $image_input['imagename'] = time().'.'.$image->extension();
-            $fileresponse=$request->file('image')->storeAs('public/front_users',$image_input['imagename']);
+            $stored = Storage::disk('public')->putFileAs('front_users', $image, $image_input['imagename']);
+            if ($stored === false) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Unable to store profile image.',
+                    'error_code' => 'PROFILE_IMAGE_STORE_FAILED',
+                ], 500);
+            }
             $destinationPath = storage_path('app/public/front_users/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();
             })->save($destinationPath.'/'.$image_input['imagename']);
             $user->image = $image_input['imagename'];
         }
-        if($request->file('cover_image')){
-            $image = $request->file('cover_image');
+        if($coverImageFile){
+            $image = $coverImageFile;
             $image_input['imagename'] = time().'.'.$image->extension();
-            $fileresponse=$request->file('cover_image')->storeAs('public/front_users',$image_input['imagename']);
+            $stored = Storage::disk('public')->putFileAs('front_users', $image, $image_input['imagename']);
+            if ($stored === false) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Unable to store cover image.',
+                    'error_code' => 'COVER_IMAGE_STORE_FAILED',
+                ], 500);
+            }
             $destinationPath = storage_path('app/public/front_users/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();
@@ -716,11 +945,35 @@ class ApiController extends Controller
             }
         }
 
-        return response()->json([
+        $response = [
             'status' => true,
             'user' => $user,
+            'image_url' => !empty($user->image) ? url('storage/front_users/'.$user->image) : null,
+            'cover_image_url' => !empty($user->cover_image) ? url('storage/front_users/'.$user->cover_image) : null,
             'message' => __('messages.user_updated')
-        ]);
+        ];
+
+        if (config('app.debug')) {
+            $response['upload_debug'] = [
+                'received_file_keys' => $receivedFileKeys,
+                'profile_image_received' => (bool) $profileImageFile,
+                'cover_image_received' => (bool) $coverImageFile,
+            ];
+        }
+
+        return response()->json($response);
+    }
+
+    private function resolveUploadedFile(Request $request, array $candidateKeys)
+    {
+        foreach ($candidateKeys as $key) {
+            $file = $request->file($key);
+            if ($file) {
+                return $file;
+            }
+        }
+
+        return null;
     }
     public function notifications_list(){
         $user = Auth::user();
@@ -764,7 +1017,15 @@ class ApiController extends Controller
 
         $entities = DB::table('entities')->where('status', 1)->select($e_select)->orderBy('sort_order', 'ASC')->get();
         $countries = DB::table('countries')->where('status', 1)->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
-        $states = DB::table('states')->where('country_id', 194)->select(['id', 'name', 'country_id'])->get();
+        $countryIds = $countries->pluck('id')->unique()->values()->all();
+        $states = $countryIds === []
+            ? collect()
+            : DB::table('states')
+                ->whereIn('country_id', $countryIds)
+                ->select(['id', 'name', 'country_id'])
+                ->orderBy('country_id')
+                ->orderBy('name')
+                ->get();
         $business_types = AppHelper::get_key_values(1);
         $type_of_account = AppHelper::get_key_values(4);
 
@@ -780,6 +1041,7 @@ class ApiController extends Controller
             'status' => true,
             'entities' => $entities,
             'countries' => $countries,
+            'states' => $states,
             'business_types' => $business_types,
             'type_of_account' => $type_of_account,
             'packages' => $packages,
@@ -1448,6 +1710,10 @@ class ApiController extends Controller
             $business_accounts = $query->select(['ba.*', 'ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name'])->inRandomOrder()->get();
         }
 
+        if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
+            AppHelper::decorateVideoIterable($videos);
+        }
+
         return response()->json([
             'status' => true,
             'videos' => $videos,
@@ -1517,6 +1783,7 @@ class ApiController extends Controller
             $totalData = $query1->select(['v.id'])->count();
             $query2->orderBy('v.system_id', 'DESC');
             $videos = $query2->select(['v.*', 'u.name as user_name', 'u.image as user_image'])->get();
+            AppHelper::decorateVideoIterable($videos);
             $video_types[$key]->videos = $videos;
         }
 
@@ -1549,6 +1816,7 @@ class ApiController extends Controller
             'status' => true,
             'video_types' => $video_types,
             'countries' => $countries,
+            'media_base_url' => AppHelper::mediaPublicBaseUrl(),
         ], 200);
     }
     public function create_video(Request $request){
@@ -1645,8 +1913,10 @@ class ApiController extends Controller
 
             // Initialize S3 service
 
-            // Upload original image to S3
-            $this->s3Service->storeFile('videos/' . $imageName, file_get_contents($image));
+            // Upload original image to S3 (explicit Content-Type for correct playback / CDN behavior)
+            $this->s3Service->storeFile('videos/' . $imageName, file_get_contents($image), [
+                'mimetype' => S3Service::resolveMimeType($image, 'image/jpeg'),
+            ]);
 
             // Generate thumbnail locally
             $thumbnailLocalPath = storage_path('app/temp-thumbnails');
@@ -1662,7 +1932,9 @@ class ApiController extends Controller
             })->save($thumbnailFullLocalPath);
 
             // Upload thumbnail to S3
-            $this->s3Service->storeFile('videos/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath));
+            $this->s3Service->storeFile('videos/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath), [
+                'mimetype' => S3Service::resolveMimeType($thumbnailFullLocalPath, 'image/jpeg'),
+            ]);
 
             // Delete local thumbnail
             if (file_exists($thumbnailFullLocalPath)) {
@@ -1678,21 +1950,36 @@ class ApiController extends Controller
         }
         if ($request->file('video')) {
             $video = $request->file('video');
-            $video_name = time() . rand(1000, 9999) . '1.' . $video->extension();
-
-            // Get the video content
-            $contents = file_get_contents($video->getRealPath());
+            // Prefer client extension so .mp4 stays .mp4 (guessExtension() can mis-detect on some devices).
+            $ext = strtolower((string) ($video->getClientOriginalExtension() ?: $video->guessExtension() ?: 'mp4'));
+            $ext = preg_match('/^[a-z0-9]{1,10}$/', $ext) ? $ext : 'mp4';
+            $video_name = time().rand(1000, 9999).'1.'.$ext;
 
             // Initialize S3 service
             $s3Service = app(S3Service::class);
 
-            // Upload the video to S3
-            $uploaded = $s3Service->storeFile('videos/' . $video_name, $contents);
+            // Stream the uploaded video to S3 to avoid loading large files into RAM.
+            $stream = fopen($video->getRealPath(), 'rb');
+            if ($stream === false) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => ['video' => ['Unable to open uploaded video file']],
+                ], 422);
+            }
+
+            try {
+                $uploaded = $s3Service->storeFile('videos/'.$video_name, $stream, [
+                    'mimetype' => S3Service::resolveMimeType($video, 'video/mp4'),
+                ]);
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+            }
 
             if ($uploaded) {
-                $data['video'] = $video_name;  // Save the filename or S3 path if you need
-            } else {
-
+                $data['video'] = $video_name;
             }
         }
 
@@ -1722,9 +2009,16 @@ class ApiController extends Controller
             AppHelper::add_user_sponsor_video($video_id, $request->cities, $request->sponsor_type, $request->days, $payment_data);
         }
 
+        $created = DB::table('videos')->where('id', $data['id'])->first();
+        if ($created) {
+            AppHelper::decorateVideoRow($created);
+        }
+
         return response()->json([
             'status' => true,
             'message' => __('messages.video_create_success'),
+            'media_base_url' => AppHelper::mediaPublicBaseUrl(),
+            'video' => $created,
         ], 201);
     }
     public function edit_video(Request $request){
@@ -1789,9 +2083,15 @@ class ApiController extends Controller
             AppHelper::run_add_tag_script($request->tags);
         }
 
+        $updated = DB::table('videos')->where('id', $request->video_id)->first();
+        if ($updated) {
+            AppHelper::decorateVideoRow($updated);
+        }
+
         return response()->json([
             'status' => true,
             'message' => __('messages.video_edit_success'),
+            'video' => $updated,
         ], 201);
     }
     public function delete_video(Request $request){
@@ -2177,6 +2477,8 @@ class ApiController extends Controller
             }
         }
 
+        AppHelper::decorateVideoIterable($finalList);
+
         return response()->json([
             'status' => true,
             'videos' => $finalList,
@@ -2470,6 +2772,8 @@ class ApiController extends Controller
         while (isset($premiumSponsoredVideos[$premiumIndex])) {
             $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
         }
+
+        AppHelper::decorateVideoIterable($finalList);
         
         return response()->json([
             'status' => true,
@@ -2509,6 +2813,7 @@ class ApiController extends Controller
         $query2->offset($start)->limit($length);
         // $query2->orderBy('v.system_id', 'DESC');
         $videos = $query2->select(['v.video'])->inRandomOrder()->get();
+        AppHelper::decorateVideoIterable($videos);
         
         return response()->json([
             'status' => true,
@@ -2543,10 +2848,47 @@ class ApiController extends Controller
         $query->where('v.id', $request->id);
         $video = $query->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
         DB::raw('COALESCE(following.following_count, 0) as following_count')])->first();
+
+        if ($video) {
+            AppHelper::decorateVideoRow($video);
+        }
         
         return response()->json([
             'status' => true,
             'video' => $video,
+        ], 200);
+    }
+    /**
+     * Debug endpoint: compare raw DB value vs decorated absolute URL.
+     * Only available when APP_DEBUG=true.
+     */
+    public function debug_video_url(Request $request)
+    {
+        if (! config('app.debug')) {
+            return response()->json(['status' => false, 'message' => 'Not available'], 403);
+        }
+
+        $row = DB::table('videos')->where('id', $request->id)->first(['id', 'video', 'image']);
+        if (! $row) {
+            return response()->json(['status' => false, 'message' => 'Video not found'], 404);
+        }
+
+        $rawVideo = $row->video;
+        $rawImage = $row->image;
+
+        AppHelper::decorateVideoRow($row);
+
+        return response()->json([
+            'status'           => true,
+            'media_base_url'   => AppHelper::mediaPublicBaseUrl(),
+            'raw_db_video'     => $rawVideo,
+            'raw_db_image'     => $rawImage,
+            'decorated_video'  => $row->video,
+            'decorated_video_url' => $row->video_url,
+            'decorated_image'  => $row->image,
+            'decorated_image_url' => $row->image_url,
+            'decorated_thumbnail_url' => $row->thumbnail_url,
+            'hint' => 'The Flutter VideoPlayer should use decorated_video_url (or decorated_video) directly. Never prepend media_base_url when the value already starts with https://.',
         ], 200);
     }
     public function contact_for_order(Request $request){
@@ -2851,6 +3193,7 @@ class ApiController extends Controller
         // $query2->orderBy('v.system_id', 'DESC');
         $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
         DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('sv.system_id', 'DESC')->get();
+        AppHelper::decorateVideoIterable($videos);
         
         return response()->json([
             'status' => true,
@@ -2917,6 +3260,10 @@ class ApiController extends Controller
             $query2->offset($start)->limit($length);
             $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
             DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('v.system_id', 'DESC')->get();
+        }
+
+        if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
+            AppHelper::decorateVideoIterable($videos);
         }
         
         return response()->json([
@@ -3695,12 +4042,70 @@ class ApiController extends Controller
         ], 200);
     }
     public function urway_credentials(){
+        $requestUrl = (string) config('services.urway.request_url');
+        $configured = [
+            'request_url' => $requestUrl !== '',
+            'terminal_id' => (string) config('services.urway.terminal_id') !== '',
+            'terminal_pass' => (string) config('services.urway.terminal_pass') !== '',
+            'merchant_key' => (string) config('services.urway.merchant_key') !== '',
+        ];
+
         return response()->json([
-            'merchantKey' => env('URWAY_MERCHANT_KEY'),
-            'terminalId' => env('URWAY_TERMINAL_ID'),
-            'terminalPass' => env('URWAY_TERMINAL_PASS'),
-            'requestUrl' => env('URWAY_REQUEST_URL')
+            'merchantKey' => config('services.urway.merchant_key'),
+            'terminalId' => config('services.urway.terminal_id'),
+            'terminalPass' => config('services.urway.terminal_pass'),
+            'requestUrl' => $requestUrl,
+            'isConfigured' => !in_array(false, $configured, true),
+            'configured' => $configured,
         ], 200);
+    }
+    public function urway_health()
+    {
+        $requestUrl = (string) config('services.urway.request_url');
+
+        if ($requestUrl === '') {
+            return response()->json([
+                'status' => false,
+                'message' => 'URWAY request URL is not configured.',
+                'error_code' => 'URWAY_URL_MISSING',
+            ], 500);
+        }
+
+        try {
+            $response = Http::timeout(15)->withHeaders([
+                'Accept' => 'application/json',
+            ])->withOptions([
+                'allow_redirects' => false,
+                'verify' => true,
+            ])->get($requestUrl);
+
+            $statusCode = $response->status();
+            $location = $response->header('Location');
+            $contentType = (string) $response->header('Content-Type');
+            $body = trim($response->body());
+            $bodySnippet = mb_substr($body, 0, 500);
+            $isJson = str_contains(strtolower($contentType), 'json') || str_starts_with($body, '{') || str_starts_with($body, '[');
+            $isRedirect = $statusCode >= 300 && $statusCode < 400;
+
+            return response()->json([
+                'status' => !$isRedirect && $isJson,
+                'request_url' => $requestUrl,
+                'http_status' => $statusCode,
+                'is_redirect' => $isRedirect,
+                'redirect_location' => $location,
+                'content_type' => $contentType,
+                'looks_like_json' => $isJson,
+                'response_preview' => $bodySnippet,
+            ], !$isRedirect && $isJson ? 200 : 502);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => false,
+                'request_url' => $requestUrl,
+                'message' => 'URWAY health check failed.',
+                'error_code' => 'URWAY_HEALTH_CHECK_ERROR',
+                'error_message' => $e->getMessage(),
+            ], 502);
+        }
     }
     public function entities(){
         $language = App::getLocale();

@@ -153,7 +153,9 @@ class AudiosController extends Controller
             // Initialize S3 service
 
             // Upload original image to S3
-            $this->s3Service->storeFile('audios/' . $imageName, file_get_contents($image));
+            $this->s3Service->storeFile('audios/' . $imageName, file_get_contents($image), [
+                'mimetype' => S3Service::resolveMimeType($image, 'image/jpeg'),
+            ]);
 
             // Generate thumbnail locally
             $thumbnailLocalPath = storage_path('app/temp-thumbnails');
@@ -169,7 +171,9 @@ class AudiosController extends Controller
             })->save($thumbnailFullLocalPath);
 
             // Upload thumbnail to S3
-            $this->s3Service->storeFile('audios/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath));
+            $this->s3Service->storeFile('audios/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath), [
+                'mimetype' => S3Service::resolveMimeType($thumbnailFullLocalPath, 'image/jpeg'),
+            ]);
 
             // Delete local thumbnail
             if (file_exists($thumbnailFullLocalPath)) {
@@ -203,7 +207,9 @@ class AudiosController extends Controller
             $s3Service = app(S3Service::class);
 
             // Upload the file to S3
-            $uploaded = $s3Service->storeFile('audios/' . $file_name, $contents);
+            $uploaded = $s3Service->storeFile('audios/' . $file_name, $contents, [
+                'mimetype' => S3Service::resolveMimeType($file, 'audio/mpeg'),
+            ]);
 
             if ($uploaded) {
                 $input['file'] = $file_name;  // Save the filename or S3 path if you need
@@ -293,7 +299,9 @@ class AudiosController extends Controller
             // Initialize S3 service
 
             // Upload original image to S3
-            $this->s3Service->storeFile('audios/' . $imageName, file_get_contents($image));
+            $this->s3Service->storeFile('audios/' . $imageName, file_get_contents($image), [
+                'mimetype' => S3Service::resolveMimeType($image, 'image/jpeg'),
+            ]);
 
             // Generate thumbnail locally
             $thumbnailLocalPath = storage_path('app/temp-thumbnails');
@@ -309,7 +317,9 @@ class AudiosController extends Controller
             })->save($thumbnailFullLocalPath);
 
             // Upload thumbnail to S3
-            $this->s3Service->storeFile('audios/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath));
+            $this->s3Service->storeFile('audios/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath), [
+                'mimetype' => S3Service::resolveMimeType($thumbnailFullLocalPath, 'image/jpeg'),
+            ]);
 
             // Delete local thumbnail
             if (file_exists($thumbnailFullLocalPath)) {
@@ -344,7 +354,9 @@ class AudiosController extends Controller
             $s3Service = app(S3Service::class);
 
             // Upload the file to S3
-            $uploaded = $s3Service->storeFile('audios/' . $file_name, $contents);
+            $uploaded = $s3Service->storeFile('audios/' . $file_name, $contents, [
+                'mimetype' => S3Service::resolveMimeType($file, 'audio/mpeg'),
+            ]);
 
             if ($uploaded) {
                 $input['file'] = $file_name;  // Save the filename or S3 path if you need

@@ -22,6 +22,7 @@ class NotificationsController extends Controller
     private $permission_initial = 'notifications';
     private $table_name = 'push_notifications';
     private $url_path = 'notifications';
+    private $default_date_time_format = 'd-M-Y h:i A';
     function __construct()
     {
          $this->middleware('permission:'.$this->permission_initial.'-list', ['only' => ['index']]);
@@ -78,11 +79,12 @@ class NotificationsController extends Controller
             $sub_array[]=$sdata->title;
             $sub_array[]=$to_label;
             $sub_array[]=$user_name;
-            $sub_array[]=date(env('DATE_TIME_FORMAT'), strtotime($sdata->created_at));
+            $formattedDate = $this->formatDateTime($sdata->created_at ?? null);
+            $sub_array[] = $formattedDate;
 
             $actionshtml="";
             if(auth()->user()->can($this->permission_initial.'-list')){
-                $actionshtml.='<a href="javascript:void(0)" data-title="'.$sdata->title.'" data-text="'.$sdata->text.'" data-date="'.date(env('DATE_TIME_FORMAT'), strtotime($sdata->created_at)).'" class="btn btn-primary btn-icon waves-effect waves-light viewNotificationDetails"><i class="fa-light fa-eye"></i></a>';
+                $actionshtml .= '<a href="javascript:void(0)" data-title="'.$sdata->title.'" data-text="'.$sdata->text.'" data-date="'.$formattedDate.'" class="btn btn-primary btn-icon waves-effect waves-light viewNotificationDetails"><i class="fa-light fa-eye"></i></a>';
             }
             $sub_array[]=$actionshtml;
             $dataToPass[]=$sub_array;
@@ -94,6 +96,25 @@ class NotificationsController extends Controller
             "data"  =>  $dataToPass
         );
         echo json_encode($output);
+    }
+
+    private function formatDateTime($rawDateTime): string
+    {
+        if (empty($rawDateTime)) {
+            return '-';
+        }
+
+        $format = env('DATE_TIME_FORMAT');
+        if (!is_string($format) || trim($format) === '') {
+            $format = $this->default_date_time_format;
+        }
+
+        $timestamp = strtotime((string) $rawDateTime);
+        if ($timestamp === false) {
+            return '-';
+        }
+
+        return date($format, $timestamp);
     }
     
     /**

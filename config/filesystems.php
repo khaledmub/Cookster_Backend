@@ -44,15 +44,24 @@ return [
             'throw' => false,
         ],
 
+        // Use env() here — config/services.php loads *after* this file (ksort), so
+        // config('services.s3.*') is null during bootstrap and would freeze an empty bucket.
+        // Production overrides still apply via AwsSecretsProvider (filesystems.disks.s3.*).
         's3' => [
             'driver' => 's3',
-            'key' => config('services.s3.key'),
-            'secret' => config('services.s3.secret'),
-            'region' => env('AWS_DEFAULT_REGION'),
-            'bucket' => env('AWS_BUCKET'),
+            'key' => env('AWS_ACCESS_KEY_ID') ?? '',
+            'secret' => env('AWS_SECRET_ACCESS_KEY') ?? '',
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'bucket' => (string) (env('AWS_BUCKET') ?? ''),
             'url' => env('AWS_URL'),
+            // Optional CDN base; AppHelper::mediaPublicBaseUrl() prefers this over url (must use config(), not env() in helpers).
+            'cloudfront_path' => env('AWS_CLOUD_FRONT_PATH'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            // Read in AppServiceProvider via config() so config:cache does not break GCS ACL stripping.
+            'use_object_acl' => env('S3_USE_OBJECT_ACL'),
+            // Default string so filter_var is true when .env omits the key.
+            'api_media_absolute_urls' => filter_var(env('API_MEDIA_USE_ABSOLUTE_VIDEO_URL', 'true'), FILTER_VALIDATE_BOOLEAN),
             'throw' => true,
         ],
 

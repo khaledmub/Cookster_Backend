@@ -38,8 +38,11 @@ class UserController extends Controller
         $input=$request->all();
         $query=DB::table('users');
         if(isset($input['search']['value']) && $input['search']['value']!=''){
-            $query->where('users.name', 'LIKE', '%'.$input['search']['value'].'%');
-            $query->orWhere('users.email', 'LIKE', '%'.$input['search']['value'].'%');
+            $term = '%'.$input['search']['value'].'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('users.name', 'LIKE', $term)
+                    ->orWhere('users.email', 'LIKE', $term);
+            });
         }
         $query1 = clone $query;
         $query2 = clone $query;
@@ -47,14 +50,14 @@ class UserController extends Controller
         $totalData = $query1->select(['users.*'])->count();
         
         if(isset($input['length']) && $input['length']!=-1){
-            $query2->offset($input['start'])->limit($input['length']);
+            $query2->offset((int) ($input['start'] ?? 0))->limit((int) $input['length']);
         }
-        $data = $query2->select(['users.*'])->get();
+        $data = $query2->select(['users.*'])->orderBy('users.id', 'desc')->get();
         $dataToPass=array();
         foreach($data as $sdata){
             $user = User::where('id',$sdata->id)->first();
             $role_names = "";
-            if(!empty($user->roles)){
+            if($user && $user->roles->isNotEmpty()){
                 foreach($user->roles as $role){
                     $role_names.='<label class="badge bg-success">'.$role->name.'</label>';
                 }
@@ -79,12 +82,13 @@ class UserController extends Controller
             $dataToPass[]=$sub_array;
         }
         $output=array(
-            "draw"  =>  intval($input['draw']),
+            "draw"  =>  intval($input['draw'] ?? 0),
             "recordsTotal"  =>  $totalData,
             "recordsFiltered"   =>  $totalData,
             "data"  =>  $dataToPass
         );
-        echo json_encode($output);
+
+        return response()->json($output);
     }
     
     /**
@@ -113,8 +117,7 @@ class UserController extends Controller
             'roles' => 'required'
         ]);
     
-        $input = $request->all();
-        $input['password'] = Hash::make($input['password']);
+        $input = $request->only(['name', 'email', 'password', 'system_id']);
         $user = User::create($input);
         $user->assignRole($request->input('roles'));
     

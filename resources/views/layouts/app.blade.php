@@ -54,7 +54,7 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
             </svg>
         </div>
     </div>
-    <input type="hidden" id="baseurl" value="<?php echo config('app.url'); ?>">
+    <input type="hidden" id="baseurl" value="{{ rtrim(config('app.url'), '/') }}/">
     <input type="hidden" id="pageName" value="{{ Route::currentRouteName() }}">
     <!-- Begin page -->
     <div id="layout-wrapper">

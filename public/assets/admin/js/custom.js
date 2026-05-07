@@ -1,6 +1,9 @@
 $(document).ready(function () {
     hideLoader();
-    var baseurl = $('#baseurl').val();
+    var baseurl = $('#baseurl').val() || '';
+    if (baseurl.length > 0 && baseurl.slice(-1) !== '/') {
+        baseurl += '/';
+    }
     var pageName = $('#pageName').val();
     $('#logoutClicker').click(function () {
         $("#logout-form").submit();

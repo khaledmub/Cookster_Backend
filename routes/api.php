@@ -11,6 +11,7 @@ Route::get('/videos/list2', [ApiController::class, 'videos_list2']);
 Route::middleware([SetLanguage::class])->group(function () {
     /** General **/
     Route::get('/urway_credentials', [ApiController::class, 'urway_credentials']);
+    Route::get('/urway_health', [ApiController::class, 'urway_health']);
     Route::get('/entities', [ApiController::class, 'entities']);
     Route::get('/site_languages', [ApiController::class, 'site_languages']);
     Route::get('/countries', [ApiController::class, 'countries']);
@@ -25,6 +26,8 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/registration_settings', [ApiController::class, 'registration_settings']);
     Route::post('/register', [ApiController::class, 'register']);
     Route::post('/validate_register', [ApiController::class, 'validate_register']);
+    Route::post('/verify_registration_otp', [ApiController::class, 'verify_registration_otp']);
+    Route::post('/resend_registration_otp', [ApiController::class, 'resend_registration_otp']);
     Route::post('/login', [ApiController::class, 'login']);
     Route::post('/login_with_email', [ApiController::class, 'login_with_email']);
     Route::get('/page', [ApiController::class, 'page_content']);
@@ -41,6 +44,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/videos/settings', [ApiController::class, 'video_settings']);
     Route::post('/videos/list', [ApiController::class, 'videos_list']);
     Route::get('/videos/details', [ApiController::class, 'video_details']);
+    Route::get('/videos/debug_url', [ApiController::class, 'debug_video_url']);
     Route::post('/videos/send_liked_video_notification', [ApiController::class, 'send_liked_video_notification']);
 
     // Nearest Business Accounts/Restaurants

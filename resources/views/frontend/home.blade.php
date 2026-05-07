@@ -1,9 +1,8 @@
 @extends('frontend.layouts.app')
 
-@section('meta_title', $data['page']->meta_title)
-@section('meta_description', $data['page']->meta_description)
-@section('meta_keywords', $data['page']->meta_keywords)
-
+@section('meta_title', $data['page']->meta_title ?? 'Cookster Home')
+@section('meta_description', $data['page']->meta_description ?? 'Welcome to Cookster')
+@section('meta_keywords', $data['page']->meta_keywords ?? 'food, recipes')
 @section('content')
 
 @php

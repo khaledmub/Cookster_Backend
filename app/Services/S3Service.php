@@ -1,39 +1,113 @@
 <?php
 namespace App\Services;
 
+use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class S3Service
 {
-    private $disk;
-    
-    public function __construct()
+    /** Resolved only when an operation runs (ApiController injects this on every API request). */
+    private ?Filesystem $resolvedDisk = null;
+
+    private function requireBucketConfigured(): void
     {
-        $this->disk = Storage::disk('s3');
+        $bucket = (string) (config('filesystems.disks.s3.bucket') ?? '');
+        if ($bucket === '') {
+            throw new RuntimeException(
+                'Object storage bucket is not configured. Set AWS_BUCKET in .env (e.g. GCS HMAC: AWS_ENDPOINT=https://storage.googleapis.com, AWS_USE_PATH_STYLE_ENDPOINT=true), or add AWS_BUCKET to the cooksterS3bucket secret JSON in production.'
+            );
+        }
     }
 
-    public function storeFile($filename, $contents)
+    private function disk(): Filesystem
     {
-        return $this->disk->put($filename, $contents);
-     }
+        $this->requireBucketConfigured();
+
+        return $this->resolvedDisk ??= Storage::disk('s3');
+    }
+
+    /**
+     * @param  array<string, mixed>  $options  Flysystem / S3 adapter options, e.g. ['mimetype' => 'video/mp4']
+     */
+    public function storeFile(string $filename, $contents, array $options = []): bool
+    {
+        return (bool) $this->disk()->put($filename, $contents, $options);
+    }
+
+    /**
+     * Best-effort MIME for PutObject Content-Type (GCS/S3 interoperability).
+     *
+     * @param  UploadedFile|string  $fileOrPath
+     */
+    public static function resolveMimeType($fileOrPath, string $fallback = 'application/octet-stream'): string
+    {
+        if ($fileOrPath instanceof UploadedFile) {
+            $mime = $fileOrPath->getMimeType();
+            if ($mime && $mime !== 'application/octet-stream') {
+                return $mime;
+            }
+
+            return self::mimeFromExtension($fileOrPath->getClientOriginalExtension(), $fallback);
+        }
+
+        if (is_string($fileOrPath) && is_file($fileOrPath)) {
+            $mime = @mime_content_type($fileOrPath);
+            if ($mime && $mime !== 'application/octet-stream') {
+                return $mime;
+            }
+        }
+
+        return $fallback;
+    }
+
+    private static function mimeFromExtension(?string $ext, string $fallback): string
+    {
+        if ($ext === null || $ext === '') {
+            return $fallback;
+        }
+
+        $e = strtolower(ltrim($ext, '.'));
+
+        return match ($e) {
+            'mp4', 'm4v' => 'video/mp4',
+            'mov' => 'video/quicktime',
+            'webm' => 'video/webm',
+            'mkv' => 'video/x-matroska',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'aac' => 'audio/aac',
+            'ogg' => 'audio/ogg',
+            'm4a' => 'audio/mp4',
+            'flac' => 'audio/flac',
+            'wma' => 'audio/x-ms-wma',
+            default => $fallback,
+        };
+    }
 
     public function retrieveFile($filename)
     {
-        return $this->disk->get($filename);
+        return $this->disk()->get($filename);
     }
 
     public function fileExists($filename)
     {
-        return $this->disk->exists($filename);
+        return $this->disk()->exists($filename);
     }
 
     public function deleteFile($filename)
     {
-        return $this->disk->delete($filename);
+        return $this->disk()->delete($filename);
     }
 
     public function generateTemporaryUrl($filename, $duration)
     {
-        return $this->disk->temporaryUrl($filename, now()->addMinutes($duration));
+        return $this->disk()->temporaryUrl($filename, now()->addMinutes($duration));
     }
 }
