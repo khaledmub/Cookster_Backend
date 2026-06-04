@@ -9,14 +9,20 @@
    php artisan migrate --path=database/migrations/2026_05_15_000001_add_video_feed_performance_indexes.php --force
    ```
    For a fresh install, use `php artisan migrate` as usual.
-2. Start queue worker (required for async thumbnails):
+2. Run remaining performance migrations on live DB (skip tables that already exist):
    ```bash
-   php artisan queue:work --tries=3 --timeout=120
+   php artisan migrate --path=database/migrations/2026_05_23_000001_add_query_performance_indexes.php --force
+   php artisan migrate --path=database/migrations/2026_05_24_000001_add_video_hls_transcode_columns.php --force
+   ```
+3. Set `CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`, and `REDIS_QUEUE_RETRY_AFTER=7500` (must exceed `FFMPEG_TIMEOUT`, default 7200).
+4. Start queue workers (thumbnails + long transcodes):
+   ```bash
+   php artisan queue:work --queue=video-processing,thumbnails,notifications,default --sleep=3 --tries=3 --timeout=7200
    ```
    Use Supervisor in production, for example:
    ```ini
    [program:cookster-queue]
-   command=php /path/to/cookster_admin/artisan queue:work --sleep=3 --tries=3 --timeout=120
+   command=php /path/to/cookster_admin/artisan queue:work --queue=video-processing,thumbnails,notifications,default --sleep=3 --tries=3 --timeout=7200
    autostart=true
    autorestart=true
    user=www-data

@@ -19,11 +19,15 @@ class ProcessVideoThumbnailJob implements ShouldQueue
 
     public int $tries = 3;
 
+    public int $timeout = 300;
+
     public function __construct(
         public string $videoId,
         public string $localImagePath,
         public string $imageName,
-    ) {}
+    ) {
+        $this->onQueue('thumbnails');
+    }
 
     public function handle(S3Service $s3Service): void
     {

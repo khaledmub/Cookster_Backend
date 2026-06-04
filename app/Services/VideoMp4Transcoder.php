@@ -14,9 +14,10 @@ class VideoMp4Transcoder
     ];
 
     /**
+     * @param  list<int>|null  $ladderHeights  Heights to encode; null = full ladder.
      * @return array<int, string> Map of height => local file path
      */
-    public function transcode(string $sourcePath, string $workDir): array
+    public function transcode(string $sourcePath, string $workDir, ?array $ladderHeights = null): array
     {
         if (! is_file($sourcePath)) {
             throw new RuntimeException('Source video file not found: '.$sourcePath);
@@ -26,33 +27,56 @@ class VideoMp4Transcoder
             throw new RuntimeException('Unable to create MP4 work directory: '.$workDir);
         }
 
+        $heights = $ladderHeights ?? array_keys(self::VARIANTS);
         $ffmpeg = (string) config('ffmpeg.ffmpeg.binaries', '/usr/bin/ffmpeg');
         $timeout = (int) config('ffmpeg.timeout', 7200);
+        $preset = (string) config('ffmpeg.preset', 'veryfast');
+        $threads = (int) config('ffmpeg.threads', 0);
         $outputs = [];
+        $running = [];
 
-        foreach (self::VARIANTS as $height => $variant) {
+        foreach ($heights as $height) {
+            if (! isset(self::VARIANTS[$height])) {
+                continue;
+            }
+
+            $variant = self::VARIANTS[$height];
             $outputPath = $workDir.'/'.$height.'.mp4';
 
-            $process = new Process([
+            $command = [
                 $ffmpeg,
                 '-y',
                 '-i', $sourcePath,
                 '-vf', 'scale=-2:'.$variant['height'],
                 '-c:v', 'libx264',
+                '-preset', $preset,
                 '-b:v', (string) $variant['video_kbps'].'k',
                 '-c:a', 'aac',
                 '-b:a', (string) $variant['audio_kbps'].'k',
                 '-movflags', '+faststart',
-                $outputPath,
-            ]);
-            $process->setTimeout($timeout);
-            $process->mustRun();
+            ];
 
-            if (! is_file($outputPath) || filesize($outputPath) === 0) {
-                throw new RuntimeException('FFmpeg did not produce MP4 rendition: '.$outputPath);
+            if ($threads > 0) {
+                $command[] = '-threads';
+                $command[] = (string) $threads;
             }
 
-            $outputs[$height] = $outputPath;
+            $command[] = $outputPath;
+
+            $process = new Process($command);
+            $process->setTimeout($timeout);
+            $process->start();
+            $running[$height] = ['process' => $process, 'path' => $outputPath];
+        }
+
+        foreach ($running as $height => $meta) {
+            $meta['process']->mustRun();
+
+            if (! is_file($meta['path']) || filesize($meta['path']) === 0) {
+                throw new RuntimeException('FFmpeg did not produce MP4 rendition: '.$meta['path']);
+            }
+
+            $outputs[$height] = $meta['path'];
         }
 
         return $outputs;

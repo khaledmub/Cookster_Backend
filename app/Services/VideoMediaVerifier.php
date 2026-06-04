@@ -21,6 +21,18 @@ class VideoMediaVerifier
     }
 
     /**
+     * Optional renditions (e.g. 1080) — verified when present, not required for "ready".
+     *
+     * @return list<string>
+     */
+    public static function optionalTranscodeKeys(string $videoId): array
+    {
+        return [
+            VideoMediaService::mp4Key($videoId, 1080),
+        ];
+    }
+
+    /**
      * @return list<string> Keys that were expected but missing on object storage.
      */
     public function missingTranscodeKeys(string $videoId, S3Service $s3Service): array

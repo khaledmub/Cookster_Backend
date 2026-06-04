@@ -40,6 +40,37 @@ class S3Service
         return (bool) $this->disk()->put($filename, $contents, $options);
     }
 
+    /**
+     * Stream a local file to object storage without loading it entirely into memory.
+     */
+    public function storeFileFromPath(string $filename, string $localPath, array $options = []): bool
+    {
+        if (! is_file($localPath)) {
+            throw new RuntimeException('Local file not found for upload: '.$localPath);
+        }
+
+        if (! isset($options['CacheControl'])) {
+            $options['CacheControl'] = $this->defaultCacheControl($filename);
+        }
+
+        if (! isset($options['mimetype'])) {
+            $options['mimetype'] = self::resolveMimeType($localPath);
+        }
+
+        $stream = fopen($localPath, 'rb');
+        if ($stream === false) {
+            throw new RuntimeException('Unable to open local file for upload: '.$localPath);
+        }
+
+        try {
+            return (bool) $this->disk()->put($filename, $stream, $options);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+    }
+
     private function defaultCacheControl(string $filename): string
     {
         if (str_ends_with($filename, '.m3u8')) {

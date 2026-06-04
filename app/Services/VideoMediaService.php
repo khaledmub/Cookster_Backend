@@ -29,7 +29,7 @@ class VideoMediaService
     /**
      * @return array{url_360: ?string, url_720: ?string, url_1080: ?string}
      */
-    public static function videoSources(string $videoId, bool $isReady): array
+    public static function videoSources(string $videoId, bool $isReady, ?S3Service $s3 = null): array
     {
         if (! $isReady) {
             return [
@@ -39,10 +39,16 @@ class VideoMediaService
             ];
         }
 
+        $url1080 = null;
+        $key1080 = self::mp4Key($videoId, 1080);
+        if ($s3 === null || $s3->fileExists($key1080)) {
+            $url1080 = CdnUrl::forPath($key1080);
+        }
+
         return [
             'url_360' => CdnUrl::forPath(self::mp4Key($videoId, 360)),
             'url_720' => CdnUrl::forPath(self::mp4Key($videoId, 720)),
-            'url_1080' => CdnUrl::forPath(self::mp4Key($videoId, 1080)),
+            'url_1080' => $url1080,
         ];
     }
 

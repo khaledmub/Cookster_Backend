@@ -33,11 +33,12 @@ class VideoHlsTranscoder
     ];
 
     /**
-     * Transcode a local MP4 into three HLS renditions plus a master playlist.
+     * Transcode a local MP4 into HLS renditions plus a master playlist.
      *
+     * @param  list<int>|null  $ladderHeights  Heights to encode; null = full ladder.
      * @return array{work_dir: string, master_playlist: string}
      */
-    public function transcode(string $sourcePath, string $workDir): array
+    public function transcode(string $sourcePath, string $workDir, ?array $ladderHeights = null): array
     {
         if (! is_file($sourcePath)) {
             throw new RuntimeException('Source video file not found: '.$sourcePath);
@@ -55,25 +56,40 @@ class VideoHlsTranscoder
 
         $video = $ffmpeg->open($sourcePath);
         $segmentSeconds = (int) config('ffmpeg.hls_segment_seconds', 6);
+        $preset = (string) config('ffmpeg.preset', 'veryfast');
+        $threads = (int) config('ffmpeg.threads', 0);
 
+        $heights = $ladderHeights ?? [360, 720, 1080];
         $renditionMeta = [];
 
         foreach (self::VARIANTS as $label => $variant) {
+            if (! in_array($variant['height'], $heights, true)) {
+                continue;
+            }
+
             $playlistPath = $workDir.'/'.$variant['playlist'];
             $segmentPattern = $workDir.'/'.$variant['segment'];
 
-            $format = new HlsX264('aac', 'libx264');
-            $format->setPasses(1);
-            $format->setKiloBitrate($variant['video_kbps']);
-            $format->setAudioKiloBitrate($variant['audio_kbps']);
-            $format->setAdditionalParameters([
+            $extra = [
                 '-vf', 'scale=-2:'.$variant['height'],
+                '-preset', $preset,
                 '-f', 'hls',
                 '-hls_time', (string) $segmentSeconds,
                 '-hls_list_size', '0',
                 '-hls_segment_filename', $segmentPattern,
                 '-hls_flags', 'independent_segments',
-            ]);
+            ];
+
+            if ($threads > 0) {
+                $extra[] = '-threads';
+                $extra[] = (string) $threads;
+            }
+
+            $format = new HlsX264('aac', 'libx264');
+            $format->setPasses(1);
+            $format->setKiloBitrate($variant['video_kbps']);
+            $format->setAudioKiloBitrate($variant['audio_kbps']);
+            $format->setAdditionalParameters($extra);
 
             $video->save($format, $playlistPath);
 
@@ -87,6 +103,10 @@ class VideoHlsTranscoder
                 'bandwidth' => ($variant['video_kbps'] + $variant['audio_kbps']) * 1000,
                 'height' => $variant['height'],
             ];
+        }
+
+        if ($renditionMeta === []) {
+            throw new RuntimeException('No HLS renditions were produced for: '.$sourcePath);
         }
 
         $masterPath = $workDir.'/master.m3u8';

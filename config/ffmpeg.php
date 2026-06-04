@@ -6,5 +6,7 @@ return [
     'ffprobe.binaries' => env('FFPROBE_BINARIES', '/usr/bin/ffprobe'),
     'timeout' => (int) env('FFMPEG_TIMEOUT', 7200),
     'hls_segment_seconds' => (int) env('FFMPEG_HLS_SEGMENT_SECONDS', 3),
+    'preset' => env('FFMPEG_PRESET', 'veryfast'),
+    'threads' => (int) env('FFMPEG_THREADS', 0),
 
 ];

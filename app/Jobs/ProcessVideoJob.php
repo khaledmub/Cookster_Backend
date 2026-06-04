@@ -10,7 +10,9 @@ use App\Services\VideoMediaService;
 use App\Services\VideoMediaVerifier;
 use App\Services\VideoMp4Transcoder;
 use App\Services\VideoPosterExtractor;
+use App\Services\VideoProbeService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -22,13 +24,15 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
-class ProcessVideoJob implements ShouldQueue
+class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
 
     public int $timeout;
+
+    public int $uniqueFor = 7200;
 
     public function __construct(
         public string $videoId,
@@ -38,11 +42,17 @@ class ProcessVideoJob implements ShouldQueue
         $this->timeout = (int) config('ffmpeg.timeout', 7200);
     }
 
+    public function uniqueId(): string
+    {
+        return $this->videoId;
+    }
+
     public function handle(
         VideoHlsTranscoder $transcoder,
         VideoMp4Transcoder $mp4Transcoder,
         VideoMediaVerifier $mediaVerifier,
         VideoPosterExtractor $posterExtractor,
+        VideoProbeService $probeService,
         S3Service $s3Service,
     ): void {
         if (! Schema::hasColumn('videos', 'transcode_status')) {
@@ -51,6 +61,10 @@ class ProcessVideoJob implements ShouldQueue
 
         $video = DB::table('videos')->where('id', $this->videoId)->first();
         if (! $video || empty($video->video)) {
+            return;
+        }
+
+        if ($this->tryMarkReadyFromExistingArtifacts($mediaVerifier, $s3Service)) {
             return;
         }
 
@@ -64,12 +78,15 @@ class ProcessVideoJob implements ShouldQueue
             $this->prepareWorkDirectory($workDir);
             $this->downloadSource($s3Service, (string) $video->video, $sourcePath);
 
-            $result = $transcoder->transcode($sourcePath, $workDir);
+            $sourceHeight = $probeService->probeVideoHeight($sourcePath);
+            $ladderHeights = $probeService->ladderHeightsForSource($sourceHeight);
+
+            $result = $transcoder->transcode($sourcePath, $workDir, $ladderHeights);
             $s3Prefix = 'videos/'.$this->videoId.'/hls';
 
             $this->uploadHlsArtifacts($s3Prefix, $result['work_dir'], $s3Service);
 
-            $mp4Outputs = $mp4Transcoder->transcode($sourcePath, $mp4Dir);
+            $mp4Outputs = $mp4Transcoder->transcode($sourcePath, $mp4Dir, $ladderHeights);
             $this->uploadMp4Artifacts('videos/'.$this->videoId, $mp4Outputs, $s3Service);
 
             $this->maybeExtractPosterFromVideo($video, $sourcePath, $workDir, $posterExtractor, $s3Service);
@@ -104,6 +121,34 @@ class ProcessVideoJob implements ShouldQueue
         $this->updateTranscodeStatus('failed');
     }
 
+    private function tryMarkReadyFromExistingArtifacts(
+        VideoMediaVerifier $mediaVerifier,
+        S3Service $s3Service,
+    ): bool {
+        try {
+            $mediaVerifier->assertTranscodeReady($this->videoId, $s3Service);
+        } catch (Throwable) {
+            return false;
+        }
+
+        $hlsKey = VideoMediaService::hlsMasterKey($this->videoId);
+        $this->updateTranscodeStatus('ready', $hlsKey);
+
+        $hlsUrl = AppHelper::absoluteUrlForStoredObject(
+            AppHelper::mediaPublicBaseUrl(),
+            $hlsKey,
+            'videos/'
+        ) ?? $hlsKey;
+
+        event(new VideoTranscoded($this->videoId, $hlsUrl, 'ready'));
+
+        Log::info('ProcessVideoJob skipped re-encode; artifacts already on storage', [
+            'video_id' => $this->videoId,
+        ]);
+
+        return true;
+    }
+
     private function handleTranscodeFailure(Throwable $e): void
     {
         Log::warning('ProcessVideoJob transcode attempt failed', [
@@ -112,13 +157,14 @@ class ProcessVideoJob implements ShouldQueue
             'message' => $e->getMessage(),
         ]);
 
-        $this->updateTranscodeStatus('failed');
-
         if ($this->attempts() < $this->tries) {
+            $this->updateTranscodeStatus('pending');
             $this->release(300);
 
             return;
         }
+
+        $this->updateTranscodeStatus('failed');
 
         throw $e;
     }
@@ -178,7 +224,7 @@ class ProcessVideoJob implements ShouldQueue
     {
         foreach ($localFiles as $height => $localPath) {
             $remoteKey = $s3Prefix.'/'.$height.'.mp4';
-            $s3Service->storeFile($remoteKey, file_get_contents($localPath), [
+            $s3Service->storeFileFromPath($remoteKey, $localPath, [
                 'mimetype' => 'video/mp4',
             ]);
         }
@@ -197,7 +243,7 @@ class ProcessVideoJob implements ShouldQueue
             }
 
             $remoteKey = $s3Prefix.'/'.$entry;
-            $s3Service->storeFile($remoteKey, file_get_contents($localPath), [
+            $s3Service->storeFileFromPath($remoteKey, $localPath, [
                 'mimetype' => $this->mimeForHlsFile($entry),
             ]);
         }
@@ -224,13 +270,17 @@ class ProcessVideoJob implements ShouldQueue
         $posterDir = $workDir.'/poster';
         $extracted = $posterExtractor->extract($sourcePath, $posterDir);
 
-        $s3Service->storeFile(VideoMediaService::posterKey($this->videoId), file_get_contents($extracted['poster']), [
-            'mimetype' => 'image/webp',
-        ]);
+        $s3Service->storeFileFromPath(
+            VideoMediaService::posterKey($this->videoId),
+            $extracted['poster'],
+            ['mimetype' => 'image/webp']
+        );
 
-        $s3Service->storeFile(VideoMediaService::posterBlurKey($this->videoId), file_get_contents($extracted['blur']), [
-            'mimetype' => 'image/webp',
-        ]);
+        $s3Service->storeFileFromPath(
+            VideoMediaService::posterBlurKey($this->videoId),
+            $extracted['blur'],
+            ['mimetype' => 'image/webp']
+        );
 
         DB::table('videos')
             ->where('id', $this->videoId)

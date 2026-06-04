@@ -628,22 +628,46 @@ class ApiController extends Controller
     }
     public function followers_list(Request $request){
         $user_id = $request->user_id;
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
 
-        // Followers
-        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $followersQuery = DB::table('followers')
+            ->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')
+            ->where('followers.following_id', $user_id)
+            ->where('front_users.is_soft_delete', 0)
+            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
 
-        // Following
-        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $followingQuery = DB::table('followers')
+            ->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')
+            ->where('followers.follower_id', $user_id)
+            ->where('front_users.is_soft_delete', 0)
+            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
+
+        if ($request->input('paginate') == 1) {
+            $followers = (clone $followersQuery)->skip($start)->take($length)->get();
+            $following = (clone $followingQuery)->skip($start)->take($length)->get();
+            AppHelper::decorateUserIterable($followers);
+            AppHelper::decorateUserIterable($following);
+
+            return response()->json([
+                'status' => true,
+                'followers' => $followers,
+                'following' => $following,
+                'meta' => FeedPaginationHelper::meta($request, $page, $perPage),
+            ], 200);
+        }
+
+        $followers = $followersQuery->get();
+        $following = $followingQuery->get();
 
         AppHelper::decorateUserIterable($followers);
         AppHelper::decorateUserIterable($following);
-            
-        $return_data = array(
+
+        return response()->json([
             'status' => true,
             'followers' => $followers,
-            'following' => $following
-        );
-        return response()->json($return_data, 200);
+            'following' => $following,
+        ], 200);
     }
     public function profile(){
         $user = Auth::user();
@@ -1362,12 +1386,8 @@ class ApiController extends Controller
 
         if($user){
             $follower_id = $user->id;
-            $followingIds = DB::table('followers')
-                                    ->where('follower_id', $follower_id)
-                                    ->pluck('following_id');
-            $blocked_users = DB::table('blocked_users')
-                                    ->where('blocked_by', $user->id)
-                                    ->pluck('blocked_user');
+            $followingIds = collect(\App\Support\FeedSocialCache::followingIds($follower_id));
+            $blocked_users = collect(\App\Support\FeedSocialCache::blockedUserIds($user->id));
             // $country = $user->country;
             // $city = $user->city;
         }
@@ -1392,45 +1412,13 @@ class ApiController extends Controller
             $city = $input['city'];
         }
         else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
-            $currentLat = $input['latitude'];
-            $currentLng = $input['longitude'];
-            $radiusList = [10, 25, 50];
-            foreach($radiusList as $radiusKm){
-                $nearestCity = DB::table('cities')
-                    ->select(
-                        'id',
-                        'name',
-                        DB::raw("(
-                            6371 * acos(
-                                cos(radians($currentLat)) *
-                                cos(radians(latitude)) *
-                                cos(radians(longitude) - radians($currentLng)) +
-                                sin(radians($currentLat)) *
-                                sin(radians(latitude))
-                            )
-                        ) AS distance")
-                    )
-                    ->having('distance', '<', $radiusKm)
-                    ->orderBy('distance', 'asc')
-                    ->first();
-    
-                if($nearestCity){
-                    $city = $nearestCity->id;
-                    break; // Stop if a city is found
-                }
-            }
+            $city = \App\Support\FeedSocialCache::nearestCityId(
+                (float) $input['latitude'],
+                (float) $input['longitude']
+            );
         }
 
-        $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
-        if(!empty($city_group)){
-            $cities_ids = explode(',', $city_group->cities);
-        }
-        else if($city != 0){
-            $cities_ids = array($city);
-        }
-        else{
-            $cities_ids = array();
-        }
+        $cities_ids = \App\Support\FeedSocialCache::cityGroupIds((int) $city);
 
         $pagination = FeedPaginationHelper::resolve($request);
         extract($pagination);
@@ -2918,8 +2906,23 @@ class ApiController extends Controller
         ->having('distance', '<=', $radius)
         ->orderBy('distance');
 
-        // Now add the bindings using mergeBindings and pass them to the query
-        $results = $query->addBinding([$latitude, $longitude, $latitude], 'select')->get();
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
+        $query = $query->addBinding([$latitude, $longitude, $latitude], 'select');
+
+        if ($request->input('paginate') == 1) {
+            $results = $query->skip($start)->take($length)->get();
+
+            return response()->json([
+                'status' => true,
+                'accounts' => $results,
+                'meta' => FeedPaginationHelper::meta($request, $page, $perPage),
+            ], 200);
+        }
+
+        $results = $query->get();
+
         return response()->json([
             'status' => true,
             'accounts' => $results,
@@ -3171,13 +3174,25 @@ class ApiController extends Controller
         $query_count   = clone $query;
         $query_avg     = clone $query;
 
-        // Get review list
-        $user_reviews = $query_reviews->select([
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
+        $reviewSelect = [
             'ur.*',
             'r.id as reviewer_id',
             'r.name as reviewer_name',
-            'r.image as reviewer_image'
-        ])->get();
+            'r.image as reviewer_image',
+        ];
+
+        if ($request->input('paginate') == 1) {
+            $user_reviews = $query_reviews->select($reviewSelect)
+                ->orderByDesc('ur.id')
+                ->skip($start)
+                ->take($length)
+                ->get();
+        } else {
+            $user_reviews = $query_reviews->select($reviewSelect)->get();
+        }
 
         // Total number of reviews
         $total_reviews = $query_count->count();
@@ -3202,15 +3217,21 @@ class ApiController extends Controller
             $rating_counts[$i] = $rating_breakdown[$i] ?? 0;
         }
 
-        return response()->json([
+        $payload = [
             'status' => true,
             'user_reviews' => $user_reviews,
             'review_counters' => [
                 'total_reviews' => $total_reviews,
                 'average_rating' => $average_rating,
-                'ratings' => $rating_counts
-            ]
-        ], 200);
+                'ratings' => $rating_counts,
+            ],
+        ];
+
+        if ($request->input('paginate') == 1) {
+            $payload['meta'] = FeedPaginationHelper::meta($request, $page, $perPage);
+        }
+
+        return response()->json($payload, 200);
     }
     public function update_review_status(Request $request){
         if($request->status == 1){
@@ -3754,37 +3775,55 @@ class ApiController extends Controller
         ], 200);
     }
     public function countries(Request $request){
-        $query = DB::table('countries');
-        if($request->input('id')){
-            $query->where('id', $request->input('id'));
-        }
-        $query->where('status', 1);
-        $countries = $query->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+        $id = $request->input('id');
+        $cacheKey = 'api:countries:'.($id ?: 'all');
+        $countries = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($id) {
+            $query = DB::table('countries')->where('status', 1);
+            if ($id) {
+                $query->where('id', $id);
+            }
+
+            return $query->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'countries' => $countries,
         ], 200);
     }
     public function states(Request $request){
-        $query = DB::table('states');
-        if($request->input('country_id')){
-            $query->where('country_id', $request->input('country_id'));
-        }
-        $states = $query->select(['id', 'name', 'country_id'])->get();
+        $countryId = $request->input('country_id') ?? 'all';
+        $cacheKey = 'api:states:'.$countryId;
+        $states = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($request) {
+            $query = DB::table('states');
+            if ($request->input('country_id')) {
+                $query->where('country_id', $request->input('country_id'));
+            }
+
+            return $query->select(['id', 'name', 'country_id'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'states' => $states,
         ], 200);
     }
     public function cities(Request $request){
-        $query = DB::table('cities');
-        if($request->input('state_id')){
-            $query->where('state_id', $request->input('state_id'));
-        }
-        if($request->input('country_id')){
-            $query->where('country_id', $request->input('country_id'));
-        }
-        $cities = $query->select(['id', 'name', 'state_id'])->get();
+        $stateId = $request->input('state_id') ?? 'all';
+        $countryId = $request->input('country_id') ?? 'all';
+        $cacheKey = 'api:cities:'.$countryId.':'.$stateId;
+        $cities = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($request) {
+            $query = DB::table('cities');
+            if ($request->input('state_id')) {
+                $query->where('state_id', $request->input('state_id'));
+            }
+            if ($request->input('country_id')) {
+                $query->where('country_id', $request->input('country_id'));
+            }
+
+            return $query->select(['id', 'name', 'state_id'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'cities' => $cities,
@@ -3798,7 +3837,13 @@ class ApiController extends Controller
         ], 200);
     }
     public function site_settings(){
-        $settings = DB::table('settings')->where('id', 1)->select(['email', 'phone', 'address', 'facebook', 'twitter', 'instagram', 'linkedin', 'basic_sponsored_video_price', 'premium_sponsored_video_price', 'sponsor_video_discount', 'allow_general_videos', 'currency_symbol', 'allow_following_videos'])->first();
+        $row = AppHelper::get_site_settings();
+        $settings = $row ? $row->only([
+            'email', 'phone', 'address', 'facebook', 'twitter', 'instagram', 'linkedin',
+            'basic_sponsored_video_price', 'premium_sponsored_video_price', 'sponsor_video_discount',
+            'allow_general_videos', 'currency_symbol', 'allow_following_videos',
+        ]) : null;
+
         return response()->json([
             'status' => true,
             'settings' => $settings,
