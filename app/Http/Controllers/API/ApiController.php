@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use App\Jobs\ProcessVideoJob;
 use App\Jobs\ProcessVideoThumbnailJob;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
@@ -617,6 +618,7 @@ class ApiController extends Controller
 
         // Blocked Users list
         $blocked_users = DB::table('blocked_users')->leftJoin('front_users', 'front_users.id', '=', 'blocked_users.blocked_user')->where('blocked_users.blocked_by', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        AppHelper::decorateUserIterable($blocked_users);
             
         $return_data = array(
             'status' => true,
@@ -632,6 +634,9 @@ class ApiController extends Controller
 
         // Following
         $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+
+        AppHelper::decorateUserIterable($followers);
+        AppHelper::decorateUserIterable($following);
             
         $return_data = array(
             'status' => true,
@@ -686,34 +691,76 @@ class ApiController extends Controller
         }
 
         $video_types = AppHelper::get_key_values(2)['values'];
-        foreach($video_types as $key => $video_type){
-            $query=DB::table('videos as v');
-            $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
-            $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
-            $query->leftJoin('sponsored_videos as sv', 'sv.video_id', '=', 'v.id');
-            $query->where('v.status', 1);
-            $query->where('v.is_soft_delete', 0);
-            $query->where('v.video_type', $video_type->id);
-            $query->where('v.front_user_id', $user->id);
-            $query1 = clone $query;
-            $query2 = clone $query;
-            $totalData = $query1->select(['v.id'])->count();
-            $query2->orderBy('v.system_id', 'DESC');
-            $videos = $query2->select(['v.*', 'u.name as user_name', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', 'sv.sponsor_type', 'sv.cities', 'sv.days', 'sv.start_date', 'sv.end_date', 'sv.per_day_price', 'sv.discount_percentage', 'sv.discount_amount', 'sv.total_amount'])->get();
 
-            foreach($videos as $video){
-                if(!empty($video->cities)){
-                    $cityIds = explode(',', $video->cities);
-                    $cityNames = DB::table('cities')->whereIn('id', $cityIds)->pluck('name')->toArray();
-                    $video->city_names = $cityNames? implode(',', $cityNames): '';
-                }
-                else{
-                    $video->city_names = '';
+        // ---- Optimized: single video query + one bulk city-name lookup ----
+        // Was: 4 sequential queries (one per video type) + N+1 city lookups
+        //      inside each result row. Now: 2 queries total for this whole block.
+        $allTypeIds = collect($video_types)->pluck('id')->all();
+
+        $allVideos = collect();
+        if (! empty($allTypeIds)) {
+            $allVideos = DB::table('videos as v')
+                ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
+                ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
+                ->leftJoin('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
+                ->where('v.status', 1)
+                ->where('v.is_soft_delete', 0)
+                ->where('v.front_user_id', $user->id)
+                ->whereIn('v.video_type', $allTypeIds)
+                ->orderBy('v.system_id', 'DESC')
+                ->select([
+                    'v.*',
+                    'u.name as user_name', 'u.image as user_image',
+                    'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude',
+                    'sv.sponsor_type', 'sv.cities', 'sv.days', 'sv.start_date', 'sv.end_date',
+                    'sv.per_day_price', 'sv.discount_percentage', 'sv.discount_amount', 'sv.total_amount',
+                ])
+                ->get();
+        }
+
+        // Bulk-resolve every city name referenced across every video in one query,
+        // then attach via in-memory map (fixes the city N+1).
+        $allCityIds = [];
+        foreach ($allVideos as $video) {
+            if (! empty($video->cities)) {
+                foreach (explode(',', $video->cities) as $cid) {
+                    $cid = trim($cid);
+                    if ($cid !== '') {
+                        $allCityIds[$cid] = true;
+                    }
                 }
             }
+        }
 
-            AppHelper::decorateVideoIterable($videos);
-            $video_types[$key]->videos = $videos;
+        $cityNameMap = [];
+        if (! empty($allCityIds)) {
+            $cityNameMap = DB::table('cities')
+                ->whereIn('id', array_keys($allCityIds))
+                ->pluck('name', 'id')
+                ->all();
+        }
+
+        foreach ($allVideos as $video) {
+            if (! empty($video->cities)) {
+                $names = [];
+                foreach (explode(',', $video->cities) as $cid) {
+                    $cid = trim($cid);
+                    if (isset($cityNameMap[$cid])) {
+                        $names[] = $cityNameMap[$cid];
+                    }
+                }
+                $video->city_names = implode(',', $names);
+            } else {
+                $video->city_names = '';
+            }
+        }
+
+        AppHelper::decorateVideoIterable($allVideos);
+
+        // Group videos back under their type for the response shape callers expect.
+        $videosByType = $allVideos->groupBy('video_type');
+        foreach ($video_types as $key => $video_type) {
+            $video_types[$key]->videos = ($videosByType[$video_type->id] ?? collect())->values();
         }
 
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->pluck('followers.follower_id'); // Followers
@@ -721,6 +768,9 @@ class ApiController extends Controller
 
         $subscription = DB::table('subscription_history')->join('packages', 'packages.id', '=', 'subscription_history.package_id')->join('packages_description', 'packages_description.package_id', '=', 'packages.id')->join('site_languages', 'packages_description.language_id', '=', 'site_languages.id')->where('site_languages.code', $language)->where('subscription_history.front_user_id', $user->id)->orderBy('subscription_history.system_id', 'DESC')->select(['subscription_history.*', 'packages_description.title', 'packages_description.description'])->first();
             
+        $user->image_url = AppHelper::userImageUrl($user->image ?? null);
+        $user->cover_image_url = AppHelper::userImageUrl($user->cover_image ?? null);
+
         $return_data = array(
             'status' => true,
             'user' => $user,
@@ -819,6 +869,7 @@ class ApiController extends Controller
                 $constraint->aspectRatio();
             })->save($destinationPath.'/'.$image_input['imagename']);
             $user->image = $image_input['imagename'];
+            $this->syncUserImageToObjectStorage($image_input['imagename']);
         }
         if($coverImageFile){
             $image = $coverImageFile;
@@ -840,6 +891,7 @@ class ApiController extends Controller
                 $constraint->aspectRatio();
             })->save($destinationPath.'/'.$image_input['imagename']);
             $user->cover_image = $image_input['imagename'];
+            $this->syncUserImageToObjectStorage($image_input['imagename']);
         }
         $user->save();
         if($user->entity==1){
@@ -951,8 +1003,8 @@ class ApiController extends Controller
         $response = [
             'status' => true,
             'user' => $user,
-            'image_url' => !empty($user->image) ? url('storage/front_users/'.$user->image) : null,
-            'cover_image_url' => !empty($user->cover_image) ? url('storage/front_users/'.$user->cover_image) : null,
+            'image_url' => AppHelper::userImageUrl($user->image ?? null),
+            'cover_image_url' => AppHelper::userImageUrl($user->cover_image ?? null),
             'message' => __('messages.user_updated')
         ];
 
@@ -978,6 +1030,28 @@ class ApiController extends Controller
 
         return null;
     }
+
+    private function syncUserImageToObjectStorage(string $filename): void
+    {
+        $localPath = storage_path('app/public/front_users/'.$filename);
+        if (! is_file($localPath)) {
+            return;
+        }
+
+        $key = AppHelper::userImageStorageKey($filename);
+        if ($key === null) {
+            return;
+        }
+
+        try {
+            $this->s3Service->storeFile($key, file_get_contents($localPath), [
+                'mimetype' => S3Service::resolveMimeType($localPath, 'image/jpeg'),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function notifications_list(){
         $user = Auth::user();
         $query = DB::table('notifications');
@@ -990,13 +1064,61 @@ class ApiController extends Controller
         $query->whereDate('notifications.created_at', '>=', $user->created_at);
         $query->where('to_type', 2)->where('read_status', 0);
         $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_id', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'user_review_id', 'read_status', 'status', 'created_at'])->get();
-        foreach($notifications as $key => $notification){
-            $notifications[$key]->details = AppHelper::get_notification_subject_text($notification);
+
+        // Batched lookup of related records to avoid N+1 in the foreach below.
+        // Previously each notification type triggered 1–2 DB queries inside
+        // AppHelper::get_notification_subject_text; with 30 notifications that
+        // was up to 60 queries per request. Now: at most 5 queries total.
+        $related = $this->preloadNotificationRelations($notifications);
+
+        foreach ($notifications as $key => $notification) {
+            $notifications[$key]->details = AppHelper::get_notification_subject_text($notification, $related);
         }
+
         return response()->json([
             'status' => true,
             'notifications' => $notifications,
         ], 200);
+    }
+
+    /**
+     * Pre-load every related record the notifications list needs in a fixed
+     * number of `whereIn` queries instead of one-per-notification.
+     *
+     * Returns: ['reports'=>[id=>row], 'pushes'=>[..], 'videos'=>[..], 'reviews'=>[..], 'users'=>[..]]
+     */
+    private function preloadNotificationRelations($notifications): array
+    {
+        $reportIds = [];
+        $pushIds = [];
+        $videoIds = [];
+        $reviewIds = [];
+        $userIds = [];
+
+        foreach ($notifications as $n) {
+            switch ((int) $n->type) {
+                case 1: if (! empty($n->video_report_id)) $reportIds[] = $n->video_report_id; break;
+                case 2: if (! empty($n->push_notification_id)) $pushIds[] = $n->push_notification_id; break;
+                case 3: if (! empty($n->video_id)) $videoIds[] = $n->video_id; break;
+                case 4: if (! empty($n->user_review_id)) $reviewIds[] = $n->user_review_id; break;
+                case 5:
+                    if (! empty($n->video_id)) $videoIds[] = $n->video_id;
+                    if (! empty($n->front_user_id)) $userIds[] = $n->front_user_id;
+                    break;
+            }
+        }
+
+        $reports = $reportIds ? DB::table('video_reports')->whereIn('id', array_unique($reportIds))->get()->keyBy('id') : collect();
+        $pushes  = $pushIds   ? DB::table('push_notifications')->whereIn('id', array_unique($pushIds))->get()->keyBy('id') : collect();
+        $videos  = $videoIds  ? DB::table('videos')->whereIn('id', array_unique($videoIds))->select(['id','title'])->get()->keyBy('id') : collect();
+        $reviews = $reviewIds ? DB::table('user_reviews')
+            ->join('front_users', 'front_users.id', '=', 'user_reviews.reviewer_id')
+            ->whereIn('user_reviews.id', array_unique($reviewIds))
+            ->select(['user_reviews.id', 'user_reviews.reviewer_id', 'front_users.name as reviewer_name'])
+            ->get()->keyBy('id') : collect();
+        $users   = $userIds   ? DB::table('front_users')->whereIn('id', array_unique($userIds))->select(['id','name'])->get()->keyBy('id') : collect();
+
+        return compact('reports', 'pushes', 'videos', 'reviews', 'users');
     }
     public function notifications_update_status(){
         $user = Auth::user();
@@ -1805,24 +1927,31 @@ class ApiController extends Controller
             $additional_data = DB::table('sponsored_account_additional_data')->where('front_user_id', $user->id)->first();
         }
         $video_types = AppHelper::get_key_values(2)['values'];
-        foreach($video_types as $key => $video_type){
-            $query=DB::table('videos as v');
-            $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
-            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
-            $query->where('v.status', 1);
-            $query->where('v.is_soft_delete', 0);
-            $query->where('v.video_type', $video_type->id);
-            $query->where('v.front_user_id', $user->id);
-            $query->where(function ($q) {
-                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
-            });
-            $query1 = clone $query;
-            $query2 = clone $query;
-            $totalData = $query1->select(['v.id'])->count();
-            $query2->orderBy('v.system_id', 'DESC');
-            $videos = $query2->select(['v.*', 'u.name as user_name', 'u.image as user_image'])->get();
-            AppHelper::decorateVideoIterable($videos);
-            $video_types[$key]->videos = $videos;
+
+        // Single query for every video type (was 4 sequential queries per
+        // profile view). Group by video_type in PHP afterwards.
+        $allTypeIds = collect($video_types)->pluck('id')->all();
+        $allVideos = collect();
+        if (! empty($allTypeIds)) {
+            $allVideos = DB::table('videos as v')
+                ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
+                ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
+                ->where('v.status', 1)
+                ->where('v.is_soft_delete', 0)
+                ->where('v.front_user_id', $user->id)
+                ->whereIn('v.video_type', $allTypeIds)
+                ->where(function ($q) {
+                    $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
+                })
+                ->orderBy('v.system_id', 'DESC')
+                ->select(['v.*', 'u.name as user_name', 'u.image as user_image'])
+                ->get();
+            AppHelper::decorateVideoIterable($allVideos);
+        }
+
+        $videosByType = $allVideos->groupBy('video_type');
+        foreach ($video_types as $key => $video_type) {
+            $video_types[$key]->videos = ($videosByType[$video_type->id] ?? collect())->values();
         }
 
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of followers
@@ -1848,12 +1977,29 @@ class ApiController extends Controller
     // Videos
     public function video_settings(){
         $language = App::getLocale();
-        $video_types = AppHelper::get_key_values(2);
-        $countries = DB::table('countries')->where('status', 1)->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+
+        // Countries are static reference data; cache per-language for 1 day
+        // (SWR up to 7 days). video_types come from generic key/values which
+        // are also static enough to cache. Both are heavy reads that run on
+        // every app cold start.
+        $payload = \App\Support\CookCache::remember(
+            'api:video_settings:'.$language,
+            [86400, 604800],
+            function () {
+                return [
+                    'video_types' => AppHelper::get_key_values(2),
+                    'countries' => DB::table('countries')
+                        ->where('status', 1)
+                        ->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])
+                        ->get(),
+                ];
+            }
+        );
+
         return response()->json([
             'status' => true,
-            'video_types' => $video_types,
-            'countries' => $countries,
+            'video_types' => $payload['video_types'],
+            'countries' => $payload['countries'],
             'media_base_url' => AppHelper::mediaPublicBaseUrl(),
         ], 200);
     }
@@ -1997,6 +2143,12 @@ class ApiController extends Controller
 
             if ($uploaded) {
                 $data['video'] = $video_name;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+                    $data['transcode_status'] = 'pending';
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status') && empty($data['processing_status'])) {
+                    $data['processing_status'] = 'processing';
+                }
             }
         }
 
@@ -2008,6 +2160,10 @@ class ApiController extends Controller
 
         if ($stagingPath !== null && $imageName !== null) {
             ProcessVideoThumbnailJob::dispatch($data['id'], $stagingPath, $imageName);
+        }
+
+        if (! empty($data['video']) && \Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+            ProcessVideoJob::dispatch($data['id'], $data['video']);
         }
 
         if($request->tags){
@@ -2065,11 +2221,24 @@ class ApiController extends Controller
             ], 404);
         }
 
-        return response()->json([
+        AppHelper::decorateVideoRow($video);
+
+        $payload = [
             'status' => true,
             'video_id' => $video->id,
             'processing_status' => $video->processing_status ?? 'ready',
-        ], 200);
+            'transcode_status' => $video->transcode_status ?? 'pending',
+            'hls_url' => $video->hls_url ?? null,
+            'hls_playlist_url' => $video->hls_playlist_url ?? null,
+            'video_sources' => $video->video_sources ?? null,
+            'video_url' => $video->video_url ?? null,
+            'thumbnail_url' => $video->thumbnail_url ?? null,
+            'thumbnail_blur' => $video->thumbnail_blur ?? null,
+            'image_url' => $video->image_url ?? null,
+            'video' => $video,
+        ];
+
+        return response()->json($payload, 200);
     }
 
     public function edit_video(Request $request){

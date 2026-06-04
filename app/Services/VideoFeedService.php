@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Helpers\AppHelper;
+use App\Support\CookCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -153,9 +154,12 @@ class VideoFeedService
 
     private function resolveNearestCityId(float $lat, float $lng): int
     {
-        $cacheKey = 'feed_nearest_city_'.round($lat, 3).'_'.round($lng, 3);
+        // SWR: 10 min fresh, 1 hour stale. The Haversine query is one of the
+        // heaviest the API runs and the lat/lng is rounded to ~100m buckets,
+        // so a tiny number of keys cover most of the traffic.
+        $cacheKey = 'feed:nearest_city:'.round($lat, 3).':'.round($lng, 3);
 
-        return (int) Cache::remember($cacheKey, now()->addMinutes(10), function () use ($lat, $lng) {
+        return (int) CookCache::rememberLocked($cacheKey, [600, 3600], function () use ($lat, $lng) {
             foreach ([10, 25, 50] as $radiusKm) {
                 $nearestCity = DB::table('cities')
                     ->select('id', DB::raw("(
@@ -185,7 +189,8 @@ class VideoFeedService
      */
     private function resolveCityGroupIds(int $city): array
     {
-        return Cache::remember('feed_city_group_'.$city, now()->addMinutes(15), function () use ($city) {
+        // Static reference data — long SWR window is safe (15 min fresh, 1 day stale).
+        return CookCache::remember('feed:city_group:'.$city, [900, 86400], function () use ($city) {
             $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
             if (! empty($city_group)) {
                 return explode(',', $city_group->cities);
@@ -252,10 +257,18 @@ class VideoFeedService
         });
 
         if ($user) {
-            $blocked_users = DB::table('blocked_users')
-                ->where('blocked_by', $user->id)
-                ->pluck('blocked_user');
-            if ($blocked_users->isNotEmpty()) {
+            // Hot per-request lookup: cached for 60s with SWR (stale up to 5 min).
+            // Invalidated only when block/unblock actions write to the table; short
+            // TTL keeps it self-healing without explicit invalidation hooks.
+            $blocked_users = CookCache::remember(
+                'feed:blocked_users:'.$user->id,
+                [60, 300],
+                fn () => DB::table('blocked_users')
+                    ->where('blocked_by', $user->id)
+                    ->pluck('blocked_user')
+                    ->all()
+            );
+            if (! empty($blocked_users)) {
                 $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
             }
         }
@@ -271,9 +284,16 @@ class VideoFeedService
         }
 
         if ($user) {
-            $followingIds = DB::table('followers')
-                ->where('follower_id', $user->id)
-                ->pluck('following_id');
+            // Following list is read on every paginated feed page; cache 60s with
+            // SWR up to 5 min so background follow/unfollow surfaces quickly.
+            $followingIds = CookCache::remember(
+                'feed:following_ids:'.$user->id,
+                [60, 300],
+                fn () => DB::table('followers')
+                    ->where('follower_id', $user->id)
+                    ->pluck('following_id')
+                    ->all()
+            );
 
             if (isset($input['is_following']) && $input['is_following'] == 1) {
                 $normalQuery->where(function ($q) {

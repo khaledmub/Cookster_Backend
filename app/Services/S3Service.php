@@ -33,7 +33,29 @@ class S3Service
      */
     public function storeFile(string $filename, $contents, array $options = []): bool
     {
+        if (! isset($options['CacheControl'])) {
+            $options['CacheControl'] = $this->defaultCacheControl($filename);
+        }
+
         return (bool) $this->disk()->put($filename, $contents, $options);
+    }
+
+    private function defaultCacheControl(string $filename): string
+    {
+        if (str_ends_with($filename, '.m3u8')) {
+            return 'public, max-age=60';
+        }
+
+        if (preg_match('#/(thumb(_blur)?\.webp|360|720|1080)\.mp4$#', $filename)
+            || preg_match('#\.(ts|m4s)$#', $filename)) {
+            return 'public, max-age=31536000, immutable';
+        }
+
+        if (preg_match('#\.mp4$#', $filename)) {
+            return 'public, max-age=31536000, immutable';
+        }
+
+        return 'public, max-age=86400';
     }
 
     /**

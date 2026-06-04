@@ -45,8 +45,8 @@
                             <div class="row">
                                 <div class="col-sm-12">
                                     <div class="video_thumbnail">
-                                        <img src="{{env('AWS_CLOUD_FRONT_PATH').'videos/'.$data['video_details']->image}}" alt="">
-                                        <a data-title="{{$data['video_details']->title}}" data-video="{{env('AWS_CLOUD_FRONT_PATH').'videos/'.$data['video_details']->video}}" href="javascript:void(0)" class="video_icon showVideo"><i class="ri-play-fill"></i></a>
+                                        <img src="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'videos/'.$data['video_details']->image }}" alt="">
+                                        <a data-title="{{$data['video_details']->title}}" data-video="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'videos/'.$data['video_details']->video }}" href="javascript:void(0)" class="video_icon showVideo"><i class="ri-play-fill"></i></a>
                                     </div>
 
                                     <div class="row">

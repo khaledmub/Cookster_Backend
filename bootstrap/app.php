@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\Localization;
 use App\Providers\AppServiceProvider;
 use App\Providers\AwsSecretsProvider;
+use App\Providers\CacheFallbackProvider;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,6 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withProviders([
+        // CacheFallbackProvider must run before anything that touches
+        // cache/queue/session so Redis can be swapped for file/database
+        // when Redis is unreachable.
+        CacheFallbackProvider::class,
         AppServiceProvider::class,
         AwsSecretsProvider::class,
     ])

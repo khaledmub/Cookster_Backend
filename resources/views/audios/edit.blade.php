@@ -97,7 +97,7 @@
                                     <div class="form-group">
                                         <label class="form-label">Image <span class="text-danger">*</span>
                                         @if($m_data->image != '')
-                                        <span><a target="_blank" href="{{ env('AWS_CLOUD_FRONT_PATH')."audios/".$m_data->image }}">(Uploaded Picture)</a></span>
+                                        <span><a target="_blank" href="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'audios/'.$m_data->image }}">(Uploaded Picture)</a></span>
                                         @endif
                                         </label>
                                         <input type="file" name="image" class="form-control">
@@ -107,7 +107,7 @@
                                     <div class="form-group">
                                         <label class="form-label">File <span class="text-danger">*</span>
                                         @if($m_data->file != '')
-                                        <span><a target="_blank" href="{{ env('AWS_CLOUD_FRONT_PATH')."audios/".$m_data->file }}">(Uploaded File)</a></span>
+                                        <span><a target="_blank" href="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'audios/'.$m_data->file }}">(Uploaded File)</a></span>
                                         @endif
                                         </label>
                                         <input type="file" name="file" class="form-control">
