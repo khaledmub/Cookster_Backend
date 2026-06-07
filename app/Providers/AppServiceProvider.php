@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Services\CdnService;
 use Aws\CommandInterface;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(CdnService::class);
     }
 
     /**
@@ -38,6 +42,14 @@ class AppServiceProvider extends ServiceProvider
         }
 
         $this->configureS3DiskForUniformBucketAccess();
+        $this->configureRateLimiting();
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('reels-presign', function (Request $request) {
+            return Limit::perMinute(60)->by((string) ($request->user()?->id ?: $request->ip()));
+        });
     }
 
     /**

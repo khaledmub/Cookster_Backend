@@ -1,8 +1,9 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\ApiController;
+use App\Http\Controllers\API\PresignController;
+use App\Http\Controllers\API\ReelsController;
 
 use App\Http\Middleware\SetLanguage;
 
@@ -44,7 +45,9 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/videos/settings', [ApiController::class, 'video_settings']);
     Route::post('/videos/list', [ApiController::class, 'videos_list']);
     Route::get('/videos/details', [ApiController::class, 'video_details']);
+    Route::get('/videos/processing_status', [ApiController::class, 'video_processing_status']);
     Route::get('/videos/debug_url', [ApiController::class, 'debug_video_url']);
+    Route::get('/reels', [ReelsController::class, 'index']);
     Route::post('/videos/send_liked_video_notification', [ApiController::class, 'send_liked_video_notification']);
 
     // Nearest Business Accounts/Restaurants
@@ -71,6 +74,9 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::post('/remove_follower', [ApiController::class, 'remove_follower']);
 
         // Videos
+        Route::get('/reels/presign/{videoId}', [PresignController::class, 'show'])
+            ->middleware('throttle:reels-presign');
+
         Route::post('/videos/create', [ApiController::class, 'create_video']);
         Route::post('/videos/edit', [ApiController::class, 'edit_video']);
         Route::delete('/videos/delete', [ApiController::class, 'delete_video']);

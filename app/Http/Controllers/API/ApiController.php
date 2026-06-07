@@ -2603,6 +2603,16 @@ class ApiController extends Controller
             }
         }
 
+        if (empty($finalList) && ! empty($cities_ids) && empty($input['is_following']) && empty($input['_geo_fallback'])) {
+            $fallbackInput = $input;
+            unset($fallbackInput['city'], $fallbackInput['latitude'], $fallbackInput['longitude']);
+            $fallbackInput['_geo_fallback'] = true;
+            $fallbackRequest = $request->duplicate();
+            $fallbackRequest->replace($fallbackInput);
+
+            return $this->videos_list($fallbackRequest);
+        }
+
         AppHelper::decorateVideoIterable($finalList);
 
         return response()->json([
@@ -2610,6 +2620,48 @@ class ApiController extends Controller
             'videos' => $finalList,
         ], 200);
     }
+
+    public function video_processing_status(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'video_id' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $video = DB::table('videos')->where('id', $request->video_id)->first();
+        if (! $video) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Video not found',
+            ], 404);
+        }
+
+        AppHelper::decorateVideoRow($video);
+
+        $payload = [
+            'status' => true,
+            'video_id' => $video->id,
+            'processing_status' => $video->processing_status ?? 'ready',
+            'transcode_status' => $video->transcode_status ?? 'pending',
+            'hls_url' => $video->hls_url ?? null,
+            'hls_playlist_url' => $video->hls_playlist_url ?? null,
+            'video_sources' => $video->video_sources ?? null,
+            'video_url' => $video->video_url ?? null,
+            'thumbnail_url' => $video->thumbnail_url ?? null,
+            'thumbnail_blur' => $video->thumbnail_blur ?? null,
+            'image_url' => $video->image_url ?? null,
+            'video' => $video,
+        ];
+
+        return response()->json($payload, 200);
+    }
+
     public function videos_list_old(Request $request){
         $user = Auth::guard('sanctum')->user();
         $input = $request->all();
