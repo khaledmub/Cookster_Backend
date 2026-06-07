@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ReelResource;
+use App\Support\FeedSocialCache;
 use App\Models\Video;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,11 +56,9 @@ class ReelsController extends Controller
             ->whereIn('videos.publish_type', [1, 2]);
 
         if ($viewer) {
-            $blockedIds = DB::table('blocked_users')
-                ->where('blocked_by', $viewer->id)
-                ->pluck('blocked_user');
+            $blockedIds = FeedSocialCache::blockedUserIds($viewer->id);
 
-            if ($blockedIds->isNotEmpty()) {
+            if (! empty($blockedIds)) {
                 $query->whereNotIn('videos.front_user_id', $blockedIds);
             }
         }
@@ -152,13 +151,7 @@ class ReelsController extends Controller
             return 'reels_feed_guest_'.$cursorKey;
         }
 
-        $blockedHash = sha1(
-            DB::table('blocked_users')
-                ->where('blocked_by', $viewer->id)
-                ->orderBy('blocked_user')
-                ->pluck('blocked_user')
-                ->implode(',')
-        );
+        $blockedHash = sha1(implode(',', FeedSocialCache::blockedUserIds($viewer->id)));
 
         return 'reels_feed_u_'.$viewer->id.'_b_'.$blockedHash.'_'.$cursorKey;
     }

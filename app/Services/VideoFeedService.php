@@ -35,6 +35,15 @@ class VideoFeedService
 
     public function legacyList(Request $request, $user): array
     {
+        $cacheKey = $this->feedPageCacheKey('legacy', $request, $user);
+
+        return CookCache::remember($cacheKey, [45, 180], function () use ($request, $user) {
+            return $this->legacyListUncached($request, $user);
+        });
+    }
+
+    public function legacyListUncached(Request $request, $user): array
+    {
         $context = $this->buildFeedContext($request, $user);
         $queries = $this->buildVideoQueries($context);
 
@@ -60,7 +69,7 @@ class VideoFeedService
             $fallbackInput['_geo_fallback'] = true;
             $fallback->replace($fallbackInput);
 
-            return $this->legacyList($fallback, $user);
+            return $this->legacyListUncached($fallback, $user);
         }
 
         AppHelper::decorateVideoIterable($finalList);
@@ -72,6 +81,15 @@ class VideoFeedService
     }
 
     public function paginatedList(Request $request, $user): array
+    {
+        $cacheKey = $this->feedPageCacheKey('paginated', $request, $user);
+
+        return CookCache::remember($cacheKey, [45, 180], function () use ($request, $user) {
+            return $this->paginatedListUncached($request, $user);
+        });
+    }
+
+    public function paginatedListUncached(Request $request, $user): array
     {
         $context = $this->buildFeedContext($request, $user);
         $queries = $this->buildVideoQueries($context);
@@ -161,6 +179,16 @@ class VideoFeedService
         }
 
         return compact('city', 'country', 'cities_ids', 'input', 'user');
+    }
+
+
+    private function feedPageCacheKey(string $mode, Request $request, $user): string
+    {
+        $input = $request->all();
+        ksort($input);
+        $viewer = $user?->id ?? 'guest';
+
+        return 'feed:page:'.$mode.':'.$viewer.':'.sha1(json_encode($input));
     }
 
     private function resolveNearestCityId(float $lat, float $lng): int

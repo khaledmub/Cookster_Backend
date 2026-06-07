@@ -74,7 +74,7 @@ class S3Service
     private function defaultCacheControl(string $filename): string
     {
         if (str_ends_with($filename, '.m3u8')) {
-            return 'public, max-age=60';
+            return 'public, max-age=300';
         }
 
         if (preg_match('#/(thumb(_blur)?\.webp|360|720|1080)\.mp4$#', $filename)

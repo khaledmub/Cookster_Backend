@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
 class VideoMp4Transcoder
@@ -70,7 +71,11 @@ class VideoMp4Transcoder
         }
 
         foreach ($running as $height => $meta) {
-            $meta['process']->mustRun();
+            $exitCode = $meta['process']->wait();
+
+            if ($exitCode !== 0) {
+                throw new ProcessFailedException($meta['process']);
+            }
 
             if (! is_file($meta['path']) || filesize($meta['path']) === 0) {
                 throw new RuntimeException('FFmpeg did not produce MP4 rendition: '.$meta['path']);

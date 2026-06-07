@@ -148,6 +148,8 @@ return [
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
             'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'serializer' => defined('Redis::SERIALIZER_IGBINARY') ? Redis::SERIALIZER_IGBINARY : Redis::SERIALIZER_PHP,
+            'compression' => defined('Redis::COMPRESSION_LZ4') ? Redis::COMPRESSION_LZ4 : (defined('Redis::COMPRESSION_ZSTD') ? Redis::COMPRESSION_ZSTD : 0),
         ],
 
         'default' => [

@@ -48,13 +48,6 @@ class VideoHlsTranscoder
             throw new RuntimeException('Unable to create HLS work directory: '.$workDir);
         }
 
-        $ffmpeg = FFMpeg::create([
-            'ffmpeg.binaries' => config('ffmpeg.ffmpeg.binaries'),
-            'ffprobe.binaries' => config('ffmpeg.ffprobe.binaries'),
-            'timeout' => config('ffmpeg.timeout'),
-        ]);
-
-        $video = $ffmpeg->open($sourcePath);
         $segmentSeconds = (int) config('ffmpeg.hls_segment_seconds', 6);
         $preset = (string) config('ffmpeg.preset', 'veryfast');
         $threads = (int) config('ffmpeg.threads', 0);
@@ -91,7 +84,13 @@ class VideoHlsTranscoder
             $format->setAudioKiloBitrate($variant['audio_kbps']);
             $format->setAdditionalParameters($extra);
 
-            $video->save($format, $playlistPath);
+            $ffmpeg = FFMpeg::create([
+                'ffmpeg.binaries' => config('ffmpeg.ffmpeg.binaries'),
+                'ffprobe.binaries' => config('ffmpeg.ffprobe.binaries'),
+                'timeout' => config('ffmpeg.timeout'),
+            ]);
+
+            $ffmpeg->open($sourcePath)->save($format, $playlistPath);
 
             if (! is_file($playlistPath)) {
                 throw new RuntimeException('FFmpeg did not produce playlist: '.$playlistPath);
