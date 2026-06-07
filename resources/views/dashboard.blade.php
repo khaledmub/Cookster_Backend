@@ -139,8 +139,8 @@
                                     <div class="element-item col-xxl-3 col-xl-4 col-sm-6">
                                         <div class="gallery-box card">
                                             <div class="gallery-container">
-                                                <a class="showVideo" data-title="{{$video->title}}" data-video="{{env('AWS_CLOUD_FRONT_PATH').'videos/'.$video->video}}" href="javascript:void(0)">
-                                                    <img class="gallery-img img-fluid mx-auto" src="{{env('AWS_CLOUD_FRONT_PATH').'videos/'.$video->image}}" alt="" />
+                                                <a class="showVideo" data-title="{{$video->title}}" data-video="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'videos/'.$video->video }}" href="javascript:void(0)">
+                                                    <img class="gallery-img img-fluid mx-auto" src="{{ \App\Helpers\AppHelper::mediaPublicBaseUrl().'videos/'.$video->image }}" alt="" />
                                                     <div class="gallery-overlay">
                                                         <h5 class="overlay-caption">{{$video->title}}</h5>
                                                     </div>

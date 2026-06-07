@@ -18,17 +18,39 @@ use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise;
 use Illuminate\Support\Facades\Log;
-use App\Jobs\SendEmailJob;
 
 class AppHelper
 {
     private static $userids=array();
 
 	public static function send_email($from_email, $to_email, $subject, $message){
+        if (config('queue.default') !== 'sync') {
+            \App\Jobs\SendTransactionalEmailJob::dispatch(
+                $from_email,
+                $to_email,
+                $subject,
+                $message
+            );
+
+            return [
+                'success' => true,
+                'mail_dispatched' => true,
+                'dispatch_mode' => 'queued',
+                'provider_message_id' => null,
+                'queue_job_id' => null,
+                'error_code' => null,
+                'error_message' => null,
+            ];
+        }
+
+        return self::sendEmailNow($from_email, $to_email, $subject, $message);
+	}
+
+    public static function sendEmailNow($from_email, $to_email, $subject, $message){
+        $dispatch_mode = 'sync';
         $provider_message_id = null;
         $mailer = (string) config('mail.default');
         $nonDeliverableMailers = ['log', 'array'];
-        $useQueue = config('queue.default') !== 'sync';
 
         if (in_array($mailer, $nonDeliverableMailers, true)) {
             $errorMessage = 'Configured mailer does not deliver externally: '.$mailer;
@@ -646,6 +668,20 @@ class AppHelper
         return $details;
     }
     public static function send_push_notification($push_notification_text, $deviceTokens){
+        if ($deviceTokens === [] || $deviceTokens === null) {
+            return;
+        }
+
+        if (config('queue.default') !== 'sync') {
+            \App\Jobs\SendPushNotificationJob::dispatch($push_notification_text, $deviceTokens);
+
+            return;
+        }
+
+        self::sendPushNotificationNow($push_notification_text, $deviceTokens);
+    }
+
+    public static function sendPushNotificationNow($push_notification_text, $deviceTokens){
         $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
         // create middleware
         $middleware = ApplicationDefaultCredentials::getMiddleware($scopes);

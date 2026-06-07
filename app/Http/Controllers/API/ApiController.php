@@ -21,8 +21,12 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use App\Jobs\ProcessVideoJob;
+use App\Jobs\ProcessVideoThumbnailJob;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
+use App\Services\VideoFeedService;
+use App\Helpers\FeedPaginationHelper;
 use Mpdf\Mpdf;
 
 class ApiController extends Controller
@@ -32,8 +36,8 @@ class ApiController extends Controller
     public function validate_register(Request $request){
         $validator = Validator::make($request->all(), [
             'name' => 'required',
-            'email' => 'required|email',
-            'phone' => 'nullable',
+            'email' => 'required|email|unique:front_users,email',
+            'phone' => 'nullable|unique:front_users,phone',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
@@ -56,40 +60,17 @@ class ApiController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-
-        // Check if the email is taken by a VERIFIED user
-        $existingUser = \App\Models\FrontUser::where('email', $request->email)->first();
-        if ($existingUser && $existingUser->email_verified_at !== null) {
+        else{
             return response()->json([
-                'status' => false,
-                'message' => __('messages.validation_failed'),
-                'errors' => ['email' => [__('validation.unique', ['attribute' => 'email'])]],
-            ], 422);
+                'status' => true,
+            ], 200);
         }
-
-        // If phone is provided, check uniqueness only against verified users
-        if ($request->phone) {
-            $phoneTaken = \App\Models\FrontUser::where('phone', $request->phone)
-                ->whereNotNull('email_verified_at')
-                ->exists();
-            if ($phoneTaken) {
-                return response()->json([
-                    'status' => false,
-                    'message' => __('messages.validation_failed'),
-                    'errors' => ['phone' => [__('validation.unique', ['attribute' => 'phone'])]],
-                ], 422);
-            }
-        }
-
-        return response()->json([
-            'status' => true,
-        ], 200);
     }
     public function register(Request $request){
         $validator = Validator::make($request->all(), [
             'name' => 'required',
-            'email' => 'required|email',
-            'phone' => 'nullable',
+            'email' => 'required|email|unique:front_users,email',
+            'phone' => 'nullable|unique:front_users,phone',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
@@ -114,183 +95,96 @@ class ApiController extends Controller
         }
         $input = $request->all();
 
-        // Check if this email already belongs to a VERIFIED user — hard block
-        $existingUser = FrontUser::where('email', $request->email)->first();
-        if ($existingUser && $existingUser->email_verified_at !== null) {
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.validation_failed'),
-                'errors' => ['email' => [__('validation.unique', ['attribute' => 'email'])]],
-            ], 422);
-        }
-
-        // If phone is provided, ensure it is not taken by a verified user
-        if ($request->phone) {
-            $phoneTaken = FrontUser::where('phone', $request->phone)
-                ->whereNotNull('email_verified_at')
-                ->when($existingUser, fn($q) => $q->where('id', '!=', $existingUser->id))
-                ->exists();
-            if ($phoneTaken) {
-                return response()->json([
-                    'status' => false,
-                    'message' => __('messages.validation_failed'),
-                    'errors' => ['phone' => [__('validation.unique', ['attribute' => 'phone'])]],
-                ], 422);
-            }
-        }
+        $front_user_data = [
+            'id' => (string) \Str::uuid(),
+            'name' => $input['name'],
+            'email' => $input['email'],
+            'phone' => isset($input['phone'])? $input['phone']: NULL,
+            'password' => Hash::make($input['password']),
+            'dob' => isset($input['dob'])? date('Y-m-d', strtotime($input['dob'])): NULL,
+            'country' => $input['country']? $input['country']: 0,
+            'state' => 0,
+            'city' => $input['city']? $input['city']: 0,
+            'uuid' => $input['uuid'],
+            'entity' => $input['entity'],
+        ];
 
         $settings = DB::table('settings')->where('id', 1)->first();
-
-        if ($existingUser && $existingUser->email_verified_at === null) {
-            // ── UNVERIFIED account exists: update data and re-send OTP ──
-            $updateData = [
-                'name'     => $input['name'],
-                'phone'    => isset($input['phone']) ? $input['phone'] : null,
-                'password' => Hash::make($input['password']),
-                'dob'      => isset($input['dob']) ? date('Y-m-d', strtotime($input['dob'])) : null,
-                'country'  => $input['country'] ?? 0,
-                'state'    => 0,
-                'city'     => $input['city'] ?? 0,
-                'uuid'     => $input['uuid'],
-                'entity'   => $input['entity'],
-            ];
-            if ($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1) {
-                $updateData['is_one_time_discount_given'] = 0;
-            }
-            $existingUser->fill($updateData)->save();
-            $user = $existingUser->fresh();
-
-            // Update or recreate additional account data
-            if ($request->entity == 1) {
-                DB::table('personal_account_additional_data')->updateOrInsert(
-                    ['front_user_id' => $user->id],
-                    ['website' => $request->website]
-                );
-            }
-            if ($request->entity == 2) {
-                DB::table('business_account_additional_data')->updateOrInsert(
-                    ['front_user_id' => $user->id],
-                    [
-                        'business_type' => $request->business_type,
-                        'contact_phone' => $request->contact_phone,
-                        'contact_email' => $request->contact_email,
-                        'website'       => $request->website,
-                        'location'      => $request->location,
-                        'latitude'      => $request->latitude,
-                        'longitude'     => $request->longitude,
-                    ]
-                );
-            }
-            if ($request->entity == 3) {
-                DB::table('chef_account_additional_data')->updateOrInsert(
-                    ['front_user_id' => $user->id],
-                    [
-                        'country'       => 194,
-                        'state'         => $request->state,
-                        'city'          => 0,
-                        'contact_phone' => $request->contact_phone,
-                        'contact_email' => $request->contact_email,
-                    ]
-                );
-            }
-            if ($request->entity == 8) {
-                DB::table('sponsored_account_additional_data')->updateOrInsert(
-                    ['front_user_id' => $user->id],
-                    ['type_of_account' => $request->type_of_account]
-                );
-            }
-        } else {
-            // ── Brand-new user: create record ──
-            $front_user_data = [
-                'id'       => (string) \Str::uuid(),
-                'name'     => $input['name'],
-                'email'    => $input['email'],
-                'phone'    => isset($input['phone']) ? $input['phone'] : null,
-                'password' => Hash::make($input['password']),
-                'dob'      => isset($input['dob']) ? date('Y-m-d', strtotime($input['dob'])) : null,
-                'country'  => $input['country'] ?? 0,
-                'state'    => 0,
-                'city'     => $input['city'] ?? 0,
-                'uuid'     => $input['uuid'],
-                'entity'   => $input['entity'],
-            ];
-            if ($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1) {
-                $front_user_data['is_one_time_discount_given'] = 0;
-            }
-
-            FrontUser::create($front_user_data);
-            $user = FrontUser::where('email', $request->email)->first();
-
-            if ($request->entity == 1) {
-                DB::table('personal_account_additional_data')->insert([
-                    'front_user_id' => $user->id,
-                    'website'       => $request->website,
-                ]);
-            }
-            if ($request->entity == 2) {
-                DB::table('business_account_additional_data')->insert([
-                    'front_user_id' => $user->id,
-                    'business_type' => $request->business_type,
-                    'contact_phone' => $request->contact_phone,
-                    'contact_email' => $request->contact_email,
-                    'website'       => $request->website,
-                    'location'      => $request->location,
-                    'latitude'      => $request->latitude,
-                    'longitude'     => $request->longitude,
-                ]);
-            }
-            if ($request->entity == 3) {
-                DB::table('chef_account_additional_data')->insert([
-                    'front_user_id' => $user->id,
-                    'country'       => 194,
-                    'state'         => $request->state,
-                    'city'          => 0,
-                    'contact_phone' => $request->contact_phone,
-                    'contact_email' => $request->contact_email,
-                ]);
-            }
-            if ($request->entity == 8) {
-                DB::table('sponsored_account_additional_data')->insert([
-                    'front_user_id'   => $user->id,
-                    'type_of_account' => $request->type_of_account,
-                ]);
-            }
+        if($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1){
+            $front_user_data['is_one_time_discount_given'] = 0;
         }
 
+        $user = FrontUser::create($front_user_data);
+        $user = FrontUser::where('email', $request->email)->first();
+
+        if($request->entity == 1){
+            $additional_data = array();
+            $additional_data['front_user_id'] = $user->id;
+            $additional_data['website'] = $request->website;
+            DB::table('personal_account_additional_data')->insert($additional_data);
+        }
+        if($request->entity == 2){
+            $additional_data = array();
+            $additional_data['front_user_id'] = $user->id;
+            $additional_data['business_type'] = $request->business_type;
+            $additional_data['contact_phone'] = $request->contact_phone;
+            $additional_data['contact_email'] = $request->contact_email;
+            $additional_data['website'] = $request->website;
+            $additional_data['location'] = $request->location;
+            $additional_data['latitude'] = $request->latitude;
+            $additional_data['longitude'] = $request->longitude;
+            DB::table('business_account_additional_data')->insert($additional_data);
+        }
+        if($request->entity == 3){
+            $additional_data = array();
+            $additional_data['front_user_id'] = $user->id;
+            $additional_data['country'] = 194;
+            $additional_data['state'] = $request->state;
+            $additional_data['city'] = 0;
+            $additional_data['contact_phone'] = $request->contact_phone;
+            $additional_data['contact_email'] = $request->contact_email;
+            DB::table('chef_account_additional_data')->insert($additional_data);
+        }
+        if($request->entity == 8){
+            $additional_data = array();
+            $additional_data['front_user_id'] = $user->id;
+            $additional_data['type_of_account'] = $request->type_of_account;
+            DB::table('sponsored_account_additional_data')->insert($additional_data);
+        }
         // Send registration OTP
         $dispatch = AppHelper::send_verification_code(1, $user, 'register');
 
         $language = App::getLocale();
 
-        if ($language == 'ar') {
+        if($language == 'ar'){
             $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
-        } else {
+        }
+        else{
             $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
         }
 
         $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
+        if(isset($input['package_id']) && $input['package_id']!='' && $input['package_id']!=null){
+            $payment_data = array();
+            $payment_data['PaymentId'] = $request->PaymentId;
+            $payment_data['TranId'] = $request->TranId;
+            $payment_data['ECI'] = $request->ECI;
+            $payment_data['TrackId'] = $request->TrackId;
+            $payment_data['RRN'] = $request->RRN;
+            $payment_data['cardBrand'] = $request->cardBrand;
+            $payment_data['maskedPAN'] = $request->maskedPAN;
+            $payment_data['PaymentType'] = $request->PaymentType;
 
-        if (isset($input['package_id']) && $input['package_id'] != '' && $input['package_id'] != null) {
-            $payment_data = [
-                'PaymentId'   => $request->PaymentId,
-                'TranId'      => $request->TranId,
-                'ECI'         => $request->ECI,
-                'TrackId'     => $request->TrackId,
-                'RRN'         => $request->RRN,
-                'cardBrand'   => $request->cardBrand,
-                'maskedPAN'   => $request->maskedPAN,
-                'PaymentType' => $request->PaymentType,
-            ];
             AppHelper::subscribe_user_to_package($user->id, $input['package_id'], $payment_data);
         }
 
         $response = [
-            'status'  => true,
+            'status' => true,
             'message' => __('messages.user_registered_please_verify', ['default' => 'User registered successfully. Please verify your email.']),
-            'user'    => $user,
+            'user' => $user,
         ];
 
-        $isStagingLike     = !app()->environment('production');
+        $isStagingLike = !app()->environment('production');
         $testModeRequested = (bool) $request->boolean('test_mode');
         if ($isStagingLike && $testModeRequested) {
             $response['otp_code'] = $dispatch['verification_code'] ?? null;
@@ -724,6 +618,7 @@ class ApiController extends Controller
 
         // Blocked Users list
         $blocked_users = DB::table('blocked_users')->leftJoin('front_users', 'front_users.id', '=', 'blocked_users.blocked_user')->where('blocked_users.blocked_by', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        AppHelper::decorateUserIterable($blocked_users);
             
         $return_data = array(
             'status' => true,
@@ -733,19 +628,46 @@ class ApiController extends Controller
     }
     public function followers_list(Request $request){
         $user_id = $request->user_id;
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
 
-        // Followers
-        $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $followersQuery = DB::table('followers')
+            ->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')
+            ->where('followers.following_id', $user_id)
+            ->where('front_users.is_soft_delete', 0)
+            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
 
-        // Following
-        $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user_id)->where('front_users.is_soft_delete', 0)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
-            
-        $return_data = array(
+        $followingQuery = DB::table('followers')
+            ->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')
+            ->where('followers.follower_id', $user_id)
+            ->where('front_users.is_soft_delete', 0)
+            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
+
+        if ($request->input('paginate') == 1) {
+            $followers = (clone $followersQuery)->skip($start)->take($length)->get();
+            $following = (clone $followingQuery)->skip($start)->take($length)->get();
+            AppHelper::decorateUserIterable($followers);
+            AppHelper::decorateUserIterable($following);
+
+            return response()->json([
+                'status' => true,
+                'followers' => $followers,
+                'following' => $following,
+                'meta' => FeedPaginationHelper::meta($request, $page, $perPage),
+            ], 200);
+        }
+
+        $followers = $followersQuery->get();
+        $following = $followingQuery->get();
+
+        AppHelper::decorateUserIterable($followers);
+        AppHelper::decorateUserIterable($following);
+
+        return response()->json([
             'status' => true,
             'followers' => $followers,
-            'following' => $following
-        );
-        return response()->json($return_data, 200);
+            'following' => $following,
+        ], 200);
     }
     public function profile(){
         $user = Auth::user();
@@ -793,34 +715,76 @@ class ApiController extends Controller
         }
 
         $video_types = AppHelper::get_key_values(2)['values'];
-        foreach($video_types as $key => $video_type){
-            $query=DB::table('videos as v');
-            $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
-            $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id');
-            $query->leftJoin('sponsored_videos as sv', 'sv.video_id', '=', 'v.id');
-            $query->where('v.status', 1);
-            $query->where('v.is_soft_delete', 0);
-            $query->where('v.video_type', $video_type->id);
-            $query->where('v.front_user_id', $user->id);
-            $query1 = clone $query;
-            $query2 = clone $query;
-            $totalData = $query1->select(['v.id'])->count();
-            $query2->orderBy('v.system_id', 'DESC');
-            $videos = $query2->select(['v.*', 'u.name as user_name', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', 'sv.sponsor_type', 'sv.cities', 'sv.days', 'sv.start_date', 'sv.end_date', 'sv.per_day_price', 'sv.discount_percentage', 'sv.discount_amount', 'sv.total_amount'])->get();
 
-            foreach($videos as $video){
-                if(!empty($video->cities)){
-                    $cityIds = explode(',', $video->cities);
-                    $cityNames = DB::table('cities')->whereIn('id', $cityIds)->pluck('name')->toArray();
-                    $video->city_names = $cityNames? implode(',', $cityNames): '';
-                }
-                else{
-                    $video->city_names = '';
+        // ---- Optimized: single video query + one bulk city-name lookup ----
+        // Was: 4 sequential queries (one per video type) + N+1 city lookups
+        //      inside each result row. Now: 2 queries total for this whole block.
+        $allTypeIds = collect($video_types)->pluck('id')->all();
+
+        $allVideos = collect();
+        if (! empty($allTypeIds)) {
+            $allVideos = DB::table('videos as v')
+                ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
+                ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
+                ->leftJoin('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
+                ->where('v.status', 1)
+                ->where('v.is_soft_delete', 0)
+                ->where('v.front_user_id', $user->id)
+                ->whereIn('v.video_type', $allTypeIds)
+                ->orderBy('v.system_id', 'DESC')
+                ->select([
+                    'v.*',
+                    'u.name as user_name', 'u.image as user_image',
+                    'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude',
+                    'sv.sponsor_type', 'sv.cities', 'sv.days', 'sv.start_date', 'sv.end_date',
+                    'sv.per_day_price', 'sv.discount_percentage', 'sv.discount_amount', 'sv.total_amount',
+                ])
+                ->get();
+        }
+
+        // Bulk-resolve every city name referenced across every video in one query,
+        // then attach via in-memory map (fixes the city N+1).
+        $allCityIds = [];
+        foreach ($allVideos as $video) {
+            if (! empty($video->cities)) {
+                foreach (explode(',', $video->cities) as $cid) {
+                    $cid = trim($cid);
+                    if ($cid !== '') {
+                        $allCityIds[$cid] = true;
+                    }
                 }
             }
+        }
 
-            AppHelper::decorateVideoIterable($videos);
-            $video_types[$key]->videos = $videos;
+        $cityNameMap = [];
+        if (! empty($allCityIds)) {
+            $cityNameMap = DB::table('cities')
+                ->whereIn('id', array_keys($allCityIds))
+                ->pluck('name', 'id')
+                ->all();
+        }
+
+        foreach ($allVideos as $video) {
+            if (! empty($video->cities)) {
+                $names = [];
+                foreach (explode(',', $video->cities) as $cid) {
+                    $cid = trim($cid);
+                    if (isset($cityNameMap[$cid])) {
+                        $names[] = $cityNameMap[$cid];
+                    }
+                }
+                $video->city_names = implode(',', $names);
+            } else {
+                $video->city_names = '';
+            }
+        }
+
+        AppHelper::decorateVideoIterable($allVideos);
+
+        // Group videos back under their type for the response shape callers expect.
+        $videosByType = $allVideos->groupBy('video_type');
+        foreach ($video_types as $key => $video_type) {
+            $video_types[$key]->videos = ($videosByType[$video_type->id] ?? collect())->values();
         }
 
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->pluck('followers.follower_id'); // Followers
@@ -828,6 +792,9 @@ class ApiController extends Controller
 
         $subscription = DB::table('subscription_history')->join('packages', 'packages.id', '=', 'subscription_history.package_id')->join('packages_description', 'packages_description.package_id', '=', 'packages.id')->join('site_languages', 'packages_description.language_id', '=', 'site_languages.id')->where('site_languages.code', $language)->where('subscription_history.front_user_id', $user->id)->orderBy('subscription_history.system_id', 'DESC')->select(['subscription_history.*', 'packages_description.title', 'packages_description.description'])->first();
             
+        $user->image_url = AppHelper::userImageUrl($user->image ?? null);
+        $user->cover_image_url = AppHelper::userImageUrl($user->cover_image ?? null);
+
         $return_data = array(
             'status' => true,
             'user' => $user,
@@ -926,6 +893,7 @@ class ApiController extends Controller
                 $constraint->aspectRatio();
             })->save($destinationPath.'/'.$image_input['imagename']);
             $user->image = $image_input['imagename'];
+            $this->syncUserImageToObjectStorage($image_input['imagename']);
         }
         if($coverImageFile){
             $image = $coverImageFile;
@@ -947,6 +915,7 @@ class ApiController extends Controller
                 $constraint->aspectRatio();
             })->save($destinationPath.'/'.$image_input['imagename']);
             $user->cover_image = $image_input['imagename'];
+            $this->syncUserImageToObjectStorage($image_input['imagename']);
         }
         $user->save();
         if($user->entity==1){
@@ -1058,8 +1027,8 @@ class ApiController extends Controller
         $response = [
             'status' => true,
             'user' => $user,
-            'image_url' => !empty($user->image) ? url('storage/front_users/'.$user->image) : null,
-            'cover_image_url' => !empty($user->cover_image) ? url('storage/front_users/'.$user->cover_image) : null,
+            'image_url' => AppHelper::userImageUrl($user->image ?? null),
+            'cover_image_url' => AppHelper::userImageUrl($user->cover_image ?? null),
             'message' => __('messages.user_updated')
         ];
 
@@ -1085,6 +1054,28 @@ class ApiController extends Controller
 
         return null;
     }
+
+    private function syncUserImageToObjectStorage(string $filename): void
+    {
+        $localPath = storage_path('app/public/front_users/'.$filename);
+        if (! is_file($localPath)) {
+            return;
+        }
+
+        $key = AppHelper::userImageStorageKey($filename);
+        if ($key === null) {
+            return;
+        }
+
+        try {
+            $this->s3Service->storeFile($key, file_get_contents($localPath), [
+                'mimetype' => S3Service::resolveMimeType($localPath, 'image/jpeg'),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function notifications_list(){
         $user = Auth::user();
         $query = DB::table('notifications');
@@ -1097,13 +1088,61 @@ class ApiController extends Controller
         $query->whereDate('notifications.created_at', '>=', $user->created_at);
         $query->where('to_type', 2)->where('read_status', 0);
         $notifications = $query->limit(30)->orderBy('id', 'DESC')->select(['id', 'to_type', 'front_user_id', 'front_user_category', 'type', 'push_notification_id', 'video_id', 'user_review_id', 'read_status', 'status', 'created_at'])->get();
-        foreach($notifications as $key => $notification){
-            $notifications[$key]->details = AppHelper::get_notification_subject_text($notification);
+
+        // Batched lookup of related records to avoid N+1 in the foreach below.
+        // Previously each notification type triggered 1–2 DB queries inside
+        // AppHelper::get_notification_subject_text; with 30 notifications that
+        // was up to 60 queries per request. Now: at most 5 queries total.
+        $related = $this->preloadNotificationRelations($notifications);
+
+        foreach ($notifications as $key => $notification) {
+            $notifications[$key]->details = AppHelper::get_notification_subject_text($notification, $related);
         }
+
         return response()->json([
             'status' => true,
             'notifications' => $notifications,
         ], 200);
+    }
+
+    /**
+     * Pre-load every related record the notifications list needs in a fixed
+     * number of `whereIn` queries instead of one-per-notification.
+     *
+     * Returns: ['reports'=>[id=>row], 'pushes'=>[..], 'videos'=>[..], 'reviews'=>[..], 'users'=>[..]]
+     */
+    private function preloadNotificationRelations($notifications): array
+    {
+        $reportIds = [];
+        $pushIds = [];
+        $videoIds = [];
+        $reviewIds = [];
+        $userIds = [];
+
+        foreach ($notifications as $n) {
+            switch ((int) $n->type) {
+                case 1: if (! empty($n->video_report_id)) $reportIds[] = $n->video_report_id; break;
+                case 2: if (! empty($n->push_notification_id)) $pushIds[] = $n->push_notification_id; break;
+                case 3: if (! empty($n->video_id)) $videoIds[] = $n->video_id; break;
+                case 4: if (! empty($n->user_review_id)) $reviewIds[] = $n->user_review_id; break;
+                case 5:
+                    if (! empty($n->video_id)) $videoIds[] = $n->video_id;
+                    if (! empty($n->front_user_id)) $userIds[] = $n->front_user_id;
+                    break;
+            }
+        }
+
+        $reports = $reportIds ? DB::table('video_reports')->whereIn('id', array_unique($reportIds))->get()->keyBy('id') : collect();
+        $pushes  = $pushIds   ? DB::table('push_notifications')->whereIn('id', array_unique($pushIds))->get()->keyBy('id') : collect();
+        $videos  = $videoIds  ? DB::table('videos')->whereIn('id', array_unique($videoIds))->select(['id','title'])->get()->keyBy('id') : collect();
+        $reviews = $reviewIds ? DB::table('user_reviews')
+            ->join('front_users', 'front_users.id', '=', 'user_reviews.reviewer_id')
+            ->whereIn('user_reviews.id', array_unique($reviewIds))
+            ->select(['user_reviews.id', 'user_reviews.reviewer_id', 'front_users.name as reviewer_name'])
+            ->get()->keyBy('id') : collect();
+        $users   = $userIds   ? DB::table('front_users')->whereIn('id', array_unique($userIds))->select(['id','name'])->get()->keyBy('id') : collect();
+
+        return compact('reports', 'pushes', 'videos', 'reviews', 'users');
     }
     public function notifications_update_status(){
         $user = Auth::user();
@@ -1347,12 +1386,8 @@ class ApiController extends Controller
 
         if($user){
             $follower_id = $user->id;
-            $followingIds = DB::table('followers')
-                                    ->where('follower_id', $follower_id)
-                                    ->pluck('following_id');
-            $blocked_users = DB::table('blocked_users')
-                                    ->where('blocked_by', $user->id)
-                                    ->pluck('blocked_user');
+            $followingIds = collect(\App\Support\FeedSocialCache::followingIds($follower_id));
+            $blocked_users = collect(\App\Support\FeedSocialCache::blockedUserIds($user->id));
             // $country = $user->country;
             // $city = $user->city;
         }
@@ -1377,49 +1412,16 @@ class ApiController extends Controller
             $city = $input['city'];
         }
         else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
-            $currentLat = $input['latitude'];
-            $currentLng = $input['longitude'];
-            $radiusList = [10, 25, 50];
-            foreach($radiusList as $radiusKm){
-                $nearestCity = DB::table('cities')
-                    ->select(
-                        'id',
-                        'name',
-                        DB::raw("(
-                            6371 * acos(
-                                cos(radians($currentLat)) *
-                                cos(radians(latitude)) *
-                                cos(radians(longitude) - radians($currentLng)) +
-                                sin(radians($currentLat)) *
-                                sin(radians(latitude))
-                            )
-                        ) AS distance")
-                    )
-                    ->having('distance', '<', $radiusKm)
-                    ->orderBy('distance', 'asc')
-                    ->first();
-    
-                if($nearestCity){
-                    $city = $nearestCity->id;
-                    break; // Stop if a city is found
-                }
-            }
+            $city = \App\Support\FeedSocialCache::nearestCityId(
+                (float) $input['latitude'],
+                (float) $input['longitude']
+            );
         }
 
-        $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
-        if(!empty($city_group)){
-            $cities_ids = explode(',', $city_group->cities);
-        }
-        else if($city != 0){
-            $cities_ids = array($city);
-        }
-        else{
-            $cities_ids = array();
-        }
+        $cities_ids = \App\Support\FeedSocialCache::cityGroupIds((int) $city);
 
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
 
         // is_following = 1, this bit is used to get only following videos
 
@@ -1487,14 +1489,17 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
-            $query->where('u.is_soft_delete', 0);
-            $query->where('u.status', 1);
             $query1 = clone $query;
             $query2 = clone $query;
 
             $totalData = $query1->select(['v.id'])->count();
             $query2->offset($start)->limit($length);
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
+            if ($paginate) {
+                FeedPaginationHelper::applySeedOrder($query2, $request);
+            } else {
+                $query2->orderBy('v.created_at', 'desc');
+            }
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         if($input['type']==2){
             // $query=DB::table('front_users as ba');
@@ -1583,15 +1588,18 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
-            $query->where('u.is_soft_delete', 0);
-            $query->where('u.status', 1);
             $query->where('u.entity', 2);
             $query1 = clone $query;
             $query2 = clone $query;
 
             $totalData = $query1->select(['v.id'])->count();
             $query2->offset($start)->limit($length);
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
+            if ($paginate) {
+                FeedPaginationHelper::applySeedOrder($query2, $request);
+            } else {
+                $query2->orderBy('v.created_at', 'desc');
+            }
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         if($input['type']==3){
             // $query=DB::table('front_users as ca');
@@ -1659,15 +1667,18 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
-            $query->where('u.is_soft_delete', 0);
-            $query->where('u.status', 1);
             $query->where('u.entity', 3);
             $query1 = clone $query;
             $query2 = clone $query;
 
             $totalData = $query1->select(['v.id'])->count();
             $query2->offset($start)->limit($length);
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
+            if ($paginate) {
+                FeedPaginationHelper::applySeedOrder($query2, $request);
+            } else {
+                $query2->orderBy('v.created_at', 'desc');
+            }
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         else if($input['type']==4){
             $query=DB::table('videos as v');
@@ -1733,15 +1744,18 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
-            $query->where('u.is_soft_delete', 0);
-            $query->where('u.status', 1);
             $query->where('v.average_rating', 5);
             $query1 = clone $query;
             $query2 = clone $query;
 
             $totalData = $query1->select(['v.id'])->count();
             $query2->offset($start)->limit($length);
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->inRandomOrder()->get();
+            if ($paginate) {
+                FeedPaginationHelper::applySeedOrder($query2, $request);
+            } else {
+                $query2->orderBy('v.created_at', 'desc');
+            }
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         else if($input['type']==6){
             $query=DB::table('front_users');
@@ -1773,7 +1787,11 @@ class ApiController extends Controller
 
             $query->where('status', 1);
             $query->where('is_soft_delete', 0);
-            $users = $query->select(['*'])->inRandomOrder()->get();
+            $query1 = clone $query;
+            $query2 = clone $query;
+            $totalData = $query1->select(['id'])->count();
+            $query2->offset($start)->limit($length)->orderBy('id', 'desc');
+            $users = $query2->select(['*'])->get();
         }
         else if($input['type']==7){
             $avgSubquery = DB::table('user_reviews')
@@ -1825,20 +1843,32 @@ class ApiController extends Controller
             $query->where('ba.status', 1);
             $query->where('ba.is_soft_delete', 0);
             $query->where('avg_reviews.average_rating', 5);
-            $business_accounts = $query->select(['ba.*', 'ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name'])->inRandomOrder()->get();
+            $query1 = clone $query;
+            $query2 = clone $query;
+            $totalData = $query1->select(['ba.id'])->count();
+            $query2->offset($start)->limit($length)->orderBy('ba.id', 'desc');
+            $business_accounts = $query2->select(['ba.*', 'ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name'])->get();
         }
 
         if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
             AppHelper::decorateVideoIterable($videos);
         }
 
-        return response()->json([
+        $response = [
             'status' => true,
             'videos' => $videos,
             'users' => $users,
             'business_accounts' => $business_accounts,
-            'chef_accounts' => $chef_accounts
-        ], 200);
+            'chef_accounts' => $chef_accounts,
+        ];
+        $videoSearchTypes = [1, 2, 3, 4];
+        if (isset($paginate, $page, $perPage, $totalData) && $paginate && in_array((int) $input['type'], $videoSearchTypes, true)) {
+            $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
+        } elseif ($paginate && isset($totalData) && in_array((int) $input['type'], [6, 7], true)) {
+            $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
+        }
+
+        return response()->json($response, 200);
     }
     public function profile_details(Request $request){
         $userAgent = $request->header('User-Agent');
@@ -1873,13 +1903,7 @@ class ApiController extends Controller
 
         $input = $request->all();
         $language = App::getLocale();
-        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->where('u.is_soft_delete', 0)->where('u.status', 1)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
-        if (!$user) {
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.user_not_found'),
-            ], 404);
-        }
+        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
         $additional_data = array();
         if($user->entity==2){
             $additional_data = DB::table('business_account_additional_data as b')->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type')->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id')->where('key_language.code', $language)->where('b.front_user_id', $user->id)->select('b.*', 'bt.name as business_type_name')->first();
@@ -1891,24 +1915,31 @@ class ApiController extends Controller
             $additional_data = DB::table('sponsored_account_additional_data')->where('front_user_id', $user->id)->first();
         }
         $video_types = AppHelper::get_key_values(2)['values'];
-        foreach($video_types as $key => $video_type){
-            $query=DB::table('videos as v');
-            $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
-            $query->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id');
-            $query->where('v.status', 1);
-            $query->where('v.is_soft_delete', 0);
-            $query->where('v.video_type', $video_type->id);
-            $query->where('v.front_user_id', $user->id);
-            $query->where(function ($q) {
-                $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
-            });
-            $query1 = clone $query;
-            $query2 = clone $query;
-            $totalData = $query1->select(['v.id'])->count();
-            $query2->orderBy('v.system_id', 'DESC');
-            $videos = $query2->select(['v.*', 'u.name as user_name', 'u.image as user_image'])->get();
-            AppHelper::decorateVideoIterable($videos);
-            $video_types[$key]->videos = $videos;
+
+        // Single query for every video type (was 4 sequential queries per
+        // profile view). Group by video_type in PHP afterwards.
+        $allTypeIds = collect($video_types)->pluck('id')->all();
+        $allVideos = collect();
+        if (! empty($allTypeIds)) {
+            $allVideos = DB::table('videos as v')
+                ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
+                ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
+                ->where('v.status', 1)
+                ->where('v.is_soft_delete', 0)
+                ->where('v.front_user_id', $user->id)
+                ->whereIn('v.video_type', $allTypeIds)
+                ->where(function ($q) {
+                    $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
+                })
+                ->orderBy('v.system_id', 'DESC')
+                ->select(['v.*', 'u.name as user_name', 'u.image as user_image'])
+                ->get();
+            AppHelper::decorateVideoIterable($allVideos);
+        }
+
+        $videosByType = $allVideos->groupBy('video_type');
+        foreach ($video_types as $key => $video_type) {
+            $video_types[$key]->videos = ($videosByType[$video_type->id] ?? collect())->values();
         }
 
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of followers
@@ -1934,12 +1965,29 @@ class ApiController extends Controller
     // Videos
     public function video_settings(){
         $language = App::getLocale();
-        $video_types = AppHelper::get_key_values(2);
-        $countries = DB::table('countries')->where('status', 1)->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+
+        // Countries are static reference data; cache per-language for 1 day
+        // (SWR up to 7 days). video_types come from generic key/values which
+        // are also static enough to cache. Both are heavy reads that run on
+        // every app cold start.
+        $payload = \App\Support\CookCache::remember(
+            'api:video_settings:'.$language,
+            [86400, 604800],
+            function () {
+                return [
+                    'video_types' => AppHelper::get_key_values(2),
+                    'countries' => DB::table('countries')
+                        ->where('status', 1)
+                        ->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])
+                        ->get(),
+                ];
+            }
+        );
+
         return response()->json([
             'status' => true,
-            'video_types' => $video_types,
-            'countries' => $countries,
+            'video_types' => $payload['video_types'],
+            'countries' => $payload['countries'],
             'media_base_url' => AppHelper::mediaPublicBaseUrl(),
         ], 200);
     }
@@ -2029,48 +2077,27 @@ class ApiController extends Controller
             $data['is_image'] = $request->is_image;
         }
         // $data['location'] = $request->location;
+        $stagingPath = null;
+        $imageName = null;
         if ($request->file('image')) {
             $image = $request->file('image');
+            $imageName = time().rand(1000, 9999).'.'.$image->getClientOriginalExtension();
 
-            // Create unique name
-            $imageName = time() . rand(1000, 9999) . '.' . $image->getClientOriginalExtension();
-
-            // Initialize S3 service
-
-            // Upload original image to S3 (explicit Content-Type for correct playback / CDN behavior)
-            $this->s3Service->storeFile('videos/' . $imageName, file_get_contents($image), [
+            $this->s3Service->storeFile('videos/'.$imageName, file_get_contents($image), [
                 'mimetype' => S3Service::resolveMimeType($image, 'image/jpeg'),
             ]);
 
-            // Generate thumbnail locally
-            $thumbnailLocalPath = storage_path('app/temp-thumbnails');
-            if (!file_exists($thumbnailLocalPath)) {
-                mkdir($thumbnailLocalPath, 0755, true);
+            $stagingDir = storage_path('app/temp-thumbnails/staging');
+            if (! file_exists($stagingDir)) {
+                mkdir($stagingDir, 0755, true);
             }
+            $stagingPath = $stagingDir.'/'.$imageName;
+            copy($image->getRealPath(), $stagingPath);
 
-            $thumbnailFullLocalPath = $thumbnailLocalPath . '/' . $imageName;
-
-            $img = Image::read($image->getRealPath());
-            $img->resize(100, 100, function ($constraint) {
-                $constraint->aspectRatio();
-            })->save($thumbnailFullLocalPath);
-
-            // Upload thumbnail to S3
-            $this->s3Service->storeFile('videos/thumbnail/' . $imageName, file_get_contents($thumbnailFullLocalPath), [
-                'mimetype' => S3Service::resolveMimeType($thumbnailFullLocalPath, 'image/jpeg'),
-            ]);
-
-            // Delete local thumbnail
-            if (file_exists($thumbnailFullLocalPath)) {
-                unlink($thumbnailFullLocalPath);
-            }
-
-            // Save only the name or optionally full S3 URLs
             $data['image'] = $imageName;
-
-            // Optional: Save full URL
-            // $data['image_url'] = Storage::disk('s3')->url('videos/' . $imageName);
-            // $data['thumbnail_url'] = Storage::disk('s3')->url('videos/thumbnail/' . $imageName);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status')) {
+                $data['processing_status'] = 'processing';
+            }
         }
         if ($request->file('video')) {
             $video = $request->file('video');
@@ -2104,6 +2131,12 @@ class ApiController extends Controller
 
             if ($uploaded) {
                 $data['video'] = $video_name;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+                    $data['transcode_status'] = 'pending';
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status') && empty($data['processing_status'])) {
+                    $data['processing_status'] = 'processing';
+                }
             }
         }
 
@@ -2112,6 +2145,14 @@ class ApiController extends Controller
         }
         
         DB::table('videos')->insert($data);
+
+        if ($stagingPath !== null && $imageName !== null) {
+            ProcessVideoThumbnailJob::dispatch($data['id'], $stagingPath, $imageName);
+        }
+
+        if (! empty($data['video']) && \Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+            ProcessVideoJob::dispatch($data['id'], $data['video']);
+        }
 
         if($request->tags){
             AppHelper::run_add_tag_script($request->tags);
@@ -2142,9 +2183,52 @@ class ApiController extends Controller
             'status' => true,
             'message' => __('messages.video_create_success'),
             'media_base_url' => AppHelper::mediaPublicBaseUrl(),
+            'video_id' => $data['id'],
             'video' => $created,
         ], 201);
     }
+
+    public function video_processing_status(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'video_id' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $video = DB::table('videos')->where('id', $request->video_id)->first();
+        if (! $video) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Video not found',
+            ], 404);
+        }
+
+        AppHelper::decorateVideoRow($video);
+
+        $payload = [
+            'status' => true,
+            'video_id' => $video->id,
+            'processing_status' => $video->processing_status ?? 'ready',
+            'transcode_status' => $video->transcode_status ?? 'pending',
+            'hls_url' => $video->hls_url ?? null,
+            'hls_playlist_url' => $video->hls_playlist_url ?? null,
+            'video_sources' => $video->video_sources ?? null,
+            'video_url' => $video->video_url ?? null,
+            'thumbnail_url' => $video->thumbnail_url ?? null,
+            'thumbnail_blur' => $video->thumbnail_blur ?? null,
+            'image_url' => $video->image_url ?? null,
+            'video' => $video,
+        ];
+
+        return response()->json($payload, 200);
+    }
+
     public function edit_video(Request $request){
         $validator = Validator::make($request->all(), [
             'video_id' => 'required',
@@ -2266,706 +2350,35 @@ class ApiController extends Controller
     }
     public function videos_list(Request $request){
         $user = Auth::guard('sanctum')->user();
-        $input = $request->all();
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
-        $cities_ids = array();
-        $country = 0;
-        $city = 0;
+        $feedService = app(VideoFeedService::class);
 
-        // if(isset($input['country']) && $input['country']!=''){
-        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
-        //     if(isset($country_details->id)){
-        //         $country = $country_details->id;
-        //     }
-        // }
-        // if(isset($input['city']) && $input['city']!=''){
-        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
-        //     if(isset($city_details->id)){
-        //         $city = $city_details->id;
-        //     }
-        // }
-
-        if(isset($input['city']) && $input['city']!=''){
-            $city = $input['city'];
-        }
-        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
-            $currentLat = $input['latitude'];
-            $currentLng = $input['longitude'];
-            $radiusList = [10, 25, 50];
-            foreach($radiusList as $radiusKm){
-                $nearestCity = DB::table('cities')
-                    ->select(
-                        'id',
-                        'name',
-                        DB::raw("(
-                            6371 * acos(
-                                cos(radians($currentLat)) *
-                                cos(radians(latitude)) *
-                                cos(radians(longitude) - radians($currentLng)) +
-                                sin(radians($currentLat)) *
-                                sin(radians(latitude))
-                            )
-                        ) AS distance")
-                    )
-                    ->having('distance', '<', $radiusKm)
-                    ->orderBy('distance', 'asc')
-                    ->first();
-    
-                if($nearestCity){
-                    $city = $nearestCity->id;
-                    break; // Stop if a city is found
-                }
-            }
-        }
-
-        if($city){
-            $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
-            if(!empty($city_group)){
-                $cities_ids = explode(',', $city_group->cities);
-            }
-            else{
-                $cities_ids = array($city);
-            }
-        }
-
-        // Base query to clone for all types
-        $baseQuery = DB::table('videos as v')
-        ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
-        ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
-        ->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')
-        ->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id')
-        ->leftJoin(DB::raw("
-            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
-            FROM followers f
-            JOIN front_users fu ON fu.id = f.follower_id
-            WHERE fu.is_soft_delete = 0
-            GROUP BY f.following_id) as followers
-        "), 'followers.following_id', '=', 'u.id')
-        ->leftJoin(DB::raw("
-            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
-            FROM followers f
-            JOIN front_users fu ON fu.id = f.following_id
-            WHERE fu.is_soft_delete = 0
-            GROUP BY f.follower_id) as following
-        "), 'following.follower_id', '=', 'u.id')
-        ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
-        ->where(function ($q) {
-            $q->where('video_type_language.is_default', 1)
-              ->orWhere('v.video_type', 0);
-        })
-        ->where('v.status', 1)
-        ->where('v.is_soft_delete', 0)
-        ->where('u.is_soft_delete', 0)
-        ->where('u.status', 1);
-
-        if (isset($input['search']['value']) && $input['search']['value'] != '') {
-            $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
-        }
-        if (isset($input['user']) && $input['user'] != '') {
-            $baseQuery->where('v.front_user_id', $input['user']);
-        }
-        if (isset($input['video_type']) && $input['video_type'] != '') {
-            $baseQuery->where('v.video_type', $input['video_type']);
-        }
-        if (isset($input['title']) && $input['title'] != '') {
-            $baseQuery->where('v.title', 'LIKE', '%' . $input['title'] . '%');
-        }
-        if (isset($input['tags']) && $input['tags'] != '') {
-            $baseQuery->where('v.tags', 'LIKE', '%' . $input['tags'] . '%');
-        }
-        $baseQuery->where(function ($query) {
-            $query->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
-        });
-
-        // Exclude those videos which are from blocked user
-        if($user){
-            $blocked_users = DB::table('blocked_users')
-                                    ->where('blocked_by', $user->id)
-                                    ->pluck('blocked_user');
-            if($blocked_users){
-                $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
-            }
-        }
-            
-        // NORMAL VIDEOS
-        $normalQuery = clone $baseQuery;
-
-        // is_following = 1, this bit is used to get only following videos
-
-        if(isset($input['is_following']) && $input['is_following'] == 1){
-            // do nothing
-        }
-        else{
-            if($country){
-                $normalQuery->where('v.country', $country);
-            }
-            if(!empty($cities_ids)){
-                $normalQuery->whereIn('v.city', $cities_ids);
-            }
-        }
-
-        if($user){
-            $follower_id = $user->id;
-            $followingIds = DB::table('followers')
-                                    ->where('follower_id', $follower_id)
-                                    ->pluck('following_id');
-
-            if(isset($input['is_following']) && $input['is_following'] == 1){
-                $normalQuery->where(function ($q) use ($followingIds) {
-                    $q->where('v.publish_type', 2)
-                        ->orWhere('v.publish_type', 1);
-                });
-                $normalQuery->whereIn('v.front_user_id', $followingIds);
-            }
-            else{
-                $normalQuery->where(function ($q) use ($followingIds) {
-                    $q->where('v.publish_type', 2)
-                        ->orWhere(function ($iq) use ($followingIds) {
-                            $iq->where('v.publish_type', 1)
-                                ->whereIn('v.front_user_id', $followingIds);
-                        });
-                });
-            }
-        }
-        else{
-            $normalQuery->where('v.publish_type', 2);
-        }
-        
-        $normalQuery->leftJoin('sponsored_videos as sv', function ($join) use ($cities_ids, $input) {
-            $join->on('sv.video_id', '=', 'v.id');
-
-            // Add OR conditions using FIND_IN_SET
-            if(isset($input['is_following']) && $input['is_following'] == 1){
-                // do nothing
-            }
-            else{
-                $join->where(function ($query) use ($cities_ids) {
-                    foreach ($cities_ids as $cityId) {
-                        $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
+        if ($request->filled('cursor')) {
+            try {
+                $decoded = base64_decode((string) $request->input('cursor'), true);
+                if ($decoded !== false) {
+                    $cursorData = json_decode($decoded, true, 512, JSON_THROW_ON_ERROR);
+                    if (is_array($cursorData)) {
+                        $request->merge($cursorData);
                     }
-                });
-            }
-        });
-
-        $normalQuery->where(function ($q) {
-            $q->where('v.is_sponsored', 0)
-                ->whereNull('sv.video_id');
-        });
-
-        $normalVideos = $normalQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // SPONSORED VIDEOS
-        $sponsoredQuery = clone $baseQuery;
-        $sponsoredQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
-        ->where(function ($query) use ($cities_ids) {
-            foreach ($cities_ids as $cityId) {
-                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
-            }
-        })
-        ->where('sv.sponsor_type', 1);
-
-        $sponsoredVideos = $sponsoredQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // PREMIUM SPONSORED VIDEOS
-        $premiumQuery = clone $baseQuery;
-        $premiumQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
-            ->where(function ($query) use ($cities_ids) {
-            foreach ($cities_ids as $cityId) {
-                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
-            }
-        })
-        ->where('sv.sponsor_type', 2);
-
-        $premiumSponsoredVideos = $premiumQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // MERGE VIDEO LOGIC
-        // $finalList = [];
-        // $normalCount = 0;
-        // $sponsoredIndex = 0;
-        // $premiumIndex = 0;
-        // $sponsoredCount = 0;
-        // $totalNormal = count($normalVideos);
-        // $i = 0;
-        // $normal_videos_cc = 5; // This counter is used to show the sponor video after xyz number of normal videos
-
-        // while ($i < $totalNormal) {
-        //     for ($j = 0; $j < $normal_videos_cc && $i < $totalNormal; $j++, $i++) {
-        //         $finalList[] = $normalVideos[$i];
-        //     }
-
-        //     if (isset($sponsoredVideos[$sponsoredIndex])) {
-        //         $finalList[] = $sponsoredVideos[$sponsoredIndex++];
-        //         $sponsoredCount++;
-
-        //         if ($sponsoredCount % 3 == 0 && isset($premiumSponsoredVideos[$premiumIndex])) {
-        //             $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
-        //         }
-        //     }
-        // }
-
-        // while (isset($sponsoredVideos[$sponsoredIndex])) {
-        //     $finalList[] = $sponsoredVideos[$sponsoredIndex++];
-        // }
-
-        // while (isset($premiumSponsoredVideos[$premiumIndex])) {
-        //     $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
-        // }
-
-        // NEW MERGE LOGIC - WEIGHTED BUT NEVER TOGETHER
-        $finalList = [];
-        $normalIndex = 0;
-        $premiumIndex = 0;
-        $normalSponsoredIndex = 0;
-
-        $totalNormal = count($normalVideos);
-        $totalPremium = count($premiumSponsoredVideos);
-        $totalNormalSponsored = count($sponsoredVideos);
-
-        $pattern = []; // This will store pattern like ['P','P','S']
-        if($totalPremium > 0 && $totalNormalSponsored > 0){
-            $pattern = ['P', 'P', 'S']; // 2 premium then 1 normal
-        }
-        elseif($totalPremium > 0){
-            $pattern = ['P']; // Only premium
-        }
-        elseif($totalNormalSponsored > 0){
-            $pattern = ['S']; // Only normal sponsored
-        }
-
-        $patternIndex = 0;
-        $normal_videos_cc = 5; // number of non-sponsored before sponsored
-
-        while($normalIndex < $totalNormal){
-            // Add 5 non-sponsored videos
-            for($j = 0; $j < $normal_videos_cc && $normalIndex < $totalNormal; $j++, $normalIndex++){
-                $finalList[] = $normalVideos[$normalIndex];
-            }
-
-            // If we have a pattern and any sponsored videos
-            if(!empty($pattern)){
-                $type = $pattern[$patternIndex];
-
-                if($type === 'P' && $totalPremium > 0){
-                    $finalList[] = $premiumSponsoredVideos[$premiumIndex];
-                    $premiumIndex = ($premiumIndex + 1) % $totalPremium; // loop
                 }
-                elseif($type === 'S' && $totalNormalSponsored > 0){
-                    $finalList[] = $sponsoredVideos[$normalSponsoredIndex];
-                    $normalSponsoredIndex = ($normalSponsoredIndex + 1) % $totalNormalSponsored; // loop
-                }
-
-                // Move to next in pattern
-                $patternIndex = ($patternIndex + 1) % count($pattern);
+            } catch (\Throwable $e) {
+                // Ignore invalid cursor payloads and continue with explicit params.
             }
         }
 
-        if (empty($finalList) && ! empty($cities_ids) && empty($input['is_following']) && empty($input['_geo_fallback'])) {
-            $fallbackInput = $input;
-            unset($fallbackInput['city'], $fallbackInput['latitude'], $fallbackInput['longitude']);
-            $fallbackInput['_geo_fallback'] = true;
-            $fallbackRequest = $request->duplicate();
-            $fallbackRequest->replace($fallbackInput);
-
-            return $this->videos_list($fallbackRequest);
+        if ($request->boolean('paginate') || $request->input('paginate') == 1) {
+            return response()->json($feedService->paginatedList($request, $user), 200);
         }
 
-        AppHelper::decorateVideoIterable($finalList);
-
-        return response()->json([
-            'status' => true,
-            'videos' => $finalList,
-        ], 200);
+        // Legacy full-list path — sunset once all clients send paginate=1 (see PERFORMANCE_DEPLOYMENT.md).
+        return response()->json($feedService->legacyList($request, $user), 200);
     }
 
-    public function video_processing_status(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'video_id' => 'required',
-        ]);
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.validation_failed'),
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $video = DB::table('videos')->where('id', $request->video_id)->first();
-        if (! $video) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Video not found',
-            ], 404);
-        }
-
-        AppHelper::decorateVideoRow($video);
-
-        $payload = [
-            'status' => true,
-            'video_id' => $video->id,
-            'processing_status' => $video->processing_status ?? 'ready',
-            'transcode_status' => $video->transcode_status ?? 'pending',
-            'hls_url' => $video->hls_url ?? null,
-            'hls_playlist_url' => $video->hls_playlist_url ?? null,
-            'video_sources' => $video->video_sources ?? null,
-            'video_url' => $video->video_url ?? null,
-            'thumbnail_url' => $video->thumbnail_url ?? null,
-            'thumbnail_blur' => $video->thumbnail_blur ?? null,
-            'image_url' => $video->image_url ?? null,
-            'video' => $video,
-        ];
-
-        return response()->json($payload, 200);
-    }
-
-    public function videos_list_old(Request $request){
-        $user = Auth::guard('sanctum')->user();
-        $input = $request->all();
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
-        $cities_ids = array();
-        $country = 0;
-        $city = 0;
-
-        // if(isset($input['country']) && $input['country']!=''){
-        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
-        //     if(isset($country_details->id)){
-        //         $country = $country_details->id;
-        //     }
-        // }
-        // if(isset($input['city']) && $input['city']!=''){
-        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
-        //     if(isset($city_details->id)){
-        //         $city = $city_details->id;
-        //     }
-        // }
-
-        if(isset($input['city']) && $input['city']!=''){
-            $city = $input['city'];
-        }
-        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
-            $currentLat = $input['latitude'];
-            $currentLng = $input['longitude'];
-            $radiusList = [10, 25, 50];
-            foreach($radiusList as $radiusKm){
-                $nearestCity = DB::table('cities')
-                    ->select(
-                        'id',
-                        'name',
-                        DB::raw("(
-                            6371 * acos(
-                                cos(radians($currentLat)) *
-                                cos(radians(latitude)) *
-                                cos(radians(longitude) - radians($currentLng)) +
-                                sin(radians($currentLat)) *
-                                sin(radians(latitude))
-                            )
-                        ) AS distance")
-                    )
-                    ->having('distance', '<', $radiusKm)
-                    ->orderBy('distance', 'asc')
-                    ->first();
-    
-                if($nearestCity){
-                    $city = $nearestCity->id;
-                    break; // Stop if a city is found
-                }
-            }
-        }
-
-        if($city){
-            $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
-            if(!empty($city_group)){
-                $cities_ids = explode(',', $city_group->cities);
-            }
-            else{
-                $cities_ids = array($city);
-            }
-        }
-
-        // Base query to clone for all types
-        $baseQuery = DB::table('videos as v')
-        ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
-        ->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'u.id')
-        ->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')
-        ->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id')
-        ->leftJoin(DB::raw("
-            (SELECT f.following_id, COUNT(f.follower_id) as followers_count 
-            FROM followers f
-            JOIN front_users fu ON fu.id = f.follower_id
-            WHERE fu.is_soft_delete = 0
-            GROUP BY f.following_id) as followers
-        "), 'followers.following_id', '=', 'u.id')
-        ->leftJoin(DB::raw("
-            (SELECT f.follower_id, COUNT(f.following_id) as following_count 
-            FROM followers f
-            JOIN front_users fu ON fu.id = f.following_id
-            WHERE fu.is_soft_delete = 0
-            GROUP BY f.follower_id) as following
-        "), 'following.follower_id', '=', 'u.id')
-        ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
-        ->where(function ($q) {
-            $q->where('video_type_language.is_default', 1)
-              ->orWhere('v.video_type', 0);
-        })
-        ->where('v.status', 1)
-        ->where('v.is_soft_delete', 0)
-        ->where('u.is_soft_delete', 0)
-        ->where('u.status', 1);
-
-        if (isset($input['search']['value']) && $input['search']['value'] != '') {
-            $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
-        }
-        if (isset($input['user']) && $input['user'] != '') {
-            $baseQuery->where('v.front_user_id', $input['user']);
-        }
-        if (isset($input['video_type']) && $input['video_type'] != '') {
-            $baseQuery->where('v.video_type', $input['video_type']);
-        }
-        if (isset($input['title']) && $input['title'] != '') {
-            $baseQuery->where('v.title', 'LIKE', '%' . $input['title'] . '%');
-        }
-        if (isset($input['tags']) && $input['tags'] != '') {
-            $baseQuery->where('v.tags', 'LIKE', '%' . $input['tags'] . '%');
-        }
-        $baseQuery->where(function ($query) {
-            $query->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
-        });
-
-        // Exclude those videos which are from blocked user
-        if($user){
-            $blocked_users = DB::table('blocked_users')
-                                    ->where('blocked_by', $user->id)
-                                    ->pluck('blocked_user');
-            if($blocked_users){
-                $baseQuery->whereNotIn('v.front_user_id', $blocked_users);
-            }
-        }
-            
-        // NORMAL VIDEOS
-        $normalQuery = clone $baseQuery;
-
-        // is_following = 1, this bit is used to get only following videos
-
-        if(isset($input['is_following']) && $input['is_following'] == 1){
-            // do nothing
-        }
-        else{
-            if($country){
-                $normalQuery->where('v.country', $country);
-            }
-            if(!empty($cities_ids)){
-                $normalQuery->whereIn('v.city', $cities_ids);
-            }
-        }
-
-        if($user){
-            $follower_id = $user->id;
-            $followingIds = DB::table('followers')
-                                    ->where('follower_id', $follower_id)
-                                    ->pluck('following_id');
-
-            if(isset($input['is_following']) && $input['is_following'] == 1){
-                $normalQuery->where(function ($q) use ($followingIds) {
-                    $q->where('v.publish_type', 2)
-                        ->orWhere('v.publish_type', 1);
-                });
-                $normalQuery->whereIn('v.front_user_id', $followingIds);
-            }
-            else{
-                $normalQuery->where(function ($q) use ($followingIds) {
-                    $q->where('v.publish_type', 2)
-                        ->orWhere(function ($iq) use ($followingIds) {
-                            $iq->where('v.publish_type', 1)
-                                ->whereIn('v.front_user_id', $followingIds);
-                        });
-                });
-            }
-        }
-        else{
-            $normalQuery->where('v.publish_type', 2);
-        }
-        
-        $normalQuery->leftJoin('sponsored_videos as sv', function ($join) use ($cities_ids, $input) {
-            $join->on('sv.video_id', '=', 'v.id');
-
-            // Add OR conditions using FIND_IN_SET
-            if(isset($input['is_following']) && $input['is_following'] == 1){
-                // do nothing
-            }
-            else{
-                $join->where(function ($query) use ($cities_ids) {
-                    foreach ($cities_ids as $cityId) {
-                        $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
-                    }
-                });
-            }
-        });
-
-        $normalQuery->where(function ($q) {
-            $q->where('v.is_sponsored', 0)
-                ->whereNull('sv.video_id');
-        });
-
-        $normalVideos = $normalQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // SPONSORED VIDEOS
-        $sponsoredQuery = clone $baseQuery;
-        $sponsoredQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
-        ->where(function ($query) use ($cities_ids) {
-            foreach ($cities_ids as $cityId) {
-                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
-            }
-        })
-        ->where('sv.sponsor_type', 1);
-
-        $sponsoredVideos = $sponsoredQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // PREMIUM SPONSORED VIDEOS
-        $premiumQuery = clone $baseQuery;
-        $premiumQuery->join('sponsored_videos as sv', 'sv.video_id', '=', 'v.id')
-            ->where(function ($query) use ($cities_ids) {
-            foreach ($cities_ids as $cityId) {
-                $query->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
-            }
-        })
-        ->where('sv.sponsor_type', 2);
-
-        $premiumSponsoredVideos = $premiumQuery->inRandomOrder()->select([
-            'v.*', 'sv.sponsor_type',
-            'video_type_description.name as video_type_name',
-            'u.name as user_name',
-            'u.email as user_email',
-            'u.image as user_image',
-            'ba.contact_phone',
-            'ba.contact_email',
-            'ba.website',
-            'ba.location',
-            'ba.latitude',
-            'ba.longitude',
-            DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
-            DB::raw('COALESCE(following.following_count, 0) as following_count')
-        ])->get();
-
-        // MERGE VIDEO LOGIC
-        $finalList = [];
-        $normalCount = 0;
-        $sponsoredIndex = 0;
-        $premiumIndex = 0;
-        $sponsoredCount = 0;
-        $totalNormal = count($normalVideos);
-        $i = 0;
-        $normal_videos_cc = 5; // This counter is used to show the sponor video after xyz number of normal videos
-
-        while ($i < $totalNormal) {
-            for ($j = 0; $j < $normal_videos_cc && $i < $totalNormal; $j++, $i++) {
-                $finalList[] = $normalVideos[$i];
-            }
-
-            if (isset($sponsoredVideos[$sponsoredIndex])) {
-                $finalList[] = $sponsoredVideos[$sponsoredIndex++];
-                $sponsoredCount++;
-
-                if ($sponsoredCount % 3 == 0 && isset($premiumSponsoredVideos[$premiumIndex])) {
-                    $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
-                }
-            }
-        }
-
-        while (isset($sponsoredVideos[$sponsoredIndex])) {
-            $finalList[] = $sponsoredVideos[$sponsoredIndex++];
-        }
-
-        while (isset($premiumSponsoredVideos[$premiumIndex])) {
-            $finalList[] = $premiumSponsoredVideos[$premiumIndex++];
-        }
-
-        AppHelper::decorateVideoIterable($finalList);
-        
-        return response()->json([
-            'status' => true,
-            'videos' => $finalList,
-        ], 200);
-    }
     public function videos_list2(Request $request){
         $input = $request->all();
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
-        
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
         $query=DB::table('videos as v');
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
         $query->leftJoin('generic_key_values_description as video_type_description', 'video_type_description.value_id', '=', 'v.video_type')->leftJoin('site_languages as video_type_language', 'video_type_description.language_id', '=', 'video_type_language.id');
@@ -2991,14 +2404,23 @@ class ApiController extends Controller
 
         $totalData = $query1->select(['v.id'])->count();
         $query2->offset($start)->limit($length);
-        // $query2->orderBy('v.system_id', 'DESC');
-        $videos = $query2->select(['v.video'])->inRandomOrder()->get();
+        if ($paginate) {
+            FeedPaginationHelper::applySeedOrder($query2, $request);
+        } else {
+            $query2->orderBy('v.created_at', 'desc');
+        }
+        $videos = $query2->select(['v.video'])->get();
         AppHelper::decorateVideoIterable($videos);
-        
-        return response()->json([
+
+        $response = [
             'status' => true,
             'videos' => $videos,
-        ], 200);
+        ];
+        if ($paginate) {
+            $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
+        }
+
+        return response()->json($response, 200);
     }
     public function video_details(Request $request){
         $input = $request->all();
@@ -3318,10 +2740,9 @@ class ApiController extends Controller
     public function saved_videos_list(Request $request){
         $user = Auth::user();
         $input = $request->all();
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
-        
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
         $query=DB::table('videos as v');
         $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
         $query->join('user_saved_videos as sv', 'sv.video_id', '=', 'v.id');
@@ -3374,18 +2795,23 @@ class ApiController extends Controller
         $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
         DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('sv.system_id', 'DESC')->get();
         AppHelper::decorateVideoIterable($videos);
-        
-        return response()->json([
+
+        $response = [
             'status' => true,
             'videos' => $videos,
-        ], 200);
+        ];
+        if ($paginate) {
+            $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
+        }
+
+        return response()->json($response, 200);
     }
     public function liked_videos_list(Request $request){
         $input = $request->all();
-        $page = $input['page'] ?? 1; // Default to page 1 if not provided
-        $length = 100000; // Number of records per page
-        $start = ($page - 1) * $length;
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
         $videos = [];
+        $totalData = 0;
 
         if(isset($input['video_ids']) && $input['video_ids'] != ''){
             $video_ids = explode(',', $input['video_ids']);
@@ -3445,11 +2871,16 @@ class ApiController extends Controller
         if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
             AppHelper::decorateVideoIterable($videos);
         }
-        
-        return response()->json([
+
+        $response = [
             'status' => true,
             'videos' => $videos,
-        ], 200);
+        ];
+        if ($paginate && isset($input['video_ids']) && $input['video_ids'] != '') {
+            $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
+        }
+
+        return response()->json($response, 200);
     }
 
     public function nearest_business_accounts(Request $request){
@@ -3475,8 +2906,23 @@ class ApiController extends Controller
         ->having('distance', '<=', $radius)
         ->orderBy('distance');
 
-        // Now add the bindings using mergeBindings and pass them to the query
-        $results = $query->addBinding([$latitude, $longitude, $latitude], 'select')->get();
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
+        $query = $query->addBinding([$latitude, $longitude, $latitude], 'select');
+
+        if ($request->input('paginate') == 1) {
+            $results = $query->skip($start)->take($length)->get();
+
+            return response()->json([
+                'status' => true,
+                'accounts' => $results,
+                'meta' => FeedPaginationHelper::meta($request, $page, $perPage),
+            ], 200);
+        }
+
+        $results = $query->get();
+
         return response()->json([
             'status' => true,
             'accounts' => $results,
@@ -3728,13 +3174,25 @@ class ApiController extends Controller
         $query_count   = clone $query;
         $query_avg     = clone $query;
 
-        // Get review list
-        $user_reviews = $query_reviews->select([
+        $pagination = FeedPaginationHelper::resolve($request);
+        extract($pagination);
+
+        $reviewSelect = [
             'ur.*',
             'r.id as reviewer_id',
             'r.name as reviewer_name',
-            'r.image as reviewer_image'
-        ])->get();
+            'r.image as reviewer_image',
+        ];
+
+        if ($request->input('paginate') == 1) {
+            $user_reviews = $query_reviews->select($reviewSelect)
+                ->orderByDesc('ur.id')
+                ->skip($start)
+                ->take($length)
+                ->get();
+        } else {
+            $user_reviews = $query_reviews->select($reviewSelect)->get();
+        }
 
         // Total number of reviews
         $total_reviews = $query_count->count();
@@ -3759,15 +3217,21 @@ class ApiController extends Controller
             $rating_counts[$i] = $rating_breakdown[$i] ?? 0;
         }
 
-        return response()->json([
+        $payload = [
             'status' => true,
             'user_reviews' => $user_reviews,
             'review_counters' => [
                 'total_reviews' => $total_reviews,
                 'average_rating' => $average_rating,
-                'ratings' => $rating_counts
-            ]
-        ], 200);
+                'ratings' => $rating_counts,
+            ],
+        ];
+
+        if ($request->input('paginate') == 1) {
+            $payload['meta'] = FeedPaginationHelper::meta($request, $page, $perPage);
+        }
+
+        return response()->json($payload, 200);
     }
     public function update_review_status(Request $request){
         if($request->status == 1){
@@ -4311,37 +3775,55 @@ class ApiController extends Controller
         ], 200);
     }
     public function countries(Request $request){
-        $query = DB::table('countries');
-        if($request->input('id')){
-            $query->where('id', $request->input('id'));
-        }
-        $query->where('status', 1);
-        $countries = $query->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+        $id = $request->input('id');
+        $cacheKey = 'api:countries:'.($id ?: 'all');
+        $countries = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($id) {
+            $query = DB::table('countries')->where('status', 1);
+            if ($id) {
+                $query->where('id', $id);
+            }
+
+            return $query->select(['id', 'name', 'iso3', 'capital', 'currency', 'currency_symbol'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'countries' => $countries,
         ], 200);
     }
     public function states(Request $request){
-        $query = DB::table('states');
-        if($request->input('country_id')){
-            $query->where('country_id', $request->input('country_id'));
-        }
-        $states = $query->select(['id', 'name', 'country_id'])->get();
+        $countryId = $request->input('country_id') ?? 'all';
+        $cacheKey = 'api:states:'.$countryId;
+        $states = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($request) {
+            $query = DB::table('states');
+            if ($request->input('country_id')) {
+                $query->where('country_id', $request->input('country_id'));
+            }
+
+            return $query->select(['id', 'name', 'country_id'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'states' => $states,
         ], 200);
     }
     public function cities(Request $request){
-        $query = DB::table('cities');
-        if($request->input('state_id')){
-            $query->where('state_id', $request->input('state_id'));
-        }
-        if($request->input('country_id')){
-            $query->where('country_id', $request->input('country_id'));
-        }
-        $cities = $query->select(['id', 'name', 'state_id'])->get();
+        $stateId = $request->input('state_id') ?? 'all';
+        $countryId = $request->input('country_id') ?? 'all';
+        $cacheKey = 'api:cities:'.$countryId.':'.$stateId;
+        $cities = \App\Support\CookCache::remember($cacheKey, [3600, 86400], function () use ($request) {
+            $query = DB::table('cities');
+            if ($request->input('state_id')) {
+                $query->where('state_id', $request->input('state_id'));
+            }
+            if ($request->input('country_id')) {
+                $query->where('country_id', $request->input('country_id'));
+            }
+
+            return $query->select(['id', 'name', 'state_id'])->get();
+        });
+
         return response()->json([
             'status' => true,
             'cities' => $cities,
@@ -4355,7 +3837,13 @@ class ApiController extends Controller
         ], 200);
     }
     public function site_settings(){
-        $settings = DB::table('settings')->where('id', 1)->select(['email', 'phone', 'address', 'facebook', 'twitter', 'instagram', 'linkedin', 'basic_sponsored_video_price', 'premium_sponsored_video_price', 'sponsor_video_discount', 'allow_general_videos', 'currency_symbol', 'allow_following_videos'])->first();
+        $row = AppHelper::get_site_settings();
+        $settings = $row ? $row->only([
+            'email', 'phone', 'address', 'facebook', 'twitter', 'instagram', 'linkedin',
+            'basic_sponsored_video_price', 'premium_sponsored_video_price', 'sponsor_video_discount',
+            'allow_general_videos', 'currency_symbol', 'allow_following_videos',
+        ]) : null;
+
         return response()->json([
             'status' => true,
             'settings' => $settings,

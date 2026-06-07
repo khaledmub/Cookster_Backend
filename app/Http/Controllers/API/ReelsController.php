@@ -18,7 +18,8 @@ class ReelsController extends Controller
     public function index(Request $request): JsonResponse
     {
         $cursor = $this->normalizeCursor($request->input('cursor'));
-        $cacheKey = 'reels_feed_'.$cursor['cache_key'];
+        $viewer = Auth::guard('sanctum')->user();
+        $cacheKey = $this->feedCacheKey($cursor['cache_key'], $viewer);
 
         $payload = $this->rememberFeedPage($cacheKey, fn () => $this->fetchReelsPage($cursor, $request));
 
@@ -143,6 +144,23 @@ class ReelsController extends Controller
             'system_id' => (int) $data['system_id'],
             'id' => (string) $data['id'],
         ];
+    }
+
+    private function feedCacheKey(string $cursorKey, mixed $viewer): string
+    {
+        if ($viewer === null) {
+            return 'reels_feed_guest_'.$cursorKey;
+        }
+
+        $blockedHash = sha1(
+            DB::table('blocked_users')
+                ->where('blocked_by', $viewer->id)
+                ->orderBy('blocked_user')
+                ->pluck('blocked_user')
+                ->implode(',')
+        );
+
+        return 'reels_feed_u_'.$viewer->id.'_b_'.$blockedHash.'_'.$cursorKey;
     }
 
     /**
