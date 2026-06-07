@@ -32,8 +32,8 @@ class ApiController extends Controller
     public function validate_register(Request $request){
         $validator = Validator::make($request->all(), [
             'name' => 'required',
-            'email' => 'required|email|unique:front_users,email',
-            'phone' => 'nullable|unique:front_users,phone',
+            'email' => 'required|email',
+            'phone' => 'nullable',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
@@ -56,17 +56,40 @@ class ApiController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
-        else{
+
+        // Check if the email is taken by a VERIFIED user
+        $existingUser = \App\Models\FrontUser::where('email', $request->email)->first();
+        if ($existingUser && $existingUser->email_verified_at !== null) {
             return response()->json([
-                'status' => true,
-            ], 200);
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => ['email' => [__('validation.unique', ['attribute' => 'email'])]],
+            ], 422);
         }
+
+        // If phone is provided, check uniqueness only against verified users
+        if ($request->phone) {
+            $phoneTaken = \App\Models\FrontUser::where('phone', $request->phone)
+                ->whereNotNull('email_verified_at')
+                ->exists();
+            if ($phoneTaken) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => ['phone' => [__('validation.unique', ['attribute' => 'phone'])]],
+                ], 422);
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+        ], 200);
     }
     public function register(Request $request){
         $validator = Validator::make($request->all(), [
             'name' => 'required',
-            'email' => 'required|email|unique:front_users,email',
-            'phone' => 'nullable|unique:front_users,phone',
+            'email' => 'required|email',
+            'phone' => 'nullable',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
@@ -91,96 +114,183 @@ class ApiController extends Controller
         }
         $input = $request->all();
 
-        $front_user_data = [
-            'id' => (string) \Str::uuid(),
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'phone' => isset($input['phone'])? $input['phone']: NULL,
-            'password' => Hash::make($input['password']),
-            'dob' => isset($input['dob'])? date('Y-m-d', strtotime($input['dob'])): NULL,
-            'country' => $input['country']? $input['country']: 0,
-            'state' => 0,
-            'city' => $input['city']? $input['city']: 0,
-            'uuid' => $input['uuid'],
-            'entity' => $input['entity'],
-        ];
+        // Check if this email already belongs to a VERIFIED user — hard block
+        $existingUser = FrontUser::where('email', $request->email)->first();
+        if ($existingUser && $existingUser->email_verified_at !== null) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => ['email' => [__('validation.unique', ['attribute' => 'email'])]],
+            ], 422);
+        }
+
+        // If phone is provided, ensure it is not taken by a verified user
+        if ($request->phone) {
+            $phoneTaken = FrontUser::where('phone', $request->phone)
+                ->whereNotNull('email_verified_at')
+                ->when($existingUser, fn($q) => $q->where('id', '!=', $existingUser->id))
+                ->exists();
+            if ($phoneTaken) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => ['phone' => [__('validation.unique', ['attribute' => 'phone'])]],
+                ], 422);
+            }
+        }
 
         $settings = DB::table('settings')->where('id', 1)->first();
-        if($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1){
-            $front_user_data['is_one_time_discount_given'] = 0;
+
+        if ($existingUser && $existingUser->email_verified_at === null) {
+            // ── UNVERIFIED account exists: update data and re-send OTP ──
+            $updateData = [
+                'name'     => $input['name'],
+                'phone'    => isset($input['phone']) ? $input['phone'] : null,
+                'password' => Hash::make($input['password']),
+                'dob'      => isset($input['dob']) ? date('Y-m-d', strtotime($input['dob'])) : null,
+                'country'  => $input['country'] ?? 0,
+                'state'    => 0,
+                'city'     => $input['city'] ?? 0,
+                'uuid'     => $input['uuid'],
+                'entity'   => $input['entity'],
+            ];
+            if ($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1) {
+                $updateData['is_one_time_discount_given'] = 0;
+            }
+            $existingUser->fill($updateData)->save();
+            $user = $existingUser->fresh();
+
+            // Update or recreate additional account data
+            if ($request->entity == 1) {
+                DB::table('personal_account_additional_data')->updateOrInsert(
+                    ['front_user_id' => $user->id],
+                    ['website' => $request->website]
+                );
+            }
+            if ($request->entity == 2) {
+                DB::table('business_account_additional_data')->updateOrInsert(
+                    ['front_user_id' => $user->id],
+                    [
+                        'business_type' => $request->business_type,
+                        'contact_phone' => $request->contact_phone,
+                        'contact_email' => $request->contact_email,
+                        'website'       => $request->website,
+                        'location'      => $request->location,
+                        'latitude'      => $request->latitude,
+                        'longitude'     => $request->longitude,
+                    ]
+                );
+            }
+            if ($request->entity == 3) {
+                DB::table('chef_account_additional_data')->updateOrInsert(
+                    ['front_user_id' => $user->id],
+                    [
+                        'country'       => 194,
+                        'state'         => $request->state,
+                        'city'          => 0,
+                        'contact_phone' => $request->contact_phone,
+                        'contact_email' => $request->contact_email,
+                    ]
+                );
+            }
+            if ($request->entity == 8) {
+                DB::table('sponsored_account_additional_data')->updateOrInsert(
+                    ['front_user_id' => $user->id],
+                    ['type_of_account' => $request->type_of_account]
+                );
+            }
+        } else {
+            // ── Brand-new user: create record ──
+            $front_user_data = [
+                'id'       => (string) \Str::uuid(),
+                'name'     => $input['name'],
+                'email'    => $input['email'],
+                'phone'    => isset($input['phone']) ? $input['phone'] : null,
+                'password' => Hash::make($input['password']),
+                'dob'      => isset($input['dob']) ? date('Y-m-d', strtotime($input['dob'])) : null,
+                'country'  => $input['country'] ?? 0,
+                'state'    => 0,
+                'city'     => $input['city'] ?? 0,
+                'uuid'     => $input['uuid'],
+                'entity'   => $input['entity'],
+            ];
+            if ($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1) {
+                $front_user_data['is_one_time_discount_given'] = 0;
+            }
+
+            FrontUser::create($front_user_data);
+            $user = FrontUser::where('email', $request->email)->first();
+
+            if ($request->entity == 1) {
+                DB::table('personal_account_additional_data')->insert([
+                    'front_user_id' => $user->id,
+                    'website'       => $request->website,
+                ]);
+            }
+            if ($request->entity == 2) {
+                DB::table('business_account_additional_data')->insert([
+                    'front_user_id' => $user->id,
+                    'business_type' => $request->business_type,
+                    'contact_phone' => $request->contact_phone,
+                    'contact_email' => $request->contact_email,
+                    'website'       => $request->website,
+                    'location'      => $request->location,
+                    'latitude'      => $request->latitude,
+                    'longitude'     => $request->longitude,
+                ]);
+            }
+            if ($request->entity == 3) {
+                DB::table('chef_account_additional_data')->insert([
+                    'front_user_id' => $user->id,
+                    'country'       => 194,
+                    'state'         => $request->state,
+                    'city'          => 0,
+                    'contact_phone' => $request->contact_phone,
+                    'contact_email' => $request->contact_email,
+                ]);
+            }
+            if ($request->entity == 8) {
+                DB::table('sponsored_account_additional_data')->insert([
+                    'front_user_id'   => $user->id,
+                    'type_of_account' => $request->type_of_account,
+                ]);
+            }
         }
 
-        $user = FrontUser::create($front_user_data);
-        $user = FrontUser::where('email', $request->email)->first();
-
-        if($request->entity == 1){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['website'] = $request->website;
-            DB::table('personal_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 2){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['business_type'] = $request->business_type;
-            $additional_data['contact_phone'] = $request->contact_phone;
-            $additional_data['contact_email'] = $request->contact_email;
-            $additional_data['website'] = $request->website;
-            $additional_data['location'] = $request->location;
-            $additional_data['latitude'] = $request->latitude;
-            $additional_data['longitude'] = $request->longitude;
-            DB::table('business_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 3){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['country'] = 194;
-            $additional_data['state'] = $request->state;
-            $additional_data['city'] = 0;
-            $additional_data['contact_phone'] = $request->contact_phone;
-            $additional_data['contact_email'] = $request->contact_email;
-            DB::table('chef_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 8){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['type_of_account'] = $request->type_of_account;
-            DB::table('sponsored_account_additional_data')->insert($additional_data);
-        }
         // Send registration OTP
         $dispatch = AppHelper::send_verification_code(1, $user, 'register');
 
         $language = App::getLocale();
 
-        if($language == 'ar'){
+        if ($language == 'ar') {
             $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
-        }
-        else{
+        } else {
             $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
         }
 
         $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
-        if(isset($input['package_id']) && $input['package_id']!='' && $input['package_id']!=null){
-            $payment_data = array();
-            $payment_data['PaymentId'] = $request->PaymentId;
-            $payment_data['TranId'] = $request->TranId;
-            $payment_data['ECI'] = $request->ECI;
-            $payment_data['TrackId'] = $request->TrackId;
-            $payment_data['RRN'] = $request->RRN;
-            $payment_data['cardBrand'] = $request->cardBrand;
-            $payment_data['maskedPAN'] = $request->maskedPAN;
-            $payment_data['PaymentType'] = $request->PaymentType;
 
+        if (isset($input['package_id']) && $input['package_id'] != '' && $input['package_id'] != null) {
+            $payment_data = [
+                'PaymentId'   => $request->PaymentId,
+                'TranId'      => $request->TranId,
+                'ECI'         => $request->ECI,
+                'TrackId'     => $request->TrackId,
+                'RRN'         => $request->RRN,
+                'cardBrand'   => $request->cardBrand,
+                'maskedPAN'   => $request->maskedPAN,
+                'PaymentType' => $request->PaymentType,
+            ];
             AppHelper::subscribe_user_to_package($user->id, $input['package_id'], $payment_data);
         }
 
         $response = [
-            'status' => true,
+            'status'  => true,
             'message' => __('messages.user_registered_please_verify', ['default' => 'User registered successfully. Please verify your email.']),
-            'user' => $user,
+            'user'    => $user,
         ];
 
-        $isStagingLike = !app()->environment('production');
+        $isStagingLike     = !app()->environment('production');
         $testModeRequested = (bool) $request->boolean('test_mode');
         if ($isStagingLike && $testModeRequested) {
             $response['otp_code'] = $dispatch['verification_code'] ?? null;
@@ -1377,6 +1487,8 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
+            $query->where('u.is_soft_delete', 0);
+            $query->where('u.status', 1);
             $query1 = clone $query;
             $query2 = clone $query;
 
@@ -1471,6 +1583,8 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
+            $query->where('u.is_soft_delete', 0);
+            $query->where('u.status', 1);
             $query->where('u.entity', 2);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1545,6 +1659,8 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
+            $query->where('u.is_soft_delete', 0);
+            $query->where('u.status', 1);
             $query->where('u.entity', 3);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1617,6 +1733,8 @@ class ApiController extends Controller
 
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
+            $query->where('u.is_soft_delete', 0);
+            $query->where('u.status', 1);
             $query->where('v.average_rating', 5);
             $query1 = clone $query;
             $query2 = clone $query;
@@ -1755,7 +1873,13 @@ class ApiController extends Controller
 
         $input = $request->all();
         $language = App::getLocale();
-        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
+        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->where('u.is_soft_delete', 0)->where('u.status', 1)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_not_found'),
+            ], 404);
+        }
         $additional_data = array();
         if($user->entity==2){
             $additional_data = DB::table('business_account_additional_data as b')->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type')->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id')->where('key_language.code', $language)->where('b.front_user_id', $user->id)->select('b.*', 'bt.name as business_type_name')->first();
@@ -2232,7 +2356,9 @@ class ApiController extends Controller
               ->orWhere('v.video_type', 0);
         })
         ->where('v.status', 1)
-        ->where('v.is_soft_delete', 0);
+        ->where('v.is_soft_delete', 0)
+        ->where('u.is_soft_delete', 0)
+        ->where('u.status', 1);
 
         if (isset($input['search']['value']) && $input['search']['value'] != '') {
             $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
@@ -2576,7 +2702,9 @@ class ApiController extends Controller
               ->orWhere('v.video_type', 0);
         })
         ->where('v.status', 1)
-        ->where('v.is_soft_delete', 0);
+        ->where('v.is_soft_delete', 0)
+        ->where('u.is_soft_delete', 0)
+        ->where('u.status', 1);
 
         if (isset($input['search']['value']) && $input['search']['value'] != '') {
             $baseQuery->where('v.title', 'LIKE', '%' . $input['search']['value'] . '%');
