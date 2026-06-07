@@ -10,3 +10,10 @@ Artisan::command('inspire', function () {
 
 Schedule::command('queue:prune-failed --hours=168')->weekly();
 Schedule::command('queue:restart')->dailyAt('04:00');
+
+// Dispatch transcode jobs for videos not yet ready (worker: cookster-transcode.service).
+Schedule::command('videos:backfill-media --transcode --limit=50')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/transcode-backfill.log'));
