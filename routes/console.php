@@ -12,8 +12,8 @@ Schedule::command('queue:prune-failed --hours=168')->weekly();
 Schedule::command('queue:restart')->dailyAt('04:00');
 
 // Dispatch transcode jobs for videos not yet ready (worker: cookster-transcode.service).
-Schedule::command('videos:backfill-media --transcode --limit=50')
+Schedule::command('videos:backfill-media --transcode --limit=60')
     ->everyFiveMinutes()
-    ->withoutOverlapping(30)
+    ->withoutOverlapping(10)
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/transcode-backfill.log'));

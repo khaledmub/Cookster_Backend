@@ -32,7 +32,7 @@ class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
 
     public int $timeout;
 
-    public int $uniqueFor = 7200;
+    public int $uniqueFor = 1800;
 
     public function __construct(
         public string $videoId,
@@ -239,6 +239,10 @@ class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
 
             $localPath = $localDir.'/'.$entry;
             if (! is_file($localPath)) {
+                continue;
+            }
+
+            if ($entry === 'source.mp4' || (! str_ends_with($entry, '.m3u8') && ! str_ends_with($entry, '.ts'))) {
                 continue;
             }
 
