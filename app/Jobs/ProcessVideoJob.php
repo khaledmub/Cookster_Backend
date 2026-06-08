@@ -12,11 +12,11 @@ use App\Services\VideoMp4Transcoder;
 use App\Services\VideoPosterExtractor;
 use App\Services\VideoProbeService;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
-class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
+class ProcessVideoJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,19 +32,12 @@ class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
 
     public int $timeout;
 
-    public int $uniqueFor = 1800;
-
     public function __construct(
         public string $videoId,
         public string $videoFilename,
     ) {
         $this->onQueue('video-processing');
         $this->timeout = (int) config('ffmpeg.timeout', 7200);
-    }
-
-    public function uniqueId(): string
-    {
-        return $this->videoId;
     }
 
     public function handle(
@@ -64,10 +57,37 @@ class ProcessVideoJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        if ($this->tryMarkReadyFromExistingArtifacts($mediaVerifier, $s3Service)) {
+        if (($video->transcode_status ?? 'pending') === 'ready') {
             return;
         }
 
+        $lock = Cache::lock('process-video:'.$this->videoId, $this->timeout);
+        if (! $lock->get()) {
+            $this->release(120);
+
+            return;
+        }
+
+        try {
+            if ($this->tryMarkReadyFromExistingArtifacts($mediaVerifier, $s3Service)) {
+                return;
+            }
+
+            $this->runTranscode($video, $transcoder, $mp4Transcoder, $mediaVerifier, $posterExtractor, $probeService, $s3Service);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function runTranscode(
+        object $video,
+        VideoHlsTranscoder $transcoder,
+        VideoMp4Transcoder $mp4Transcoder,
+        VideoMediaVerifier $mediaVerifier,
+        VideoPosterExtractor $posterExtractor,
+        VideoProbeService $probeService,
+        S3Service $s3Service,
+    ): void {
         $this->updateTranscodeStatus('pending');
 
         $workDir = storage_path('app/hls-transcode/'.$this->videoId);

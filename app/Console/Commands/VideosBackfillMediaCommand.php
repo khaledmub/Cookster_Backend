@@ -35,9 +35,17 @@ class VideosBackfillMediaCommand extends Command
             ->where('status', 1)
             ->where('is_soft_delete', 0)
             ->whereNotNull('video')
-            ->where('video', '!=', '')
-            ->orderByDesc('system_id')
-            ->limit($limit);
+            ->where('video', '!=', '');
+
+        if ($this->option('transcode') && Schema::hasColumn('videos', 'transcode_status')) {
+            $query->where(function ($builder) {
+                $builder->where('transcode_status', 'pending')
+                    ->orWhere('transcode_status', 'failed')
+                    ->orWhereNull('transcode_status');
+            });
+        }
+
+        $query->orderByDesc('system_id')->limit($limit);
 
         $videos = $query->get(['id', 'video', 'image', 'processing_status', 'transcode_status']);
         $posterCount = 0;
