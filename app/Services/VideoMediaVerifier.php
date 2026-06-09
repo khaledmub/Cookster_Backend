@@ -11,35 +11,53 @@ class VideoMediaVerifier
      *
      * @return list<string>
      */
-    public static function requiredTranscodeKeys(string $videoId): array
+    public static function requiredTranscodeKeys(string $videoId, ?array $mp4Heights = null): array
     {
-        return [
-            VideoMediaService::hlsMasterKey($videoId),
-            VideoMediaService::mp4Key($videoId, 360),
-            VideoMediaService::mp4Key($videoId, 720),
-        ];
+        $keys = [VideoMediaService::hlsMasterKey($videoId)];
+
+        foreach ($mp4Heights ?? [360] as $height) {
+            $keys[] = VideoMediaService::mp4Key($videoId, (int) $height);
+        }
+
+        return $keys;
     }
 
     /**
-     * Optional renditions (e.g. 1080) — verified when present, not required for "ready".
+     * Optional renditions — present on storage when encoded, not required for "ready".
      *
      * @return list<string>
      */
     public static function optionalTranscodeKeys(string $videoId): array
     {
         return [
+            VideoMediaService::mp4Key($videoId, 720),
             VideoMediaService::mp4Key($videoId, 1080),
         ];
     }
 
     /**
+     * MP4 heights required for "ready". HLS master carries 720/1080; only MP4 fallbacks listed here.
+     *
+     * @return list<int>
+     */
+    public function resolveRequiredMp4Heights(string $videoId, S3Service $s3Service, ?array $mp4LadderHeights = null): array
+    {
+        if ($mp4LadderHeights !== null && $mp4LadderHeights !== []) {
+            return array_values(array_unique(array_map('intval', $mp4LadderHeights)));
+        }
+
+        return [360];
+    }
+
+    /**
      * @return list<string> Keys that were expected but missing on object storage.
      */
-    public function missingTranscodeKeys(string $videoId, S3Service $s3Service): array
+    public function missingTranscodeKeys(string $videoId, S3Service $s3Service, ?array $mp4LadderHeights = null): array
     {
+        $mp4Heights = $this->resolveRequiredMp4Heights($videoId, $s3Service, $mp4LadderHeights);
         $missing = [];
 
-        foreach (self::requiredTranscodeKeys($videoId) as $key) {
+        foreach (self::requiredTranscodeKeys($videoId, $mp4Heights) as $key) {
             if (! $s3Service->fileExists($key)) {
                 $missing[] = $key;
             }
@@ -51,9 +69,9 @@ class VideoMediaVerifier
     /**
      * @throws RuntimeException
      */
-    public function assertTranscodeReady(string $videoId, S3Service $s3Service): void
+    public function assertTranscodeReady(string $videoId, S3Service $s3Service, ?array $mp4LadderHeights = null): void
     {
-        $missing = $this->missingTranscodeKeys($videoId, $s3Service);
+        $missing = $this->missingTranscodeKeys($videoId, $s3Service, $mp4LadderHeights);
         if ($missing !== []) {
             throw new RuntimeException(
                 'Transcode artifacts missing on object storage: '.implode(', ', $missing)

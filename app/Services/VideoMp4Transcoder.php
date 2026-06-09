@@ -34,7 +34,6 @@ class VideoMp4Transcoder
         $preset = (string) config('ffmpeg.preset', 'veryfast');
         $threads = (int) config('ffmpeg.threads', 0);
         $outputs = [];
-        $running = [];
 
         foreach ($heights as $height) {
             if (! isset(self::VARIANTS[$height])) {
@@ -66,22 +65,17 @@ class VideoMp4Transcoder
 
             $process = new Process($command);
             $process->setTimeout($timeout);
-            $process->start();
-            $running[$height] = ['process' => $process, 'path' => $outputPath];
-        }
+            $process->run();
 
-        foreach ($running as $height => $meta) {
-            $exitCode = $meta['process']->wait();
-
-            if ($exitCode !== 0) {
-                throw new ProcessFailedException($meta['process']);
+            if (! $process->isSuccessful()) {
+                throw new ProcessFailedException($process);
             }
 
-            if (! is_file($meta['path']) || filesize($meta['path']) === 0) {
-                throw new RuntimeException('FFmpeg did not produce MP4 rendition: '.$meta['path']);
+            if (! is_file($outputPath) || filesize($outputPath) === 0) {
+                throw new RuntimeException('FFmpeg did not produce MP4 rendition: '.$outputPath);
             }
 
-            $outputs[$height] = $meta['path'];
+            $outputs[$height] = $outputPath;
         }
 
         return $outputs;

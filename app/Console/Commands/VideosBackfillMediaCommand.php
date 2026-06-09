@@ -50,7 +50,6 @@ class VideosBackfillMediaCommand extends Command
         if ($this->option('transcode') && Schema::hasColumn('videos', 'transcode_status')) {
             $query->where(function ($builder) {
                 $builder->where('transcode_status', 'pending')
-                    ->orWhere('transcode_status', 'failed')
                     ->orWhereNull('transcode_status');
             });
         }

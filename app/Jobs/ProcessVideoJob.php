@@ -99,19 +99,20 @@ class ProcessVideoJob implements ShouldQueue
             $this->downloadSource($s3Service, (string) $video->video, $sourcePath);
 
             $sourceHeight = $probeService->probeVideoHeight($sourcePath);
-            $ladderHeights = $probeService->ladderHeightsForSource($sourceHeight);
+            $hlsLadderHeights = $probeService->ladderHeightsForSource($sourceHeight);
+            $mp4LadderHeights = $probeService->mp4LadderHeightsForSource($sourceHeight);
 
-            $result = $transcoder->transcode($sourcePath, $workDir, $ladderHeights);
+            $result = $transcoder->transcode($sourcePath, $workDir, $hlsLadderHeights);
             $s3Prefix = 'videos/'.$this->videoId.'/hls';
 
             $this->uploadHlsArtifacts($s3Prefix, $result['work_dir'], $s3Service);
 
-            $mp4Outputs = $mp4Transcoder->transcode($sourcePath, $mp4Dir, $ladderHeights);
+            $mp4Outputs = $mp4Transcoder->transcode($sourcePath, $mp4Dir, $mp4LadderHeights);
             $this->uploadMp4Artifacts('videos/'.$this->videoId, $mp4Outputs, $s3Service);
 
             $this->maybeExtractPosterFromVideo($video, $sourcePath, $workDir, $posterExtractor, $s3Service);
 
-            $mediaVerifier->assertTranscodeReady($this->videoId, $s3Service);
+            $mediaVerifier->assertTranscodeReady($this->videoId, $s3Service, $mp4LadderHeights);
 
             $hlsKey = VideoMediaService::hlsMasterKey($this->videoId);
             $this->updateTranscodeStatus('ready', $hlsKey);

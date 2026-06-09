@@ -30,14 +30,6 @@ class HealTranscodeQueueCommand extends Command
             $this->info("Cleared {$reserved} zombie reserved transcode jobs");
         }
 
-        $resetFailed = DB::table('videos')
-            ->where('transcode_status', 'failed')
-            ->update(['transcode_status' => 'pending']);
-
-        if ($resetFailed > 0) {
-            $this->info("Reset {$resetFailed} failed videos to pending");
-        }
-
         $queued = (int) Redis::llen($queueKey);
 
         if ($queued > 150) {

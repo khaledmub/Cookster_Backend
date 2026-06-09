@@ -39,17 +39,21 @@ class VideoMediaService
             ];
         }
 
-        $url1080 = null;
-        $key1080 = self::mp4Key($videoId, 1080);
-        if ($s3 === null || $s3->fileExists($key1080)) {
-            $url1080 = CdnUrl::forPath($key1080);
+        return [
+            'url_360' => self::mp4UrlIfExists($videoId, 360, $s3),
+            'url_720' => self::mp4UrlIfExists($videoId, 720, $s3),
+            'url_1080' => self::mp4UrlIfExists($videoId, 1080, $s3),
+        ];
+    }
+
+    private static function mp4UrlIfExists(string $videoId, int $height, ?S3Service $s3): ?string
+    {
+        $key = self::mp4Key($videoId, $height);
+        if ($s3 !== null && ! $s3->fileExists($key)) {
+            return null;
         }
 
-        return [
-            'url_360' => CdnUrl::forPath(self::mp4Key($videoId, 360)),
-            'url_720' => CdnUrl::forPath(self::mp4Key($videoId, 720)),
-            'url_1080' => $url1080,
-        ];
+        return CdnUrl::forPath($key);
     }
 
     public static function resolveStorageKey(?string $stored, ?string $defaultKey = null): ?string
