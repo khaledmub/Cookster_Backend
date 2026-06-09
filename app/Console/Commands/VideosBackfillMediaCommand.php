@@ -8,6 +8,7 @@ use App\Services\S3Service;
 use App\Services\VideoMediaService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 
 class VideosBackfillMediaCommand extends Command
@@ -24,6 +25,15 @@ class VideosBackfillMediaCommand extends Command
     {
         $limit = max(1, (int) $this->option('limit'));
         $dryRun = (bool) $this->option('dry-run');
+
+        if ($this->option('transcode') && ! $this->option('dry-run')) {
+            $queued = (int) Redis::llen('queues:video-processing');
+            if ($queued >= 80) {
+                $this->info("Queue already has {$queued} jobs; skipping dispatch");
+
+                return self::SUCCESS;
+            }
+        }
 
         if (! $this->option('posters') && ! $this->option('transcode')) {
             $this->error('Specify at least one of --posters or --transcode');

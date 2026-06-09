@@ -83,9 +83,14 @@ class AppServiceProvider extends ServiceProvider
         // Array callable — never use Closures here: config:cache uses var_export() and breaks on Closure::__set_state().
         $strip = [self::class, 'stripLegacyAclFromS3Command'];
 
+        // Flysystem's AwsS3V3Adapter forwards before_upload but NOT before_initiate (see
+        // MUP_AVAILABLE_OPTIONS in league/flysystem-aws-s3-v3). Files >= 16MB use multipart
+        // upload, which still sends ACL on CreateMultipartUpload and GCS rejects it.
+        // Force single PutObject uploads (up to 5GB) where before_upload strips ACL.
         $opts = array_merge(config('filesystems.disks.s3.options', []), [
             'before_upload' => $strip,
             'before_initiate' => $strip,
+            'mup_threshold' => 5 * 1024 * 1024 * 1024,
         ]);
 
         config(['filesystems.disks.s3.options' => $opts]);

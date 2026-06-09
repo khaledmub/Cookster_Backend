@@ -40,6 +40,12 @@ class HealTranscodeQueueCommand extends Command
 
         $queued = (int) Redis::llen($queueKey);
 
+        if ($queued > 150) {
+            Redis::del($queueKey, $queueKey.':delayed');
+            $this->warn("Purged bloated queue ({$queued} duplicate jobs)");
+            $queued = 0;
+        }
+
         if ($queued < 10) {
             $limit = max(1, (int) $this->option('dispatch'));
             $this->call('videos:backfill-media', [

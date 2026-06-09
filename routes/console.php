@@ -11,6 +11,12 @@ Artisan::command('inspire', function () {
 Schedule::command('queue:prune-failed --hours=168')->weekly();
 Schedule::command('queue:restart')->dailyAt('04:00');
 
+Schedule::command('transcode:status-report')
+    ->hourly()
+    ->when(fn () => (bool) env('TRANSCODE_STATUS_EMAIL'))
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/transcode-status-report.log'));
+
 // Self-heal zombie reserved jobs, then top up transcode queue.
 Schedule::command('queue:heal-transcode --dispatch=50')
     ->everyFiveMinutes()
@@ -18,9 +24,3 @@ Schedule::command('queue:heal-transcode --dispatch=50')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/transcode-heal.log'));
 
-// Dispatch transcode jobs for videos not yet ready (worker: cookster-transcode.service).
-Schedule::command('videos:backfill-media --transcode --limit=60')
-    ->everyFiveMinutes()
-    ->withoutOverlapping(10)
-    ->onOneServer()
-    ->appendOutputTo(storage_path('logs/transcode-backfill.log'));
