@@ -74,6 +74,10 @@ After every video upload (`POST /api/videos/create`):
 | Endpoint | Serializer |
 |----------|------------|
 | `GET /api/reels` | `ReelResource` |
+| `GET /api/reels?feed=general` | General home tab (default) |
+| `GET /api/reels?feed=near_me&latitude=&longitude=` | Near Me (geo filter + `meta.geo_fallback`) |
+| `GET /api/reels?feed=following` | Following (auth required) |
+| `GET /api/reels?feed=user&user_id=` | Profile reel viewer (optional `video_type`, `anchor_id`) |
 | Profile, list, search, saved/liked, details | `AppHelper::decorateVideoRow()` |
 | `GET /api/videos/processing_status?video_id=` | Full decorated video + status fields |
 

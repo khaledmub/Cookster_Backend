@@ -274,6 +274,12 @@ class ProcessVideoJob implements ShouldQueue
         }
     }
 
+    /**
+     * Guarantee the poster contract: a "ready" video must always have
+     * thumb.webp + thumb_blur.webp on object storage. The source video is
+     * already on disk here, so extract the poster from a real frame whenever
+     * the assets are missing (regardless of cover image / processing_status).
+     */
     private function maybeExtractPosterFromVideo(
         object $video,
         string $sourcePath,
@@ -281,35 +287,24 @@ class ProcessVideoJob implements ShouldQueue
         VideoPosterExtractor $posterExtractor,
         S3Service $s3Service,
     ): void {
-        if (! Schema::hasColumn('videos', 'processing_status')) {
-            return;
+        $posterKey = VideoMediaService::posterKey($this->videoId);
+        $blurKey = VideoMediaService::posterBlurKey($this->videoId);
+
+        $needsPoster = ! $s3Service->fileExists($posterKey) || ! $s3Service->fileExists($blurKey);
+
+        if ($needsPoster) {
+            $posterDir = $workDir.'/poster';
+            $extracted = $posterExtractor->extract($sourcePath, $posterDir);
+
+            $s3Service->storeFileFromPath($posterKey, $extracted['poster'], ['mimetype' => 'image/webp']);
+            $s3Service->storeFileFromPath($blurKey, $extracted['blur'], ['mimetype' => 'image/webp']);
         }
 
-        $processingStatus = (string) ($video->processing_status ?? 'ready');
-        $hasCoverImage = ! empty($video->image);
-
-        if ($hasCoverImage || $processingStatus !== 'processing') {
-            return;
+        if (Schema::hasColumn('videos', 'processing_status')) {
+            DB::table('videos')
+                ->where('id', $this->videoId)
+                ->update(['processing_status' => 'ready']);
         }
-
-        $posterDir = $workDir.'/poster';
-        $extracted = $posterExtractor->extract($sourcePath, $posterDir);
-
-        $s3Service->storeFileFromPath(
-            VideoMediaService::posterKey($this->videoId),
-            $extracted['poster'],
-            ['mimetype' => 'image/webp']
-        );
-
-        $s3Service->storeFileFromPath(
-            VideoMediaService::posterBlurKey($this->videoId),
-            $extracted['blur'],
-            ['mimetype' => 'image/webp']
-        );
-
-        DB::table('videos')
-            ->where('id', $this->videoId)
-            ->update(['processing_status' => 'ready']);
     }
 
     private function mimeForHlsFile(string $filename): string

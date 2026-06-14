@@ -131,6 +131,16 @@ class VideoFeedService
         $nextNormalOffset = $normalOffset + $merge['consumed_normals'];
         $hasMore = count($normalBuffer) > $merge['consumed_normals'];
 
+        if (empty($videos) && ! empty($context['cities_ids']) && empty($context['input']['is_following']) && empty($context['input']['_geo_fallback'])) {
+            $fallback = $request->duplicate();
+            $fallbackInput = $request->all();
+            unset($fallbackInput['city'], $fallbackInput['latitude'], $fallbackInput['longitude']);
+            $fallbackInput['_geo_fallback'] = true;
+            $fallback->replace($fallbackInput);
+
+            return $this->paginatedListUncached($fallback, $user);
+        }
+
         AppHelper::decorateVideoIterable($videos);
 
         $nextCursor = base64_encode(json_encode([
@@ -168,14 +178,35 @@ class VideoFeedService
         $country = 0;
         $cities_ids = [];
 
+        $manualCity = null;
+
         if (isset($input['city']) && $input['city'] != '') {
-            $city = (int) $input['city'];
-        } elseif (isset($input['latitude'], $input['longitude']) && $input['latitude'] != '' && $input['longitude'] != '') {
-            $city = $this->resolveNearestCityId((float) $input['latitude'], (float) $input['longitude']);
+            $manualCity = (int) $input['city'];
         }
 
-        if ($city > 0) {
-            $cities_ids = $this->resolveCityGroupIds($city);
+        if (isset($input['latitude'], $input['longitude']) && $input['latitude'] != '' && $input['longitude'] != '') {
+            $nearMe = FeedSocialCache::nearMeCityIds(
+                (float) $input['latitude'],
+                (float) $input['longitude'],
+                $manualCity
+            );
+            $city = $nearMe['city'];
+            $cities_ids = $nearMe['cities_ids'];
+        } elseif ($manualCity !== null) {
+            $cityRow = DB::table('cities')->where('id', $manualCity)->first(['id', 'latitude', 'longitude']);
+
+            if ($cityRow && $cityRow->latitude !== null && $cityRow->longitude !== null) {
+                $nearMe = FeedSocialCache::nearMeCityIds(
+                    (float) $cityRow->latitude,
+                    (float) $cityRow->longitude,
+                    $manualCity
+                );
+                $city = $nearMe['city'];
+                $cities_ids = $nearMe['cities_ids'];
+            } else {
+                $city = $manualCity;
+                $cities_ids = $this->resolveCityGroupIds($city);
+            }
         }
 
         return compact('city', 'country', 'cities_ids', 'input', 'user');
