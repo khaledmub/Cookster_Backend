@@ -27,6 +27,8 @@ use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
 use App\Services\VideoFeedService;
 use App\Helpers\FeedPaginationHelper;
+use App\Support\PublicUserProfile;
+use App\Support\UsernameService;
 use Mpdf\Mpdf;
 
 class ApiController extends Controller
@@ -34,14 +36,18 @@ class ApiController extends Controller
     public function __construct(private S3Service $s3Service) {}
 
     public function validate_register(Request $request){
-        $validator = Validator::make($request->all(), [
+        if ($request->has('user_name')) {
+            $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
+        }
+
+        $validator = Validator::make($request->all(), array_merge([
             'name' => 'required',
             'email' => 'required|email|unique:front_users,email',
             'phone' => 'nullable|unique:front_users,phone',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
-        ]);
+        ], UsernameService::validationRules()), UsernameService::customMessages());
         // Add conditional validation based on the value of 'entity'
         $validator->sometimes(['business_type', 'contact_phone', 'contact_email', 'location', 'latitude', 'longitude'], ['required'], function ($input) {
             return $input->entity == 2;
@@ -66,15 +72,48 @@ class ApiController extends Controller
             ], 200);
         }
     }
+    public function check_username(Request $request)
+    {
+        if ($request->has('user_name')) {
+            $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
+        }
+
+        $validator = Validator::make(
+            $request->all(),
+            ['user_name' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[a-z0-9_]+$/']],
+            UsernameService::customMessages()
+        );
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => $validator->errors(),
+                'available' => false,
+            ], 422);
+        }
+
+        $ignoreUserId = Auth::guard('sanctum')->user()?->id;
+
+        return response()->json([
+            'status' => true,
+            'available' => UsernameService::isAvailable((string) $request->input('user_name'), $ignoreUserId),
+        ], 200);
+    }
+
     public function register(Request $request){
-        $validator = Validator::make($request->all(), [
+        if ($request->has('user_name')) {
+            $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
+        }
+
+        $validator = Validator::make($request->all(), array_merge([
             'name' => 'required',
             'email' => 'required|email|unique:front_users,email',
             'phone' => 'nullable|unique:front_users,phone',
             'password' => 'required|string|min:8',
             'entity' => 'required',
             'uuid' => 'required',
-        ]);
+        ], UsernameService::validationRules()), UsernameService::customMessages());
         // Add conditional validation based on the value of 'entity'
         $validator->sometimes(['business_type', 'contact_phone', 'contact_email', 'location', 'latitude', 'longitude'], ['required'], function ($input) {
             return $input->entity == 2;
@@ -98,6 +137,7 @@ class ApiController extends Controller
         $front_user_data = [
             'id' => (string) \Str::uuid(),
             'name' => $input['name'],
+            'user_name' => UsernameService::normalize($input['user_name']),
             'email' => $input['email'],
             'phone' => isset($input['phone'])? $input['phone']: NULL,
             'password' => Hash::make($input['password']),
@@ -617,7 +657,7 @@ class ApiController extends Controller
         $user = Auth::user();
 
         // Blocked Users list
-        $blocked_users = DB::table('blocked_users')->leftJoin('front_users', 'front_users.id', '=', 'blocked_users.blocked_user')->where('blocked_users.blocked_by', $user->id)->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image'])->get();
+        $blocked_users = DB::table('blocked_users')->leftJoin('front_users', 'front_users.id', '=', 'blocked_users.blocked_user')->where('blocked_users.blocked_by', $user->id)->select(PublicUserProfile::selectColumns('front_users'))->get();
         AppHelper::decorateUserIterable($blocked_users);
             
         $return_data = array(
@@ -635,13 +675,13 @@ class ApiController extends Controller
             ->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')
             ->where('followers.following_id', $user_id)
             ->where('front_users.is_soft_delete', 0)
-            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
+            ->select(PublicUserProfile::selectColumns('front_users'));
 
         $followingQuery = DB::table('followers')
             ->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')
             ->where('followers.follower_id', $user_id)
             ->where('front_users.is_soft_delete', 0)
-            ->select(['front_users.id', 'front_users.name', 'front_users.email', 'front_users.image']);
+            ->select(PublicUserProfile::selectColumns('front_users'));
 
         if ($request->input('paginate') == 1) {
             $followers = (clone $followersQuery)->skip($start)->take($length)->get();
@@ -830,6 +870,25 @@ class ApiController extends Controller
         //         'errors' => $validator->errors(),
         //     ], 422);
         // }
+        if ($request->has('user_name')) {
+            $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
+
+            $usernameValidator = Validator::make(
+                $request->only('user_name'),
+                UsernameService::validationRules($user->id, true),
+                UsernameService::customMessages()
+            );
+
+            if ($usernameValidator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => $usernameValidator->errors(),
+                ], 422);
+            }
+
+            $user->user_name = $request->input('user_name');
+        }
         if($request->input('name')){
             $user->name = $request->input('name');
         }
@@ -1499,7 +1558,7 @@ class ApiController extends Controller
             } else {
                 $query2->orderBy('v.created_at', 'desc');
             }
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.user_name as creator_handle', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         if($input['type']==2){
             // $query=DB::table('front_users as ba');
@@ -1599,7 +1658,7 @@ class ApiController extends Controller
             } else {
                 $query2->orderBy('v.created_at', 'desc');
             }
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.user_name as creator_handle', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         if($input['type']==3){
             // $query=DB::table('front_users as ca');
@@ -1678,7 +1737,7 @@ class ApiController extends Controller
             } else {
                 $query2->orderBy('v.created_at', 'desc');
             }
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.user_name as creator_handle', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         else if($input['type']==4){
             $query=DB::table('videos as v');
@@ -1755,15 +1814,11 @@ class ApiController extends Controller
             } else {
                 $query2->orderBy('v.created_at', 'desc');
             }
-            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.email as user_email', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
+            $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.user_name as creator_handle', 'u.image as user_image', 'ba.contact_phone', 'ba.contact_email', 'ba.website', 'ba.location', 'ba.latitude', 'ba.longitude', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'), DB::raw('COALESCE(following.following_count, 0) as following_count')])->get();
         }
         else if($input['type']==6){
             $query=DB::table('front_users');
-            $query->where(function ($q) use ($keywords){
-                $q->where('name', 'LIKE', '%'.$keywords.'%');
-                $q->orWhere('email', 'LIKE', '%'.$keywords.'%');
-                $q->orWhere('phone', 'LIKE', '%'.$keywords.'%');
-            });
+            PublicUserProfile::applyNameOrUsernameSearch($query, $keywords);
 
             if($user && isset($input['is_following']) && $input['is_following'] == 1){
                 $query->whereIn('id', $followingIds);
@@ -1791,7 +1846,8 @@ class ApiController extends Controller
             $query2 = clone $query;
             $totalData = $query1->select(['id'])->count();
             $query2->offset($start)->limit($length)->orderBy('id', 'desc');
-            $users = $query2->select(['*'])->get();
+            $users = $query2->select(PublicUserProfile::selectColumns('front_users'))->get();
+            AppHelper::decorateUserIterable($users);
         }
         else if($input['type']==7){
             $avgSubquery = DB::table('user_reviews')
@@ -1809,9 +1865,7 @@ class ApiController extends Controller
                   ->orWhere('ad.business_type', 0); 
             });
             $query->where(function ($q) use ($keywords){
-                $q->where('ba.name', 'LIKE', '%'.$keywords.'%');
-                $q->orWhere('ba.email', 'LIKE', '%'.$keywords.'%');
-                $q->orWhere('ba.phone', 'LIKE', '%'.$keywords.'%');
+                PublicUserProfile::applyNameOrUsernameSearch($q, $keywords, 'ba');
                 $q->orWhere('ad.contact_phone', 'LIKE', '%'.$keywords.'%');
                 $q->orWhere('ad.contact_email', 'LIKE', '%'.$keywords.'%');
                 $q->orWhere('ad.website', 'LIKE', '%'.$keywords.'%');
@@ -1847,7 +1901,11 @@ class ApiController extends Controller
             $query2 = clone $query;
             $totalData = $query1->select(['ba.id'])->count();
             $query2->offset($start)->limit($length)->orderBy('ba.id', 'desc');
-            $business_accounts = $query2->select(['ba.*', 'ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name'])->get();
+            $business_accounts = $query2->select(array_merge(
+                PublicUserProfile::selectColumns('ba'),
+                ['ad.contact_phone', 'ad.contact_email', 'ad.website', 'ad.location', 'ad.latitude', 'ad.longitude', 'business_type_description.name as business_type_name']
+            ))->get();
+            AppHelper::decorateUserIterable($business_accounts);
         }
 
         if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
@@ -1903,7 +1961,14 @@ class ApiController extends Controller
 
         $input = $request->all();
         $language = App::getLocale();
-        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.*', 'c.name as country_name', 'ct.name as city_name')->first();
+        $user = DB::table('front_users as u')->leftJoin('countries as c', 'c.id', '=', 'u.country')->leftJoin('cities as ct', 'ct.id', '=', 'u.city')->where('u.id', $request->id)->select('u.id', 'u.name', 'u.user_name', 'u.image', 'u.cover_image', 'u.entity', 'u.country', 'u.city', 'u.dob', 'u.status', 'c.name as country_name', 'ct.name as city_name')->first();
+        if (! $user) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.user_not_found'),
+            ], 404);
+        }
+        AppHelper::decorateUserRow($user);
         $additional_data = array();
         if($user->entity==2){
             $additional_data = DB::table('business_account_additional_data as b')->leftJoin('generic_key_values_description as bt', 'bt.value_id', '=', 'b.business_type')->join('site_languages as key_language', 'bt.language_id', '=', 'key_language.id')->where('key_language.code', $language)->where('b.front_user_id', $user->id)->select('b.*', 'bt.name as business_type_name')->first();
@@ -1945,12 +2010,6 @@ class ApiController extends Controller
         $followers = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.follower_id')->where('followers.following_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of followers
         $following = DB::table('followers')->leftJoin('front_users', 'front_users.id', '=', 'followers.following_id')->where('followers.follower_id', $user->id)->where('front_users.is_soft_delete', 0)->count(); // Count of following
 
-        $total_amount = 0;
-        $settings = DB::table('settings')->where('id', 1)->select(['loyalty_points_exchange_rate'])->first();
-        if($user && $settings){
-            $total_amount = $user->total_loyalty_points / $settings->loyalty_points_exchange_rate;
-        }
-
         return response()->json([
             'status' => true,
             'user' => $user,
@@ -1958,7 +2017,6 @@ class ApiController extends Controller
             'video_types' => $video_types,
             'followers' => $followers,
             'following' => $following,
-            'total_amount' => number_format($total_amount, 2)
         ], 200);
     }
 
@@ -2738,7 +2796,13 @@ class ApiController extends Controller
         }
     }
     public function saved_videos_list(Request $request){
-        $user = Auth::user();
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
         $input = $request->all();
         $pagination = FeedPaginationHelper::resolve($request);
         extract($pagination);
@@ -2813,8 +2877,9 @@ class ApiController extends Controller
         $videos = [];
         $totalData = 0;
 
-        if(isset($input['video_ids']) && $input['video_ids'] != ''){
-            $video_ids = explode(',', $input['video_ids']);
+        $videoIds = $this->normalizeVideoIdsInput($input['video_ids'] ?? null);
+
+        if (! empty($videoIds)) {
             
             $query=DB::table('videos as v');
             $query->join('front_users as u', 'u.id', '=', 'v.front_user_id');
@@ -2856,7 +2921,7 @@ class ApiController extends Controller
             }
             $query->where('v.status', 1);
             $query->where('v.is_soft_delete', 0);
-            $query->whereIn('v.id', $video_ids);
+            $query->whereIn('v.id', $videoIds);
             $query->distinct();
 
             $query1 = clone $query;
@@ -2876,11 +2941,44 @@ class ApiController extends Controller
             'status' => true,
             'videos' => $videos,
         ];
-        if ($paginate && isset($input['video_ids']) && $input['video_ids'] != '') {
+        if ($paginate && ! empty($videoIds)) {
             $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
         }
 
         return response()->json($response, 200);
+    }
+
+    /**
+     * Accept comma-separated string or JSON array for liked video IDs.
+     *
+     * @return list<string>
+     */
+    private function normalizeVideoIdsInput(mixed $raw): array
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return [];
+        }
+
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map(
+                static fn ($id) => trim((string) $id),
+                $raw
+            ), static fn ($id) => $id !== ''));
+        }
+
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return $this->normalizeVideoIdsInput($decoded);
+            }
+
+            return array_values(array_filter(array_map(
+                'trim',
+                explode(',', $raw)
+            ), static fn ($id) => $id !== ''));
+        }
+
+        return [trim((string) $raw)];
     }
 
     public function nearest_business_accounts(Request $request){
@@ -3030,7 +3128,8 @@ class ApiController extends Controller
         }
 
         $query->orderBy('u.name', 'ASC');
-        $b2b_accounts_list = $query->select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.image'])->get();
+        $b2b_accounts_list = $query->select(PublicUserProfile::selectColumns('u'))->get();
+        AppHelper::decorateUserIterable($b2b_accounts_list);
 
         return response()->json([
             'status' => true,
@@ -3049,7 +3148,11 @@ class ApiController extends Controller
         $query->where('u.status', 1);
         $query->where('u.is_soft_delete', 0);
         $query->orderBy('u.name', 'ASC');
-        $accounts = $query->select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.image', 'bt.name as business_type_name'])->get();
+        $accounts = $query->select(array_merge(
+            PublicUserProfile::selectColumns('u'),
+            ['bt.name as business_type_name']
+        ))->get();
+        AppHelper::decorateUserIterable($accounts);
 
         $grouped = $accounts->groupBy('business_type_name');
 

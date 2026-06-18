@@ -16,7 +16,9 @@ class FrontUser extends Authenticatable
     protected $fillable = [
         'id',
         'name',
+        'user_name',
         'email',
+        'email_verified_at',
         'phone',
         'password',
         'dob',
@@ -39,4 +41,11 @@ class FrontUser extends Authenticatable
     protected $hidden = [
         'password'
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+        ];
+    }
 }

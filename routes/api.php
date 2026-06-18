@@ -27,6 +27,7 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/registration_settings', [ApiController::class, 'registration_settings']);
     Route::post('/register', [ApiController::class, 'register']);
     Route::post('/validate_register', [ApiController::class, 'validate_register']);
+    Route::post('/check_username', [ApiController::class, 'check_username']);
     Route::post('/verify_registration_otp', [ApiController::class, 'verify_registration_otp']);
     Route::post('/resend_registration_otp', [ApiController::class, 'resend_registration_otp']);
     Route::post('/login', [ApiController::class, 'login']);

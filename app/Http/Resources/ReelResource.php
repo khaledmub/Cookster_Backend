@@ -28,7 +28,7 @@ class ReelResource extends JsonResource
         $hlsKey = VideoMediaService::resolveHlsKey($this->hls_url ?? null, (string) $this->id, $isHlsReady);
 
         $cdn = app(CdnService::class);
-        $videoUrl = CdnUrl::forPath($originalKey);
+        $videoUrl = $isHlsReady && $originalKey ? CdnUrl::forPath($originalKey) : null;
         $hlsPlaylistUrl = $hlsKey ? CdnUrl::forPath($hlsKey) : null;
         $thumbnailUrl = VideoMediaService::resolvePosterUrl(
             (string) $this->id,
@@ -39,9 +39,15 @@ class ReelResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description,
+            'tags' => $this->tags,
+            'menu' => $this->menu,
+            'publish_type' => (int) ($this->publish_type ?? 0),
+            'video_type' => (int) ($this->video_type ?? 0),
             'video' => $videoUrl,
             'video_url' => $videoUrl,
-            'video_url_direct' => $cdn->directUrlForPath($originalKey),
+            'video_url_direct' => $isHlsReady ? $cdn->directUrlForPath($originalKey) : null,
             'hls_url' => $hlsPlaylistUrl,
             'hls_playlist_url' => $hlsPlaylistUrl,
             'hls_url_direct' => $isHlsReady ? $cdn->directUrlForPath($hlsKey) : null,
@@ -56,11 +62,13 @@ class ReelResource extends JsonResource
             ),
             'transcode_status' => $transcodeStatus,
             'processing_status' => $processingStatus !== '' ? $processingStatus : ($isHlsReady ? 'ready' : 'processing'),
+            'playback_ready' => $isHlsReady,
             'likes_count' => (int) ($this->likes_count ?? 0),
             'comments_count' => (int) ($this->comments_count ?? 0),
             'user' => $this->whenLoaded('user', fn () => [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
+                'user_name' => $this->user->user_name ?? null,
                 'image' => \App\Helpers\AppHelper::userImageUrl($this->user->image ? (string) $this->user->image : null),
             ]),
         ];

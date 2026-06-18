@@ -128,7 +128,7 @@ class ReelsController extends Controller
 
         $query = Video::query()
             ->select('videos.*')
-            ->with(['user:id,name,image'])
+            ->with(['user:id,name,user_name,image'])
             ->withCount([
                 'comments as comments_count' => fn ($q) => $q->where('status', 1),
                 'saves as likes_count' => fn ($q) => $q->where('status', 1),
@@ -138,6 +138,19 @@ class ReelsController extends Controller
             ->whereNotNull('videos.video')
             ->where('videos.video', '!=', '')
             ->whereIn('videos.publish_type', [1, 2]);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+            if ($feed === self::FEED_USER) {
+                // Owner may see processing tiles (poster only); visitors get ready videos only.
+                $viewerId = $viewer !== null ? (string) $viewer->id : null;
+                $profileUserId = $feedContext['user_id'] ?? null;
+                if ($viewerId === null || $profileUserId === null || $viewerId !== (string) $profileUserId) {
+                    $query->where('videos.transcode_status', 'ready');
+                }
+            } else {
+                $query->where('videos.transcode_status', 'ready');
+            }
+        }
 
         if ($viewer) {
             $blockedIds = FeedSocialCache::blockedUserIds($viewer->id);

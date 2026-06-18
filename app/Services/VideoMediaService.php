@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\CookCache;
 use App\Support\CdnUrl;
 
 class VideoMediaService
@@ -39,6 +40,8 @@ class VideoMediaService
             ];
         }
 
+        $s3 ??= app(S3Service::class);
+
         return [
             'url_360' => self::mp4UrlIfExists($videoId, 360, $s3),
             'url_720' => self::mp4UrlIfExists($videoId, 720, $s3),
@@ -46,10 +49,17 @@ class VideoMediaService
         ];
     }
 
-    private static function mp4UrlIfExists(string $videoId, int $height, ?S3Service $s3): ?string
+    private static function mp4UrlIfExists(string $videoId, int $height, S3Service $s3): ?string
     {
         $key = self::mp4Key($videoId, $height);
-        if ($s3 !== null && ! $s3->fileExists($key)) {
+
+        $exists = CookCache::remember(
+            'video:mp4_exists:'.$videoId.':'.$height,
+            [300, 3600],
+            fn () => $s3->fileExists($key)
+        );
+
+        if (! $exists) {
             return null;
         }
 

@@ -373,17 +373,33 @@ class AppHelper
 
         $v->hls_url = $v->hls_playlist_url ?? null;
 
+        $v->playback_ready = $isHlsReady;
+        if (! $isHlsReady) {
+            // Do not expose the raw upload MP4 while transcoding — MTK/MediaKit often
+            // decodes audio but fails to render (renderFps=0). Posters + status fields only.
+            $v->video_url = null;
+            $v->video_url_direct = null;
+            $v->hls_playlist_url = null;
+            $v->hls_playlist_url_direct = null;
+            $v->hls_url = null;
+            $v->video_sources = ['url_360' => null, 'url_720' => null, 'url_1080' => null];
+        }
+
         if (isset($v->user_image)) {
             $v->user_image_url = self::userImageUrl((string) $v->user_image);
         }
 
         $useAbsolute = (bool) config('filesystems.disks.s3.api_media_absolute_urls', true);
         if (! $useAbsolute) {
+            if (! $isHlsReady) {
+                $v->video = null;
+            }
+
             return;
         }
 
         if ($pathVideo !== '' && ! str_starts_with($pathVideo, 'http://') && ! str_starts_with($pathVideo, 'https://')) {
-            $v->video = $v->video_url;
+            $v->video = $isHlsReady ? $v->video_url : null;
         }
         if ($pathImage !== '' && ! str_starts_with($pathImage, 'http://') && ! str_starts_with($pathImage, 'https://')) {
             $v->image = $v->image_url;
