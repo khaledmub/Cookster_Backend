@@ -50,7 +50,7 @@ class VideoPosterExtractor
             $ffmpeg,
             '-y',
             '-i', $posterPath,
-            '-vf', 'scale=32:32:force_original_aspect_ratio=increase,crop=32:32',
+            '-vf', 'scale=24:24:force_original_aspect_ratio=increase,crop=24:24',
             '-c:v', 'libwebp',
             '-quality', '60',
             $blurPath,

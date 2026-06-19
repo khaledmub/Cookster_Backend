@@ -66,8 +66,22 @@ After every video upload (`POST /api/videos/create`):
    - HLS: `videos/{id}/hls/master.m3u8` + segments
    - MP4: `videos/{id}/360.mp4`, `720.mp4`, `1080.mp4`
    - Poster from cover image (`ProcessVideoThumbnailJob`) **or** first video frame when no cover
-2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + 360p + 720p exist on object storage.
-3. Until ready: `transcode_status: "pending"`, `processing_status: "processing"`, return `thumbnail_url` / `image_url` where available.
+2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + required MP4 ladder (360 + 720 when source resolution allows) + `thumb.webp` + `thumb_blur.webp` exist on object storage.
+3. Until ready: `transcode_status: "pending"`, `processing_status: "processing"`, return `thumbnail_url` / `image_url` where available. **No** raw upload MP4 or phantom ladder URLs.
+
+### MP4 ladder (mobile preload contract)
+
+| File | Resolution | Encoding |
+|------|------------|----------|
+| `360.mp4` | 360p | H.264 main, `-movflags +faststart`, GOP ~2s (`FFMPEG_GOP_SIZE=48`) |
+| `720.mp4` | 720p | Same (required when source height ≥ ~612px) |
+| `1080.mp4` | — | HLS-only (not separate MP4 unless configured) |
+
+`video_sources` only includes URLs for files that **exist on CDN** (no phantom `url_720`).
+
+### HLS encoding
+
+- Segment duration: **2 s** default (`FFMPEG_HLS_SEGMENT_SECONDS=2`)
 
 ### API endpoints
 
@@ -97,7 +111,7 @@ After every video upload (`POST /api/videos/create`):
 
 ### HLS encoding
 
-- Segment duration: 2–4 s (`FFMPEG_HLS_SEGMENT_SECONDS`, default 3)
+- Segment duration: 2–4 s (`FFMPEG_HLS_SEGMENT_SECONDS`, default **2**)
 - Variants: 360p + 720p + 1080p in master playlist
 - Audio: AAC (Android MediaKit / ExoPlayer compatible)
 - First segment at t=0 (`-ss 0` for frame-based posters; HLS independent segments)
@@ -127,8 +141,31 @@ After every video upload (`POST /api/videos/create`):
 # Queue workers (both queues required for cover-image posters)
 php artisan queue:work --queue=video-processing,default --timeout=7200
 
-# Backfill legacy videos
+# Backfill legacy videos (missing transcode)
 php artisan videos:backfill-media --posters --transcode --limit=20
+
+# Re-encode ready videos missing 720.mp4 fast-start or thumb_blur.webp (no transcode_status flip)
+php artisan videos:backfill-media --upgrade-ladder --limit=500
+
+# Re-mux existing 360/720 MP4s with moov before mdat (transcode_status stays ready)
+php artisan videos:backfill-media --reencode-faststart --limit=500
+
+# Validate CDN + API contract on random sample
+php artisan videos:validate-media --sample=10 --api-check
+```
+
+### Mobile smooth-playback validation (per video)
+
+```bash
+# moov before mdat (fast-start)
+ffprobe -v error -show_format videos/{id}/360.mp4
+
+# Range support on CDN
+curl -I "https://cdn.cookster.org/videos/{id}/360.mp4"
+curl -H "Range: bytes=0-262143" -I "https://cdn.cookster.org/videos/{id}/360.mp4"  # expect 206
+
+# API must not advertise missing tiers
+curl -s "https://cookster.org/api/reels?feed=user&user_id=..." | jq '.data[0].video_sources'
 ```
 
 See also: [CDN_MEDIA.md](./CDN_MEDIA.md), [PERFORMANCE_DEPLOYMENT.md](./PERFORMANCE_DEPLOYMENT.md).

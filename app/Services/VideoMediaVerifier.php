@@ -36,7 +36,7 @@ class VideoMediaVerifier
     }
 
     /**
-     * MP4 heights required for "ready". HLS master carries 720/1080; only MP4 fallbacks listed here.
+     * MP4 heights required for "ready". Mobile preloads 360 + 720 fast-start MP4.
      *
      * @return list<int>
      */
@@ -46,7 +46,25 @@ class VideoMediaVerifier
             return array_values(array_unique(array_map('intval', $mp4LadderHeights)));
         }
 
-        return [360];
+        $configured = config('ffmpeg.mp4_ladder_heights');
+        $heights = is_array($configured) && $configured !== []
+            ? array_map('intval', $configured)
+            : [360, 720];
+
+        return array_values(array_unique(array_filter($heights, static fn (int $h) => $h > 0)));
+    }
+
+    /**
+     * Poster keys required before transcode_status may be set to "ready".
+     *
+     * @return list<string>
+     */
+    public static function requiredPosterKeys(string $videoId): array
+    {
+        return [
+            VideoMediaService::posterKey($videoId),
+            VideoMediaService::posterBlurKey($videoId),
+        ];
     }
 
     /**
@@ -58,6 +76,12 @@ class VideoMediaVerifier
         $missing = [];
 
         foreach (self::requiredTranscodeKeys($videoId, $mp4Heights) as $key) {
+            if (! $s3Service->fileExists($key)) {
+                $missing[] = $key;
+            }
+        }
+
+        foreach (self::requiredPosterKeys($videoId) as $key) {
             if (! $s3Service->fileExists($key)) {
                 $missing[] = $key;
             }

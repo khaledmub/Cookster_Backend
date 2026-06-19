@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 class VideoMp4Transcoder
 {
     private const VARIANTS = [
-        360 => ['height' => 360, 'video_kbps' => 600, 'audio_kbps' => 64],
+        360 => ['height' => 360, 'video_kbps' => 600, 'audio_kbps' => 96],
         720 => ['height' => 720, 'video_kbps' => 2500, 'audio_kbps' => 128],
         1080 => ['height' => 1080, 'video_kbps' => 5000, 'audio_kbps' => 192],
     ];
@@ -31,8 +31,10 @@ class VideoMp4Transcoder
         $heights = $ladderHeights ?? array_keys(self::VARIANTS);
         $ffmpeg = (string) config('ffmpeg.ffmpeg.binaries', '/usr/bin/ffmpeg');
         $timeout = (int) config('ffmpeg.timeout', 7200);
-        $preset = (string) config('ffmpeg.preset', 'veryfast');
+        $preset = (string) config('ffmpeg.preset', 'fast');
         $threads = (int) config('ffmpeg.threads', 0);
+        $gop = max(1, (int) config('ffmpeg.gop_size', 48));
+        $profile = (string) config('ffmpeg.video_profile', 'main');
         $outputs = [];
 
         foreach ($heights as $height) {
@@ -49,8 +51,12 @@ class VideoMp4Transcoder
                 '-i', $sourcePath,
                 '-vf', 'scale=-2:'.$variant['height'],
                 '-c:v', 'libx264',
+                '-profile:v', $profile,
                 '-preset', $preset,
                 '-b:v', (string) $variant['video_kbps'].'k',
+                '-g', (string) $gop,
+                '-keyint_min', (string) $gop,
+                '-sc_threshold', '0',
                 '-c:a', 'aac',
                 '-b:a', (string) $variant['audio_kbps'].'k',
                 '-movflags', '+faststart',

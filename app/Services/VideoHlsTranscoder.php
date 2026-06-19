@@ -48,9 +48,11 @@ class VideoHlsTranscoder
             throw new RuntimeException('Unable to create HLS work directory: '.$workDir);
         }
 
-        $segmentSeconds = (int) config('ffmpeg.hls_segment_seconds', 6);
-        $preset = (string) config('ffmpeg.preset', 'veryfast');
+        $segmentSeconds = (int) config('ffmpeg.hls_segment_seconds', 2);
+        $preset = (string) config('ffmpeg.preset', 'fast');
         $threads = (int) config('ffmpeg.threads', 0);
+        $gop = max(1, (int) config('ffmpeg.gop_size', 48));
+        $profile = (string) config('ffmpeg.video_profile', 'main');
 
         $heights = $ladderHeights ?? [360, 720, 1080];
         $renditionMeta = [];
@@ -65,7 +67,11 @@ class VideoHlsTranscoder
 
             $extra = [
                 '-vf', 'scale=-2:'.$variant['height'],
+                '-profile:v', $profile,
                 '-preset', $preset,
+                '-g', (string) $gop,
+                '-keyint_min', (string) $gop,
+                '-sc_threshold', '0',
                 '-f', 'hls',
                 '-hls_time', (string) $segmentSeconds,
                 '-hls_list_size', '0',

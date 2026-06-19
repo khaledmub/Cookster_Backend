@@ -66,6 +66,14 @@ class VideoMediaService
         return CdnUrl::forPath($key);
     }
 
+    /** Bust cached existence checks after upload/re-transcode. */
+    public static function forgetMp4ExistsCache(string $videoId): void
+    {
+        foreach ([360, 720, 1080] as $height) {
+            CookCache::forget('video:mp4_exists:'.$videoId.':'.$height);
+        }
+    }
+
     public static function resolveStorageKey(?string $stored, ?string $defaultKey = null): ?string
     {
         if ($stored === null || trim($stored) === '') {

@@ -109,6 +109,7 @@ class ProcessVideoJob implements ShouldQueue
 
             $mp4Outputs = $mp4Transcoder->transcode($sourcePath, $mp4Dir, $mp4LadderHeights);
             $this->uploadMp4Artifacts('videos/'.$this->videoId, $mp4Outputs, $s3Service);
+            VideoMediaService::forgetMp4ExistsCache($this->videoId);
 
             $this->maybeExtractPosterFromVideo($video, $sourcePath, $workDir, $posterExtractor, $s3Service);
 
