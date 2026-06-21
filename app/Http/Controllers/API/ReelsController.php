@@ -145,10 +145,16 @@ class ReelsController extends Controller
                 $viewerId = $viewer !== null ? (string) $viewer->id : null;
                 $profileUserId = $feedContext['user_id'] ?? null;
                 if ($viewerId === null || $profileUserId === null || $viewerId !== (string) $profileUserId) {
-                    $query->where('videos.transcode_status', 'ready');
+                    $query->where(function ($q) {
+                        $q->where('videos.transcode_status', 'ready')
+                            ->orWhere('videos.is_image', 1);
+                    });
                 }
             } else {
-                $query->where('videos.transcode_status', 'ready');
+                $query->where(function ($q) {
+                    $q->where('videos.transcode_status', 'ready')
+                        ->orWhere('videos.is_image', 1);
+                });
             }
         }
 

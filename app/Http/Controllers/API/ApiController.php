@@ -2281,6 +2281,7 @@ class ApiController extends Controller
             'thumbnail_url' => $video->thumbnail_url ?? null,
             'thumbnail_blur' => $video->thumbnail_blur ?? null,
             'image_url' => $video->image_url ?? null,
+            'is_image' => AppHelper::normalizeIsImage($video),
             'video' => $video,
         ];
 

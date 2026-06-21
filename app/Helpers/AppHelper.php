@@ -317,6 +317,27 @@ class AppHelper
     }
 
     /**
+     * Mobile contract: is_image is 1 for photo posts, 0 for video.
+     */
+    public static function normalizeIsImage(object $v): int
+    {
+        if (isset($v->is_image) && ($v->is_image === true || $v->is_image === 1 || $v->is_image === '1')) {
+            return 1;
+        }
+
+        $image = isset($v->image) ? trim((string) $v->image) : '';
+        $video = isset($v->video) ? trim((string) $v->video) : '';
+
+        if ($image !== '' && \App\Services\VideoMediaService::isStaticImageFilename($image)) {
+            if ($video === '' || \App\Services\VideoMediaService::isStaticImageFilename($video)) {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
      * Add video_url / image_url / thumbnail_url and optionally rewrite video & image to absolute URLs
      * so mobile players that pass the field straight to VideoPlayer/Image.network work with GCS.
      *
@@ -330,6 +351,9 @@ class AppHelper
         $videoId = isset($v->id) ? (string) $v->id : '';
         $transcodeStatus = isset($v->transcode_status) ? (string) $v->transcode_status : 'pending';
         $processingStatus = isset($v->processing_status) ? (string) $v->processing_status : null;
+        $isImage = self::normalizeIsImage($v);
+        $v->is_image = $isImage;
+        $isPhotoPost = $isImage === 1;
         $isHlsReady = $transcodeStatus === 'ready';
 
         $videoKey = $pathVideo !== ''
@@ -348,33 +372,67 @@ class AppHelper
         $v->thumbnail_blur = $videoId !== ''
             ? \App\Services\VideoMediaService::resolvePosterBlurUrl($videoId, $processingStatus)
             : null;
-        $v->transcode_status = $transcodeStatus;
-        $v->processing_status = $processingStatus ?? ($isHlsReady ? 'ready' : 'processing');
-        $v->video_sources = $videoId !== ''
-            ? \App\Services\VideoMediaService::videoSources($videoId, $isHlsReady)
-            : ['url_360' => null, 'url_720' => null, 'url_1080' => null];
 
-        $hlsKey = $videoId !== ''
-            ? \App\Services\VideoMediaService::resolveHlsKey(isset($v->hls_url) ? (string) $v->hls_url : null, $videoId, $isHlsReady)
-            : null;
+        if ($isPhotoPost) {
+            $fullImageUrl = \App\Services\VideoMediaService::resolvePhotoFullImageUrl(
+                $pathImage !== '' ? $pathImage : null,
+                $pathVideo !== '' ? $pathVideo : null,
+            );
+            $photoThumbUrl = \App\Services\VideoMediaService::resolvePhotoThumbnailUrl(
+                $pathImage !== '' ? $pathImage : null,
+            );
 
-        if (config('cdn.expose_direct_urls')) {
-            $v->video_url_direct = $videoKey ? $cdn->directUrlForPath($videoKey) : null;
-            $v->image_url_direct = $imageKey ? $cdn->directUrlForPath($imageKey) : null;
-            $posterKey = ($processingStatus ?? '') === 'ready' && $videoId !== ''
-                ? \App\Services\VideoMediaService::posterKey($videoId)
-                : null;
-            $v->thumbnail_url_direct = $posterKey ? $cdn->directUrlForPath($posterKey) : null;
-            $v->hls_playlist_url = $hlsKey ? $cdn->urlForPath($hlsKey) : null;
-            $v->hls_playlist_url_direct = $hlsKey ? $cdn->directUrlForPath($hlsKey) : null;
-        } else {
-            $v->hls_playlist_url = $hlsKey ? $cdn->urlForPath($hlsKey) : null;
+            $v->video_url = $fullImageUrl;
+            $v->image_url = $fullImageUrl;
+            $v->thumbnail_url = $photoThumbUrl ?? $fullImageUrl;
+            $v->thumbnail = $v->thumbnail_url;
+            $v->video_sources = ['url_360' => null, 'url_720' => null, 'url_1080' => null];
+            $v->hls_playlist_url = null;
+            $v->hls_url = null;
+            if (config('cdn.expose_direct_urls')) {
+                $photoKey = $pathImage !== ''
+                    ? (str_starts_with($pathImage, 'videos/') ? $pathImage : 'videos/'.$pathImage)
+                    : null;
+                $v->video_url_direct = $photoKey ? $cdn->directUrlForPath($photoKey) : null;
+                $v->image_url_direct = $v->video_url_direct;
+                $v->hls_playlist_url_direct = null;
+                if ($photoThumbUrl !== null && $pathImage !== '') {
+                    $thumbBasename = basename(str_replace('\\', '/', $pathImage));
+                    $v->thumbnail_url_direct = $cdn->directUrlForPath('videos/thumbnail/'.$thumbBasename);
+                }
+            }
         }
 
-        $v->hls_url = $v->hls_playlist_url ?? null;
+        $v->transcode_status = $transcodeStatus;
+        $v->processing_status = $processingStatus ?? ($isHlsReady ? 'ready' : 'processing');
 
-        $v->playback_ready = $isHlsReady;
-        if (! $isHlsReady) {
+        if (! $isPhotoPost) {
+            $v->video_sources = $videoId !== ''
+                ? \App\Services\VideoMediaService::videoSources($videoId, $isHlsReady)
+                : ['url_360' => null, 'url_720' => null, 'url_1080' => null];
+
+            $hlsKey = $videoId !== ''
+                ? \App\Services\VideoMediaService::resolveHlsKey(isset($v->hls_url) ? (string) $v->hls_url : null, $videoId, $isHlsReady)
+                : null;
+
+            if (config('cdn.expose_direct_urls')) {
+                $v->video_url_direct = $videoKey ? $cdn->directUrlForPath($videoKey) : null;
+                $v->image_url_direct = $imageKey ? $cdn->directUrlForPath($imageKey) : null;
+                $posterKey = ($processingStatus ?? '') === 'ready' && $videoId !== ''
+                    ? \App\Services\VideoMediaService::posterKey($videoId)
+                    : null;
+                $v->thumbnail_url_direct = $posterKey ? $cdn->directUrlForPath($posterKey) : null;
+                $v->hls_playlist_url = $hlsKey ? $cdn->urlForPath($hlsKey) : null;
+                $v->hls_playlist_url_direct = $hlsKey ? $cdn->directUrlForPath($hlsKey) : null;
+            } else {
+                $v->hls_playlist_url = $hlsKey ? $cdn->urlForPath($hlsKey) : null;
+            }
+
+            $v->hls_url = $v->hls_playlist_url ?? null;
+        }
+
+        $v->playback_ready = $isPhotoPost || $isHlsReady;
+        if (! $isHlsReady && ! $isPhotoPost) {
             // Do not expose the raw upload MP4 while transcoding — MTK/MediaKit often
             // decodes audio but fails to render (renderFps=0). Posters + status fields only.
             $v->video_url = null;
@@ -391,7 +449,7 @@ class AppHelper
 
         $useAbsolute = (bool) config('filesystems.disks.s3.api_media_absolute_urls', true);
         if (! $useAbsolute) {
-            if (! $isHlsReady) {
+            if (! $isHlsReady && ! $isPhotoPost) {
                 $v->video = null;
             }
 
@@ -399,7 +457,11 @@ class AppHelper
         }
 
         if ($pathVideo !== '' && ! str_starts_with($pathVideo, 'http://') && ! str_starts_with($pathVideo, 'https://')) {
-            $v->video = $isHlsReady ? $v->video_url : null;
+            if ($isPhotoPost) {
+                $v->video = $v->video_url;
+            } else {
+                $v->video = ($isHlsReady || $isPhotoPost) ? $v->video_url : null;
+            }
         }
         if ($pathImage !== '' && ! str_starts_with($pathImage, 'http://') && ! str_starts_with($pathImage, 'https://')) {
             $v->image = $v->image_url;

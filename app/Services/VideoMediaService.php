@@ -145,6 +145,54 @@ class VideoMediaService
         return CdnUrl::forPath($key);
     }
 
+    public static function isStaticImageFilename(?string $filename): bool
+    {
+        if ($filename === null || trim($filename) === '') {
+            return false;
+        }
+
+        $ext = strtolower(pathinfo(basename(str_replace('\\', '/', trim($filename))), PATHINFO_EXTENSION));
+
+        return in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
+    }
+
+    /**
+     * Full-resolution photo URL for is_image posts (videos/{cover}.jpg).
+     */
+    public static function resolvePhotoFullImageUrl(?string $imageFilename, ?string $videoFilename = null): ?string
+    {
+        if ($imageFilename !== null && trim($imageFilename) !== '' && self::isStaticImageFilename($imageFilename)) {
+            return self::resolveCoverImageUrl($imageFilename);
+        }
+
+        if ($videoFilename !== null && trim($videoFilename) !== '' && self::isStaticImageFilename($videoFilename)) {
+            return self::resolveCoverImageUrl($videoFilename);
+        }
+
+        if ($imageFilename !== null && trim($imageFilename) !== '') {
+            return self::resolveCoverImageUrl($imageFilename);
+        }
+
+        return null;
+    }
+
+    /**
+     * Legacy small thumb for photo posts (videos/thumbnail/{cover}.jpg).
+     */
+    public static function resolvePhotoThumbnailUrl(?string $imageFilename): ?string
+    {
+        if ($imageFilename === null || trim($imageFilename) === '') {
+            return null;
+        }
+
+        $basename = basename(str_replace('\\', '/', trim($imageFilename)));
+        if ($basename === '') {
+            return null;
+        }
+
+        return CdnUrl::forPath('videos/thumbnail/'.$basename);
+    }
+
     public static function resolveHlsKey(?string $hlsUrl, string $videoId, bool $isReady): ?string
     {
         if (! $isReady) {
