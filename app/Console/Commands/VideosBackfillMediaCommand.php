@@ -21,8 +21,10 @@ class VideosBackfillMediaCommand extends Command
                             {--transcode : Re-run HLS + MP4 transcode for published videos}
                             {--upgrade-ladder : Encode missing 720.mp4 / thumb_blur without changing transcode_status}
                             {--reencode-faststart : Re-mux existing MP4s with +faststart (keeps transcode_status ready)}
+                            {--retag-image-posts : Set is_image=1 on JPG-only rows mis-tagged as video}
+                            {--fix-playback-metadata : Set processing_status=ready when transcode ready + poster exists}
                             {--force : Queue every candidate (--reencode-faststart verifies in job; skips if already fast-start)}
-                            {--heights=360,720 : MP4 heights for --reencode-faststart}
+                            {--heights=360,720,1080 : MP4 heights for --reencode-faststart}
                             {--limit=50 : Max videos to queue per run}
                             {--dry-run : List work without dispatching jobs}';
 
@@ -50,8 +52,16 @@ class VideosBackfillMediaCommand extends Command
             return $this->reencodeFastStart($s3, $fastStart, $limit, $dryRun);
         }
 
+        if ($this->option('retag-image-posts')) {
+            return $this->retagImagePosts($s3, $limit, $dryRun);
+        }
+
+        if ($this->option('fix-playback-metadata')) {
+            return $this->fixPlaybackMetadata($s3, $limit, $dryRun);
+        }
+
         if (! $this->option('posters') && ! $this->option('transcode')) {
-            $this->error('Specify at least one of --posters, --transcode, --upgrade-ladder, or --reencode-faststart');
+            $this->error('Specify at least one of --posters, --transcode, --upgrade-ladder, --reencode-faststart, --retag-image-posts, or --fix-playback-metadata');
 
             return self::FAILURE;
         }
@@ -133,18 +143,20 @@ class VideosBackfillMediaCommand extends Command
 
             $id = (string) $video->id;
             $hlsHas720 = $s3->fileExists('videos/'.$id.'/hls/video_720.m3u8');
+            $hlsHas1080 = $s3->fileExists('videos/'.$id.'/hls/video_1080.m3u8');
             $needs720 = $hlsHas720 && ! $s3->fileExists(VideoMediaService::mp4Key($id, 720));
+            $needs1080 = $hlsHas1080 && ! $s3->fileExists(VideoMediaService::mp4Key($id, 1080));
             $needsBlur = ! $s3->fileExists(VideoMediaService::posterBlurKey($id));
             $needs360 = ! $s3->fileExists(VideoMediaService::mp4Key($id, 360));
 
-            if (! $needs720 && ! $needsBlur && ! $needs360) {
+            if (! $needs720 && ! $needs1080 && ! $needsBlur && ! $needs360) {
                 continue;
             }
 
             $count++;
 
             if ($dryRun) {
-                $this->line("upgrade-ladder: {$id} (720=".($needs720 ? 'missing' : 'ok').', blur='.($needsBlur ? 'missing' : 'ok').', 360='.($needs360 ? 'missing' : 'ok').')');
+                $this->line("upgrade-ladder: {$id} (720=".($needs720 ? 'missing' : 'ok').', 1080='.($needs1080 ? 'missing' : 'ok').', blur='.($needsBlur ? 'missing' : 'ok').', 360='.($needs360 ? 'missing' : 'ok').')');
 
                 continue;
             }
@@ -242,7 +254,7 @@ class VideosBackfillMediaCommand extends Command
             explode(',', $value)
         ), static fn (int $h) => $h > 0)));
 
-        return $heights !== [] ? $heights : [360, 720];
+        return $heights !== [] ? $heights : [360, 720, 1080];
     }
 
     /**
@@ -291,5 +303,108 @@ class VideosBackfillMediaCommand extends Command
         file_put_contents($stagingPath, $s3->retrieveFile($sourceKey));
 
         ProcessVideoThumbnailJob::dispatch((string) $video->id, $stagingPath, $imageName);
+    }
+
+    private function retagImagePosts(S3Service $s3, int $limit, bool $dryRun): int
+    {
+        if (! Schema::hasColumn('videos', 'is_image')) {
+            $this->warn('is_image column missing');
+
+            return self::FAILURE;
+        }
+
+        $count = 0;
+
+        foreach ($this->readyVideosCursor() as $video) {
+            if ($count >= $limit) {
+                break;
+            }
+
+            if ((int) ($video->is_image ?? 0) === 1) {
+                continue;
+            }
+
+            $image = trim((string) ($video->image ?? ''));
+            $pathVideo = trim((string) ($video->video ?? ''));
+
+            if ($image === '' || ! VideoMediaService::isStaticImageFilename($image)) {
+                continue;
+            }
+
+            $id = (string) $video->id;
+            $hasLadder = $s3->fileExists(VideoMediaService::mp4Key($id, 360))
+                || $s3->fileExists(VideoMediaService::mp4Key($id, 720));
+
+            if ($hasLadder) {
+                continue;
+            }
+
+            if ($pathVideo !== '' && ! VideoMediaService::isStaticImageFilename($pathVideo)) {
+                continue;
+            }
+
+            $count++;
+
+            if ($dryRun) {
+                $this->line("retag-image: {$id}");
+
+                continue;
+            }
+
+            DB::table('videos')->where('id', $id)->update(['is_image' => 1]);
+        }
+
+        $this->info(sprintf('Retag image posts: %d row(s)%s', $count, $dryRun ? ' (dry-run)' : ' updated'));
+
+        return self::SUCCESS;
+    }
+
+    private function fixPlaybackMetadata(S3Service $s3, int $limit, bool $dryRun): int
+    {
+        if (! Schema::hasColumn('videos', 'processing_status')) {
+            $this->warn('processing_status column missing');
+
+            return self::FAILURE;
+        }
+
+        $count = 0;
+
+        foreach ($this->readyVideosCursor() as $video) {
+            if ($count >= $limit) {
+                break;
+            }
+
+            if ((int) ($video->is_image ?? 0) === 1) {
+                continue;
+            }
+
+            if (($video->processing_status ?? '') === 'ready') {
+                continue;
+            }
+
+            $id = (string) $video->id;
+            if (! $s3->fileExists(VideoMediaService::posterKey($id))) {
+                continue;
+            }
+
+            if (! $s3->fileExists(VideoMediaService::mp4Key($id, 360))
+                && ! $s3->fileExists('videos/'.$id.'/hls/master.m3u8')) {
+                continue;
+            }
+
+            $count++;
+
+            if ($dryRun) {
+                $this->line("fix-playback-metadata: {$id} (was ".($video->processing_status ?? 'null').')');
+
+                continue;
+            }
+
+            DB::table('videos')->where('id', $id)->update(['processing_status' => 'ready']);
+        }
+
+        $this->info(sprintf('Fix playback metadata: %d row(s)%s', $count, $dryRun ? ' (dry-run)' : ' updated'));
+
+        return self::SUCCESS;
     }
 }

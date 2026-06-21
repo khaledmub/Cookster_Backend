@@ -28,7 +28,7 @@ class ReencodeFastStartJob implements ShouldQueue
      */
     public function __construct(
         public string $videoId,
-        public array $heights = [360, 720],
+        public array $heights = [360, 720, 1080],
     ) {
         $this->onQueue('video-processing');
         $this->timeout = (int) config('ffmpeg.timeout', 7200);

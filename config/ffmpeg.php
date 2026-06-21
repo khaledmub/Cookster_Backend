@@ -13,10 +13,10 @@ return [
     'gop_size' => (int) env('FFMPEG_GOP_SIZE', 48),
     'video_profile' => env('FFMPEG_VIDEO_PROFILE', 'main'),
 
-    // MP4 fallbacks for mobile preload (360 + 720 fast-start). 1080 stays HLS-only.
+    // MP4 ladder for mobile HD-first playback (360 + 720 + 1080 fast-start).
     'mp4_ladder_heights' => array_values(array_filter(array_map(
         'intval',
-        explode(',', (string) env('FFMPEG_MP4_LADDER_HEIGHTS', '360,720'))
+        explode(',', (string) env('FFMPEG_MP4_LADDER_HEIGHTS', '360,720,1080'))
     ))),
 
 ];

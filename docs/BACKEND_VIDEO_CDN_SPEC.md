@@ -25,9 +25,11 @@ For each video object in `GET /api/reels`, profile video lists, hashtag feeds, s
 
 ### Playback priority when `transcode_status == "ready"`
 
-`hls_playlist_url` → `url_360` → `url_720` → `url_1080` → `video_url` → legacy `video`
+**Mobile HD-first (current):** `url_1080` → `url_720` → `url_360` → `hls_playlist_url` → `video_url`
 
-When **not** ready: only `video_url` / legacy — no HLS (slow; user feels “loading every time”).
+Partial MP4 playback requires **fast-start** (`moov` before `mdat`) on **every** ladder tier — especially `1080.mp4`.
+
+When **not** ready: poster fields only — no HLS or ladder URLs.
 
 ## Example ready video payload
 
@@ -66,7 +68,7 @@ After every video upload (`POST /api/videos/create`):
    - HLS: `videos/{id}/hls/master.m3u8` + segments
    - MP4: `videos/{id}/360.mp4`, `720.mp4`, `1080.mp4`
    - Poster from cover image (`ProcessVideoThumbnailJob`) **or** first video frame when no cover
-2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + required MP4 ladder (360 + 720 when source resolution allows) + `thumb.webp` + `thumb_blur.webp` exist on object storage.
+2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + required MP4 ladder (360 + 720 + 1080 when HLS variants exist) + `thumb.webp` + `thumb_blur.webp` exist on object storage.
 3. Until ready: `transcode_status: "pending"`, `processing_status: "processing"`, return `thumbnail_url` / `image_url` where available. **No** raw upload MP4 or phantom ladder URLs.
 
 ### MP4 ladder (mobile preload contract)
@@ -74,10 +76,10 @@ After every video upload (`POST /api/videos/create`):
 | File | Resolution | Encoding |
 |------|------------|----------|
 | `360.mp4` | 360p | H.264 main, `-movflags +faststart`, GOP ~2s (`FFMPEG_GOP_SIZE=48`) |
-| `720.mp4` | 720p | Same (required when source height ≥ ~612px) |
-| `1080.mp4` | — | HLS-only (not separate MP4 unless configured) |
+| `720.mp4` | 720p | Same (when HLS has 720p variant) |
+| `1080.mp4` | 1080p | Same (when source + HLS support 1080p — **required for HD-first mobile**) |
 
-`video_sources` only includes URLs for files that **exist on CDN** (no phantom `url_720`).
+`video_sources` only includes URLs for files that **exist on CDN** (no phantom tiers).
 
 ### HLS encoding
 
@@ -147,8 +149,11 @@ php artisan videos:backfill-media --posters --transcode --limit=20
 # Re-encode ready videos missing 720.mp4 fast-start or thumb_blur.webp (no transcode_status flip)
 php artisan videos:backfill-media --upgrade-ladder --limit=500
 
-# Re-mux existing 360/720 MP4s with moov before mdat (transcode_status stays ready)
-php artisan videos:backfill-media --reencode-faststart --limit=500
+# Re-mux existing 360/720/1080 MP4s with moov before mdat (transcode_status stays ready)
+php artisan videos:backfill-media --reencode-faststart --heights=360,720,1080 --limit=500
+
+# Add missing 1080.mp4 (and other tiers) to ready catalog
+php artisan videos:backfill-media --upgrade-ladder --limit=500
 
 # Validate CDN + API contract on random sample
 php artisan videos:validate-media --sample=10 --api-check
@@ -162,7 +167,7 @@ ffprobe -v error -show_format videos/{id}/360.mp4
 
 # Range support on CDN
 curl -I "https://cdn.cookster.org/videos/{id}/360.mp4"
-curl -H "Range: bytes=0-262143" -I "https://cdn.cookster.org/videos/{id}/360.mp4"  # expect 206
+curl -H "Range: bytes=0-262143" -I "https://cdn.cookster.org/videos/{id}/1080.mp4"  # expect 206
 
 # API must not advertise missing tiers
 curl -s "https://cookster.org/api/reels?feed=user&user_id=..." | jq '.data[0].video_sources'

@@ -366,11 +366,16 @@ class AppHelper
         $v->video_url = $videoKey ? $cdn->urlForPath($videoKey) : null;
         $v->image_url = \App\Services\VideoMediaService::resolveCoverImageUrl($pathImage !== '' ? $pathImage : null);
         $v->thumbnail_url = $videoId !== ''
-            ? \App\Services\VideoMediaService::resolvePosterUrl($videoId, $pathImage !== '' ? $pathImage : null, $processingStatus)
+            ? \App\Services\VideoMediaService::resolvePosterUrl(
+                $videoId,
+                $pathImage !== '' ? $pathImage : null,
+                $processingStatus,
+                $transcodeStatus,
+            )
             : null;
         $v->thumbnail = $v->thumbnail_url;
         $v->thumbnail_blur = $videoId !== ''
-            ? \App\Services\VideoMediaService::resolvePosterBlurUrl($videoId, $processingStatus)
+            ? \App\Services\VideoMediaService::resolvePosterBlurUrl($videoId, $processingStatus, $transcodeStatus)
             : null;
 
         if ($isPhotoPost) {
@@ -429,9 +434,24 @@ class AppHelper
             }
 
             $v->hls_url = $v->hls_playlist_url ?? null;
+
+            \App\Services\VideoMediaService::applyVideoPlaybackUrls(
+                $v,
+                $v->video_sources,
+                $isPhotoPost,
+                $isHlsReady,
+                $videoKey ? $cdn->urlForPath($videoKey) : null,
+            );
         }
 
-        $v->playback_ready = $isPhotoPost || $isHlsReady;
+        if ($isPhotoPost) {
+            $v->playback_ready = ($v->video_url ?? null) !== null;
+        } else {
+            $v->playback_ready = $isHlsReady && (
+                \App\Services\VideoMediaService::pickBestLadderMp4Url($v->video_sources ?? []) !== null
+                || ! empty($v->hls_playlist_url)
+            );
+        }
         if (! $isHlsReady && ! $isPhotoPost) {
             // Do not expose the raw upload MP4 while transcoding — MTK/MediaKit often
             // decodes audio but fails to render (renderFps=0). Posters + status fields only.
@@ -459,8 +479,10 @@ class AppHelper
         if ($pathVideo !== '' && ! str_starts_with($pathVideo, 'http://') && ! str_starts_with($pathVideo, 'https://')) {
             if ($isPhotoPost) {
                 $v->video = $v->video_url;
+            } elseif ($isHlsReady && ! \App\Services\VideoMediaService::isStaticImageUrl($v->video_url ?? null)) {
+                $v->video = $v->video_url;
             } else {
-                $v->video = ($isHlsReady || $isPhotoPost) ? $v->video_url : null;
+                $v->video = null;
             }
         }
         if ($pathImage !== '' && ! str_starts_with($pathImage, 'http://') && ! str_starts_with($pathImage, 'https://')) {

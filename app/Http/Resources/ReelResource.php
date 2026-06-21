@@ -51,18 +51,39 @@ class ReelResource extends JsonResource
                 ? $cdn->directUrlForPath(str_starts_with($pathImage, 'videos/') ? $pathImage : 'videos/'.$pathImage)
                 : null;
             $hlsUrlDirect = null;
+            $playbackReady = $fullImageUrl !== null;
         } else {
-            $videoUrl = $isHlsReady && $originalKey ? CdnUrl::forPath($originalKey) : null;
+            $videoSources = VideoMediaService::videoSources((string) $this->id, $isHlsReady);
             $hlsPlaylistUrl = $isHlsReady && $hlsKey ? CdnUrl::forPath($hlsKey) : null;
             $thumbnailUrl = VideoMediaService::resolvePosterUrl(
                 (string) $this->id,
                 $pathImage !== '' ? $pathImage : null,
                 $processingStatus !== '' ? $processingStatus : null,
+                $transcodeStatus,
             );
             $coverImageUrl = VideoMediaService::resolveCoverImageUrl($pathImage !== '' ? $pathImage : null);
-            $videoSources = VideoMediaService::videoSources((string) $this->id, $isHlsReady);
-            $videoUrlDirect = $isHlsReady && $originalKey ? $cdn->directUrlForPath($originalKey) : null;
-            $hlsUrlDirect = $isHlsReady ? $cdn->directUrlForPath($hlsKey) : null;
+            $legacyVideoUrl = $isHlsReady && $originalKey ? CdnUrl::forPath($originalKey) : null;
+
+            $row = (object) ['video_url' => $legacyVideoUrl];
+            VideoMediaService::applyVideoPlaybackUrls($row, $videoSources, false, $isHlsReady, $legacyVideoUrl);
+            $videoUrl = $row->video_url;
+
+            $videoUrlDirect = null;
+            if ($videoUrl !== null && $isHlsReady) {
+                foreach ([1080, 720, 360] as $height) {
+                    if (($videoSources['url_'.$height] ?? null) === $videoUrl) {
+                        $videoUrlDirect = $cdn->directUrlForPath(VideoMediaService::mp4Key((string) $this->id, $height));
+                        break;
+                    }
+                }
+                $videoUrlDirect ??= ($originalKey ? $cdn->directUrlForPath($originalKey) : null);
+            }
+
+            $hlsUrlDirect = $isHlsReady && $hlsKey ? $cdn->directUrlForPath($hlsKey) : null;
+            $playbackReady = $isHlsReady && (
+                VideoMediaService::pickBestLadderMp4Url($videoSources) !== null
+                || $hlsPlaylistUrl !== null
+            );
         }
 
         return [
@@ -88,10 +109,11 @@ class ReelResource extends JsonResource
             'thumbnail_blur' => VideoMediaService::resolvePosterBlurUrl(
                 (string) $this->id,
                 $processingStatus !== '' ? $processingStatus : null,
+                $transcodeStatus,
             ),
             'transcode_status' => $transcodeStatus,
             'processing_status' => $processingStatus !== '' ? $processingStatus : ($isHlsReady ? 'ready' : 'processing'),
-            'playback_ready' => $isPhotoPost || $isHlsReady,
+            'playback_ready' => $playbackReady,
             'likes_count' => (int) ($this->likes_count ?? 0),
             'comments_count' => (int) ($this->comments_count ?? 0),
             'user' => $this->whenLoaded('user', fn () => [

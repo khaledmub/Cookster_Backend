@@ -95,9 +95,15 @@ class VideoMediaService
         string $videoId,
         ?string $imageFilename,
         ?string $processingStatus,
+        ?string $transcodeStatus = null,
+        ?S3Service $s3 = null,
     ): ?string {
-        if (($processingStatus ?? '') === 'ready') {
-            return CdnUrl::forPath(self::posterKey($videoId));
+        $s3 ??= app(S3Service::class);
+        $posterKey = self::posterKey($videoId);
+
+        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')
+            && $s3->fileExists($posterKey)) {
+            return CdnUrl::forPath($posterKey);
         }
 
         if ($imageFilename === null || trim($imageFilename) === '') {
@@ -120,13 +126,82 @@ class VideoMediaService
         return self::resolveCoverImageUrl($imageFilename);
     }
 
-    public static function resolvePosterBlurUrl(string $videoId, ?string $processingStatus): ?string
-    {
-        if (($processingStatus ?? '') !== 'ready') {
-            return null;
+    public static function resolvePosterBlurUrl(
+        string $videoId,
+        ?string $processingStatus,
+        ?string $transcodeStatus = null,
+        ?S3Service $s3 = null,
+    ): ?string {
+        $s3 ??= app(S3Service::class);
+        $blurKey = self::posterBlurKey($videoId);
+
+        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')
+            && $s3->fileExists($blurKey)) {
+            return CdnUrl::forPath($blurKey);
         }
 
-        return CdnUrl::forPath(self::posterBlurKey($videoId));
+        return null;
+    }
+
+    /**
+     * @param  array{url_360: ?string, url_720: ?string, url_1080: ?string}  $videoSources
+     */
+    public static function pickBestLadderMp4Url(array $videoSources): ?string
+    {
+        foreach (['url_1080', 'url_720', 'url_360'] as $key) {
+            $url = $videoSources[$key] ?? null;
+            if (is_string($url) && $url !== '') {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    public static function isStaticImageUrl(?string $url): bool
+    {
+        if ($url === null || $url === '') {
+            return false;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?? $url;
+
+        return (bool) preg_match('/\.(jpe?g|png|webp|gif)$/i', $path);
+    }
+
+    /**
+     * Set video_url / video from MP4 ladder for ready video posts. Never JPG in video_url.
+     *
+     * @param  array{url_360: ?string, url_720: ?string, url_1080: ?string}  $videoSources
+     */
+    public static function applyVideoPlaybackUrls(
+        object $row,
+        array $videoSources,
+        bool $isPhotoPost,
+        bool $isHlsReady,
+        ?string $legacyVideoUrl = null,
+    ): void {
+        if ($isPhotoPost) {
+            return;
+        }
+
+        $best = self::pickBestLadderMp4Url($videoSources);
+
+        if ($isHlsReady && $best !== null) {
+            $row->video_url = $best;
+
+            return;
+        }
+
+        if ($legacyVideoUrl !== null && ! self::isStaticImageUrl($legacyVideoUrl)) {
+            $row->video_url = $legacyVideoUrl;
+
+            return;
+        }
+
+        if (self::isStaticImageUrl($row->video_url ?? null)) {
+            $row->video_url = $best;
+        }
     }
 
     public static function resolveCoverImageUrl(?string $imageFilename): ?string

@@ -50,7 +50,7 @@ class VideoProbeService
     }
 
     /**
-     * MP4 fallback heights — typically 360 only; 720/1080 come from HLS.
+     * MP4 fallback heights — 360 + 720 + 1080 fast-start, capped by source resolution.
      *
      * @return list<int>
      */
@@ -59,7 +59,7 @@ class VideoProbeService
         $configured = config('ffmpeg.mp4_ladder_heights');
         $heights = is_array($configured) && $configured !== []
             ? array_map('intval', $configured)
-            : [360];
+            : [360, 720, 1080];
 
         return $this->filterHeightsForSource($heights, $sourceHeight);
     }

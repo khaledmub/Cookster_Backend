@@ -23,20 +23,7 @@ class VideoMediaVerifier
     }
 
     /**
-     * Optional renditions — present on storage when encoded, not required for "ready".
-     *
-     * @return list<string>
-     */
-    public static function optionalTranscodeKeys(string $videoId): array
-    {
-        return [
-            VideoMediaService::mp4Key($videoId, 720),
-            VideoMediaService::mp4Key($videoId, 1080),
-        ];
-    }
-
-    /**
-     * MP4 heights required for "ready". Mobile preloads 360 + 720 fast-start MP4.
+     * MP4 heights required for "ready". Matches configured ladder ∩ HLS variants on storage.
      *
      * @return list<int>
      */
@@ -49,9 +36,33 @@ class VideoMediaVerifier
         $configured = config('ffmpeg.mp4_ladder_heights');
         $heights = is_array($configured) && $configured !== []
             ? array_map('intval', $configured)
-            : [360, 720];
+            : [360, 720, 1080];
 
-        return array_values(array_unique(array_filter($heights, static fn (int $h) => $h > 0)));
+        $heights = array_values(array_unique(array_filter($heights, static fn (int $h) => $h > 0)));
+
+        return $this->filterHeightsByHlsVariants($videoId, $heights, $s3Service);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function filterHeightsByHlsVariants(string $videoId, array $heights, S3Service $s3Service): array
+    {
+        $required = [];
+
+        foreach ($heights as $height) {
+            if ($height === 360) {
+                $required[] = 360;
+
+                continue;
+            }
+
+            if ($s3Service->fileExists('videos/'.$videoId.'/hls/video_'.$height.'.m3u8')) {
+                $required[] = $height;
+            }
+        }
+
+        return $required !== [] ? $required : [360];
     }
 
     /**

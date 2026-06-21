@@ -122,9 +122,20 @@ class VideosValidateMediaCommand extends Command
         }
 
         $checks = array_merge($checks, $this->checkCdnHeaders($url360));
-        $checks = array_merge($checks, $this->checkRange206($url360));
+        $checks = array_merge($checks, $this->checkRange206($url360, '360'));
         $checks = array_merge($checks, $this->checkFastStart($id, 360, $s3, $fastStart));
-        $checks = array_merge($checks, $this->checkFfprobe($url360));
+        $checks = array_merge($checks, $this->checkFfprobe($url360, '360'));
+
+        if ($s3->fileExists('videos/'.$id.'/hls/video_1080.m3u8')) {
+            $key1080 = VideoMediaService::mp4Key($id, 1080);
+            if ($s3->fileExists($key1080)) {
+                $url1080 = CdnUrl::forPath($key1080);
+                $checks = array_merge($checks, $this->checkRange206($url1080, '1080'));
+                $checks = array_merge($checks, $this->checkFastStart($id, 1080, $s3, $fastStart));
+            } else {
+                $checks['1080.mp4'] = 'missing on storage';
+            }
+        }
 
         if ($this->option('api-check')) {
             $checks = array_merge($checks, $this->checkApiPayload($id, $s3));
@@ -168,19 +179,19 @@ class VideosValidateMediaCommand extends Command
     /**
      * @return array<string, string>
      */
-    private function checkRange206(string $url): array
+    private function checkRange206(string $url, string $label = '360'): array
     {
         try {
             $response = Http::timeout(20)
                 ->withHeaders(['Range' => 'bytes=0-262143'])
                 ->get($url);
         } catch (\Throwable $e) {
-            return ['range_206' => 'error: '.$e->getMessage()];
+            return ['range_206_'.$label => 'error: '.$e->getMessage()];
         }
 
         return [
-            'range_206' => $response->status() === 206 ? 'ok' : 'http_'.$response->status(),
-            'range_body_bytes' => strlen($response->body()) > 0 ? 'ok' : 'empty',
+            'range_206_'.$label => $response->status() === 206 ? 'ok' : 'http_'.$response->status(),
+            'range_body_'.$label => strlen($response->body()) > 0 ? 'ok' : 'empty',
         ];
     }
 
@@ -224,7 +235,7 @@ class VideosValidateMediaCommand extends Command
     /**
      * @return array<string, string>
      */
-    private function checkFfprobe(string $url): array
+    private function checkFfprobe(string $url, string $label = '360'): array
     {
         $ffprobe = (string) config('ffmpeg.ffprobe.binaries', '/usr/bin/ffprobe');
         $tmp = storage_path('app/validate-media/probe_'.md5($url).'.mp4');
@@ -240,7 +251,7 @@ class VideosValidateMediaCommand extends Command
                 ->get($url);
 
             if ($response->status() !== 206 && $response->status() !== 200) {
-                return ['ffprobe' => 'download_http_'.$response->status()];
+                return ['ffprobe_'.$label => 'download_http_'.$response->status()];
             }
 
             file_put_contents($tmp, $response->body());
@@ -256,14 +267,14 @@ class VideosValidateMediaCommand extends Command
             $process->run();
 
             if (! $process->isSuccessful()) {
-                return ['ffprobe' => 'failed'];
+                return ['ffprobe_'.$label => 'failed'];
             }
 
             $output = trim($process->getOutput());
 
-            return ['ffprobe' => str_contains($output, 'mp4') || str_contains($output, 'mov') ? 'ok' : 'unexpected:'.$output];
+            return ['ffprobe_'.$label => str_contains($output, 'mp4') || str_contains($output, 'mov') ? 'ok' : 'unexpected:'.$output];
         } catch (\Throwable $e) {
-            return ['ffprobe' => 'error: '.$e->getMessage()];
+            return ['ffprobe_'.$label => 'error: '.$e->getMessage()];
         } finally {
             if (is_file($tmp)) {
                 unlink($tmp);
@@ -285,6 +296,22 @@ class VideosValidateMediaCommand extends Command
 
         $checks = [];
         $checks['api_transcode_status'] = ($video->transcode_status ?? '') === 'ready' ? 'ok' : 'not_ready';
+        $isImage = (int) ($video->is_image ?? 0) === 1;
+
+        if ($isImage) {
+            $checks['api_photo_video_url'] = VideoMediaService::isStaticImageUrl($video->video_url ?? null) ? 'ok' : 'not_image';
+            $checks['api_photo_sources_null'] = empty($video->video_sources) ? 'ok' : 'unexpected_sources';
+
+            return $checks;
+        }
+
+        if (($video->transcode_status ?? '') === 'ready') {
+            $checks['api_video_url_not_image'] = VideoMediaService::isStaticImageUrl($video->video_url ?? null)
+                ? 'jpg_in_video_url'
+                : 'ok';
+            $checks['api_video_url_is_mp4'] = str_contains((string) ($video->video_url ?? ''), '.mp4') ? 'ok' : 'not_mp4';
+        }
+
         $checks['api_thumbnail_blur'] = ! empty($video->thumbnail_blur) ? 'ok' : 'null';
         $checks['api_url_360'] = ! empty($video->video_sources['url_360'] ?? null) ? 'ok' : 'null';
 

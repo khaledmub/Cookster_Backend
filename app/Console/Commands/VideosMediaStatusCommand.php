@@ -91,6 +91,7 @@ class VideosMediaStatusCommand extends Command
         $this->info('Scanning ready catalog on object storage…');
 
         $needs720 = 0;
+        $needs1080 = 0;
         $needsBlur = 0;
         $needs360 = 0;
         $needsFastStart = 0;
@@ -117,11 +118,16 @@ class VideosMediaStatusCommand extends Command
                 $needs720++;
             }
 
+            $hlsHas1080 = $s3->fileExists('videos/'.$id.'/hls/video_1080.m3u8');
+            if ($hlsHas1080 && ! $s3->fileExists(VideoMediaService::mp4Key($id, 1080))) {
+                $needs1080++;
+            }
+
             if (! $s3->fileExists(VideoMediaService::posterBlurKey($id))) {
                 $needsBlur++;
             }
 
-            foreach ([360, 720] as $height) {
+            foreach ([360, 720, 1080] as $height) {
                 $key = VideoMediaService::mp4Key($id, $height);
                 if (! $s3->fileExists($key)) {
                     continue;
@@ -141,6 +147,7 @@ class VideosMediaStatusCommand extends Command
                 ['Scanned', (string) $scanned],
                 ['Missing 360.mp4', (string) $needs360],
                 ['Missing 720.mp4 (HLS has 720)', (string) $needs720],
+                ['Missing 1080.mp4 (HLS has 1080)', (string) $needs1080],
                 ['Missing thumb_blur.webp', (string) $needsBlur],
                 ['Likely needs fast-start remux', (string) $needsFastStart],
             ]
