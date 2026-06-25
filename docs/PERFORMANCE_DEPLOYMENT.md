@@ -15,18 +15,44 @@
    php artisan migrate --path=database/migrations/2026_05_24_000001_add_video_hls_transcode_columns.php --force
    ```
 3. Set `CACHE_STORE=redis`, `QUEUE_CONNECTION=redis`, and `REDIS_QUEUE_RETRY_AFTER=7500` (must exceed `FFMPEG_TIMEOUT`, default 7200).
-4. Start queue workers (thumbnails + long transcodes):
+4. Apply host tuning (4 vCPU / 15 GiB reference box):
    ```bash
-   php artisan queue:work --queue=video-processing,thumbnails,notifications,default --sleep=3 --tries=3 --timeout=7200
+   sudo bash deploy/apply-tuning.sh
    ```
-   Use Supervisor in production, for example:
-   ```ini
-   [program:cookster-queue]
-   command=php /path/to/cookster_admin/artisan queue:work --queue=video-processing,thumbnails,notifications,default --sleep=3 --tries=3 --timeout=7200
-   autostart=true
-   autorestart=true
-   user=www-data
+   This sets PHP-FPM `pm.max_children=16`, MariaDB `innodb_buffer_pool_size=4G`, OPcache 256M, and systemd workers:
+   - **4×** `cookster-transcode@` — `video-processing` only (`FFMPEG_THREADS=1` each → 4 parallel encodes)
+   - **2×** `cookster-queue@` — `thumbnails,notifications,emails,default`
+5. Verify workers after deploy:
+   ```bash
+   systemctl status 'cookster-*'
+   php artisan videos:media-status
    ```
+
+### Server sizing (4 vCPU / 15 GiB)
+
+| Resource | Before (typical) | Tuned | Why |
+|----------|------------------|-------|-----|
+| Load avg | ~0.2 (idle) | use burst capacity | 4 transcode workers + idle ladder backfill |
+| PHP-FPM children | 5 | 16 | More concurrent API/reel requests |
+| MariaDB buffer pool | 128M | 4G | Feed/search queries hit RAM not disk |
+| OPcache | 128M | 256M | Faster Laravel bootstrap |
+| Transcode workers | 4 | 4 | One ffmpeg thread × 4 cores |
+| `FFMPEG_THREADS` | 1 | 1 | Avoid CPU oversubscription with 4 workers |
+| `REDIS_QUEUE_RETRY_AFTER` | 1800 | 7500 | Must exceed job timeout or jobs duplicate |
+
+Idle CPU is used automatically: `videos:backfill-media --upgrade-ladder` runs every 15 min when the transcode queue is empty.
+
+### Queue workers (manual / systemd)
+
+Files live in `deploy/systemd/`. Do **not** put `video-processing` on general workers if dedicated transcode units are running.
+
+```bash
+# Transcode (one per CPU core)
+php artisan queue:work redis --queue=video-processing --timeout=7200 --memory=1024
+
+# Fast jobs
+php artisan queue:work redis --queue=thumbnails,notifications,emails,default --timeout=7200 --memory=512
+```
 
 ### API changes
 
@@ -51,8 +77,10 @@ Legacy clients without `paginate` still receive the full-list response shape (up
 
 ### Environment
 
-- `QUEUE_CONNECTION=database` (default in `.env.example`)
-- `CACHE_STORE=database` (used for city-group caching)
+- `QUEUE_CONNECTION=redis`
+- `CACHE_STORE=redis`
+- `FFMPEG_THREADS=1` with 4 transcode systemd units on a 4-core host
+- `REDIS_QUEUE_RETRY_AFTER=7500` and `FFMPEG_TIMEOUT=7200`
 
 ### Smoke test
 

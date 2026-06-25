@@ -1,0 +1,19 @@
+[Unit]
+Description=Cookster Laravel Queue Worker %i
+After=network.target redis-server.service mysql.service
+Requires=redis-server.service
+PartOf=cookster-queue.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/cookster_admin
+ExecStart=/usr/bin/php artisan queue:work redis --queue=thumbnails,notifications,emails,default --sleep=1 --tries=3 --timeout=7200 --memory=512 --max-time=7200 --backoff=10,30,60
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=cookster-queue.target

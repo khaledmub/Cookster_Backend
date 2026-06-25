@@ -24,3 +24,19 @@ Schedule::command('queue:heal-transcode --dispatch=50')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/transcode-heal.log'));
 
+// Use idle transcode capacity for ladder upgrades (1080, fast-start gaps).
+Schedule::command('videos:backfill-media --upgrade-ladder --limit=5')
+    ->everyFifteenMinutes()
+    ->when(function () {
+        if (! class_exists(\Illuminate\Support\Facades\Redis::class)) {
+            return false;
+        }
+        $waiting = (int) \Illuminate\Support\Facades\Redis::llen('queues:video-processing');
+        $reserved = (int) \Illuminate\Support\Facades\Redis::zcard('queues:video-processing:reserved');
+
+        return $waiting === 0 && $reserved === 0;
+    })
+    ->withoutOverlapping(10)
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/idle-ladder-backfill.log'));
+

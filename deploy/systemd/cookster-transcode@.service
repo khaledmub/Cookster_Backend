@@ -1,0 +1,19 @@
+[Unit]
+Description=Cookster Video Transcode Worker %i
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/cookster_admin
+# One ffmpeg thread per worker; run N workers = N CPU cores for parallel transcodes.
+ExecStart=/usr/bin/php artisan queue:work redis --queue=video-processing --sleep=1 --tries=3 --timeout=7200 --memory=1024 --max-time=7200
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
