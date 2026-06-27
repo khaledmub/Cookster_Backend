@@ -147,6 +147,10 @@ class HomeController extends Controller
                 'paths' => [
                     '/web/visitSingleVideo',
                     '/web/visitSingleVideo/*',
+                    '/web/visitProfile',
+                    '/web/visitProfile/*',
+                    '/profile',
+                    '/profile/*',
                 ],
             ];
         }
@@ -194,6 +198,60 @@ class HomeController extends Controller
             'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.env('ANDROID_APP_PACKAGE', $this->androidPackageName),
             'appSchemeUrl' => 'cookster://api/video_details?id='.$video->id,
         ]);
+    }
+
+    /**
+     * Shared profile links (/profile, /web/visitProfile) for social previews and web fallback.
+     */
+    public function visitProfile(Request $request)
+    {
+        $user = $this->resolveProfileLinkUser($request);
+
+        if ($user === null) {
+            return redirect()->route('home');
+        }
+
+        AppHelper::decorateUserRow($user);
+
+        $displayName = trim((string) ($user->name ?? '')) ?: 'Cookster User';
+        $handle = trim((string) ($user->user_name ?? ''));
+        $metaDescription = $handle !== ''
+            ? "View @{$handle}'s profile on Cookster."
+            : "View {$displayName}'s profile on Cookster.";
+
+        return view('frontend.profile_deeplink', [
+            'user' => $user,
+            'metaDescription' => $metaDescription,
+            'canonicalUrl' => $request->fullUrl(),
+            'iosAppStoreUrl' => 'https://apps.apple.com/us/app/cookster-كوكستر/id6746804733',
+            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+            'appSchemeUrl' => 'cookster://api/profile_details?id='.$user->id,
+        ]);
+    }
+
+    private function resolveProfileLinkUser(Request $request): ?object
+    {
+        $id = trim((string) $request->query('id', ''));
+        $email = trim((string) $request->query('email', ''));
+        $userName = trim((string) ($request->query('user_name', $request->query('username', ''))));
+
+        if ($id === '' && $email === '' && $userName === '') {
+            return null;
+        }
+
+        $query = DB::table('front_users')
+            ->where('is_soft_delete', 0)
+            ->where('status', 1);
+
+        if ($id !== '') {
+            $query->where('id', $id);
+        } elseif ($email !== '') {
+            $query->where('email', $email);
+        } else {
+            $query->where('user_name', $userName);
+        }
+
+        return $query->first(['id', 'name', 'user_name', 'image']);
     }
     public function blog($category = null){
         $data = array();

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Helpers\AppHelper;
 use App\Support\CookCache;
 use App\Support\FeedSocialCache;
+use App\Support\VideoFeedSort;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -46,21 +47,26 @@ class VideoFeedService
     {
         $context = $this->buildFeedContext($request, $user);
         $queries = $this->buildVideoQueries($context);
+        $sort = VideoFeedSort::fromRequest($request);
 
-        $feedSeed = (int) ($request->input('feed_seed') ?: random_int(1, 999999));
-        $normalVideos = $this->fetchVideos($queries['normal'], $feedSeed);
-        $sponsoredVideos = $this->fetchVideos($queries['sponsored'], $feedSeed);
-        $premiumSponsoredVideos = $this->fetchVideos($queries['premium'], $feedSeed);
+        if (VideoFeedSort::isChronological($sort)) {
+            $finalList = $this->fetchVideosChronological($queries['normal'], $sort);
+        } else {
+            $feedSeed = (int) ($request->input('feed_seed') ?: random_int(1, 999999));
+            $normalVideos = $this->fetchVideos($queries['normal'], $feedSeed);
+            $sponsoredVideos = $this->fetchVideos($queries['sponsored'], $feedSeed);
+            $premiumSponsoredVideos = $this->fetchVideos($queries['premium'], $feedSeed);
 
-        $finalList = $this->mergeVideos(
-            $normalVideos,
-            $sponsoredVideos,
-            $premiumSponsoredVideos,
-            0,
-            0,
-            0,
-            PHP_INT_MAX
-        )['videos'];
+            $finalList = $this->mergeVideos(
+                $normalVideos,
+                $sponsoredVideos,
+                $premiumSponsoredVideos,
+                0,
+                0,
+                0,
+                PHP_INT_MAX
+            )['videos'];
+        }
 
         if (empty($finalList) && ! empty($context['cities_ids']) && empty($context['input']['is_following']) && empty($context['input']['_geo_fallback'])) {
             $fallback = $request->duplicate();
@@ -93,6 +99,11 @@ class VideoFeedService
     {
         $context = $this->buildFeedContext($request, $user);
         $queries = $this->buildVideoQueries($context);
+        $sort = VideoFeedSort::fromRequest($request);
+
+        if (VideoFeedSort::isChronological($sort)) {
+            return $this->paginatedListChronological($request, $user, $context, $queries['normal'], $sort);
+        }
 
         $perPage = min(max((int) ($request->input('per_page') ?: 15), 1), 30);
         $page = max((int) ($request->input('page') ?: 1), 1);
@@ -375,6 +386,59 @@ class VideoFeedService
                 $cityQuery->orWhereRaw('FIND_IN_SET(?, sv.cities)', [$cityId]);
             }
         });
+    }
+
+    private function paginatedListChronological(Request $request, $user, array $context, $normalQuery, string $sort): array
+    {
+        $perPage = min(max((int) ($request->input('per_page') ?: 15), 1), 30);
+        $page = max((int) ($request->input('page') ?: 1), 1);
+        $offset = ($page - 1) * $perPage;
+
+        $countQuery = clone $normalQuery;
+        $total = $countQuery->count('v.id');
+
+        $videos = $this->fetchVideosChronological($normalQuery, $sort, $offset, $perPage);
+
+        if (empty($videos) && ! empty($context['cities_ids']) && empty($context['input']['is_following']) && empty($context['input']['_geo_fallback'])) {
+            $fallback = $request->duplicate();
+            $fallbackInput = $request->all();
+            unset($fallbackInput['city'], $fallbackInput['latitude'], $fallbackInput['longitude']);
+            $fallbackInput['_geo_fallback'] = true;
+            $fallback->replace($fallbackInput);
+
+            return $this->paginatedListChronological($fallback, $user, $this->buildFeedContext($fallback, $user), $this->buildVideoQueries($this->buildFeedContext($fallback, $user))['normal'], $sort);
+        }
+
+        AppHelper::decorateVideoIterable($videos);
+
+        $hasMore = ($offset + count($videos)) < $total;
+
+        return [
+            'status' => true,
+            'videos' => $videos,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'has_more' => $hasMore && count($videos) > 0,
+                'next_cursor' => null,
+                'sort_by' => $sort,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, object>
+     */
+    private function fetchVideosChronological($query, string $sort, int $offset = 0, ?int $limit = null): array
+    {
+        $query = clone $query;
+        VideoFeedSort::applyOrder($query, $sort, 'v');
+
+        if ($limit !== null) {
+            $query->offset($offset)->limit($limit);
+        }
+
+        return $query->select(self::videoSelectColumns())->get()->all();
     }
 
     private function applySeedOrder($query, int $feedSeed)

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ReelResource;
 use App\Models\Video;
 use App\Support\FeedSocialCache;
+use App\Support\VideoFeedSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -98,6 +99,7 @@ class ReelsController extends Controller
             $feed === self::FEED_NEAR_ME
             && $result['items']->isEmpty()
             && ! $geoFallback
+            && $cursor['created_at'] === null
             && $cursor['system_id'] === null
         ) {
             $fallbackGeo = [
@@ -194,7 +196,12 @@ class ReelsController extends Controller
 
         $anchorApplied = $this->applyAnchorOrCursor($query, $cursor, $feedContext);
 
-        if (! $anchorApplied && $cursor['system_id'] !== null && $cursor['id'] !== null) {
+        $sort = $feedContext['sort_by'];
+
+        if (! $anchorApplied && $cursor['created_at'] !== null && $cursor['id'] !== null) {
+            VideoFeedSort::applyKeysetCursor($query, $sort, $cursor['created_at'], $cursor['id']);
+        } elseif (! $anchorApplied && $cursor['system_id'] !== null && $cursor['id'] !== null) {
+            // Legacy cursor support (pre-sort_by deploy).
             $query->where(function ($q) use ($cursor) {
                 $q->where('videos.system_id', '<', $cursor['system_id'])
                     ->orWhere(function ($q2) use ($cursor) {
@@ -205,8 +212,7 @@ class ReelsController extends Controller
         }
 
         $rows = $query
-            ->orderByDesc('videos.system_id')
-            ->orderByDesc('videos.id')
+            ->tap(fn ($q) => VideoFeedSort::applyOrder($q, $sort))
             ->limit($perPage + 1)
             ->get();
 
@@ -255,7 +261,9 @@ class ReelsController extends Controller
      */
     private function applyAnchorOrCursor($query, array $cursor, array $feedContext): bool
     {
-        if ($cursor['system_id'] !== null || $feedContext['anchor_id'] === null || $feedContext['anchor_id'] === '') {
+        if (($cursor['created_at'] !== null || $cursor['system_id'] !== null)
+            || $feedContext['anchor_id'] === null
+            || $feedContext['anchor_id'] === '') {
             return false;
         }
 
@@ -270,19 +278,32 @@ class ReelsController extends Controller
             $anchorQuery->where('front_user_id', $feedContext['user_id']);
         }
 
-        $anchor = $anchorQuery->first(['id', 'system_id']);
+        $anchor = $anchorQuery->first(['id', 'system_id', 'created_at']);
 
         if ($anchor === null) {
             return false;
         }
 
-        $query->where(function ($q) use ($anchor) {
-            $q->where('videos.system_id', '<', $anchor->system_id)
-                ->orWhere(function ($q2) use ($anchor) {
-                    $q2->where('videos.system_id', $anchor->system_id)
-                        ->where('videos.id', '<=', $anchor->id);
-                });
-        });
+        $sort = $feedContext['sort_by'];
+        $createdAt = $anchor->created_at?->toDateTimeString() ?? (string) $anchor->created_at;
+
+        if ($sort === VideoFeedSort::OLDEST) {
+            $query->where(function ($q) use ($createdAt, $anchor) {
+                $q->where('videos.created_at', '>', $createdAt)
+                    ->orWhere(function ($q2) use ($createdAt, $anchor) {
+                        $q2->where('videos.created_at', $createdAt)
+                            ->where('videos.id', '>=', $anchor->id);
+                    });
+            });
+        } else {
+            $query->where(function ($q) use ($createdAt, $anchor) {
+                $q->where('videos.created_at', '<', $createdAt)
+                    ->orWhere(function ($q2) use ($createdAt, $anchor) {
+                        $q2->where('videos.created_at', $createdAt)
+                            ->where('videos.id', '<=', $anchor->id);
+                    });
+            });
+        }
 
         return true;
     }
@@ -294,8 +315,9 @@ class ReelsController extends Controller
     {
         $cursorData = [
             'feed' => $feed,
-            'system_id' => $last->system_id,
             'id' => $last->id,
+            'created_at' => $last->created_at?->toDateTimeString() ?? (string) $last->created_at,
+            'sort_by' => $feedContext['sort_by'],
         ];
 
         if ($feed === self::FEED_USER && $feedContext['user_id'] !== null) {
@@ -325,7 +347,9 @@ class ReelsController extends Controller
             max((int) ($request->input('per_page') ?: self::PER_PAGE_DEFAULT), 1),
             self::PER_PAGE_MAX
         );
-        $anchorId = $cursor['system_id'] === null && $request->filled('anchor_id')
+        $anchorId = $cursor['created_at'] === null
+            && $cursor['system_id'] === null
+            && $request->filled('anchor_id')
             ? (string) $request->input('anchor_id')
             : null;
 
@@ -335,6 +359,7 @@ class ReelsController extends Controller
             'video_type' => $videoType,
             'per_page' => $perPage,
             'anchor_id' => $anchorId,
+            'sort_by' => VideoFeedSort::fromRequest($request, $cursor),
         ];
     }
 
@@ -439,7 +464,9 @@ class ReelsController extends Controller
         $empty = [
             'cache_key' => '_start',
             'system_id' => null,
+            'created_at' => null,
             'id' => null,
+            'sort_by' => VideoFeedSort::NEWEST,
             'geo_fallback' => false,
             'feed' => null,
             'user_id' => null,
@@ -461,14 +488,23 @@ class ReelsController extends Controller
             return $empty;
         }
 
-        if (! is_array($data) || ! isset($data['system_id'], $data['id'])) {
+        if (! is_array($data) || ! isset($data['id'])) {
+            return $empty;
+        }
+
+        $createdAt = isset($data['created_at']) ? (string) $data['created_at'] : null;
+        $systemId = isset($data['system_id']) ? (int) $data['system_id'] : null;
+
+        if ($createdAt === null && $systemId === null) {
             return $empty;
         }
 
         return [
             'cache_key' => sha1((string) $rawCursor),
-            'system_id' => (int) $data['system_id'],
+            'system_id' => $systemId,
+            'created_at' => $createdAt,
             'id' => (string) $data['id'],
+            'sort_by' => VideoFeedSort::resolve($data['sort_by'] ?? null),
             'geo_fallback' => ! empty($data['geo_fallback']),
             'feed' => isset($data['feed']) ? (string) $data['feed'] : null,
             'user_id' => isset($data['user_id']) ? (string) $data['user_id'] : null,
@@ -506,7 +542,7 @@ class ReelsController extends Controller
             }
         }
 
-        return 'reels_feed_'.$feed.'_'.$viewerPart.'_b_'.$blockedHash.$geoPart.$followingPart.$userPart.'_'.$cursorKey;
+        return 'reels_feed_'.$feed.'_'.$viewerPart.'_b_'.$blockedHash.$geoPart.$followingPart.$userPart.'_s_'.$feedContext['sort_by'].'_'.$cursorKey;
     }
 
     /**

@@ -43,6 +43,8 @@ Route::get('/home', [HomeController::class, 'index'])->name('home');
 Route::get('/.well-known/assetlinks.json', [HomeController::class, 'assetlinks']);
 Route::get('/.well-known/apple-app-site-association', [HomeController::class, 'appleAppSiteAssociation']);
 Route::get('/web/visitSingleVideo', [HomeController::class, 'visitSingleVideo'])->name('web.visit_single_video');
+Route::get('/web/visitProfile', [HomeController::class, 'visitProfile'])->name('web.visit_profile');
+Route::get('/profile', [HomeController::class, 'visitProfile'])->name('web.profile');
 Route::get('/about_us', [HomeController::class, 'about_us'])->name('about_us');
 Route::get('/blog/{category?}', [HomeController::class, 'blog'])->name('blog');
 Route::get('/privacy_policy', [HomeController::class, 'privacy_policy'])->name('privacy_policy');

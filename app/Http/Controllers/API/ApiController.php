@@ -1947,16 +1947,14 @@ class ApiController extends Controller
             //     return response()->noContent();
             // }
             if($isAndroid || $isIos){
-                // Return a view that executes your JS logic
                 return view('app-redirect', [
                     'isAndroid' => $isAndroid,
                     'isIos' => $isIos,
                     'id' => $request->id
                 ]);
             }
-            
-            // For desktop/web case, show nothing
-            return response()->noContent();
+
+            return redirect()->route('home');
         }
 
         $input = $request->all();
