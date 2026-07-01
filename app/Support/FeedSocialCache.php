@@ -57,6 +57,48 @@ class FeedSocialCache
         });
     }
 
+    public static function countryIdFromCoords(float $lat, float $lng): int
+    {
+        $cityId = self::nearestCityId($lat, $lng);
+        if ($cityId === 0) {
+            return 0;
+        }
+
+        return (int) (DB::table('cities')->where('id', $cityId)->value('country_id') ?? 0);
+    }
+
+    /**
+     * Cities within radius that have published videos (for scope=local).
+     *
+     * @return list<int|string>
+     */
+    public static function localCityIds(float $lat, float $lng, float $radiusKm): array
+    {
+        $radiusKm = max(1.0, $radiusKm);
+        $ids = self::cityIdsWithVideosWithinRadius($lat, $lng, $radiusKm);
+
+        if (! empty($ids)) {
+            return $ids;
+        }
+
+        $city = self::nearestCityId($lat, $lng);
+
+        return $city > 0 ? self::cityGroupIds($city) : [];
+    }
+
+    public static function haversineDistanceSql(float $lat, float $lng, string $latCol, string $lngCol): string
+    {
+        return "(6371 * acos(
+            LEAST(1, GREATEST(-1,
+                cos(radians({$lat})) *
+                cos(radians({$latCol})) *
+                cos(radians({$lngCol}) - radians({$lng})) +
+                sin(radians({$lat})) *
+                sin(radians({$latCol}))
+            ))
+        ))";
+    }
+
     /**
      * Resolve city IDs for Near Me: exact city group first, then expand to
      * nearby cities that actually have published videos before callers fall

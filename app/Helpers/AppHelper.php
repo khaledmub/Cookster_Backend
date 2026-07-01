@@ -391,7 +391,7 @@ class AppHelper
             $v->image_url = $fullImageUrl;
             $v->thumbnail_url = $photoThumbUrl ?? $fullImageUrl;
             $v->thumbnail = $v->thumbnail_url;
-            $v->video_sources = ['url_360' => null, 'url_720' => null, 'url_1080' => null];
+            $v->video_sources = null;
             $v->hls_playlist_url = null;
             $v->hls_url = null;
             if (config('cdn.expose_direct_urls')) {

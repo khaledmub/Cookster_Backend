@@ -47,7 +47,7 @@ class ReelResource extends JsonResource
             $coverImageUrl = $fullImageUrl;
             $thumbnailUrl = $photoThumbUrl ?? $fullImageUrl;
             $hlsPlaylistUrl = null;
-            $videoSources = ['url_360' => null, 'url_720' => null, 'url_1080' => null];
+            $videoSources = null;
             $videoUrlDirect = $pathImage !== ''
                 ? $cdn->directUrlForPath(str_starts_with($pathImage, 'videos/') ? $pathImage : 'videos/'.$pathImage)
                 : null;

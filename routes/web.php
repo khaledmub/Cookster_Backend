@@ -39,7 +39,7 @@ Auth::routes();
 
 Route::get('change/lang', [LocalizationController::class, 'lang_change'])->name('LangChange');
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/home', [HomeController::class, 'index'])->name('home');
+Route::get('/home', [HomeController::class, 'index']);
 Route::get('/.well-known/assetlinks.json', [HomeController::class, 'assetlinks']);
 Route::get('/.well-known/apple-app-site-association', [HomeController::class, 'appleAppSiteAssociation']);
 Route::get('/web/visitSingleVideo', [HomeController::class, 'visitSingleVideo'])->name('web.visit_single_video');
@@ -62,7 +62,7 @@ Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|ar']], functio
 
 Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/', [DashboardController::class, 'index']);
     // Roles
     Route::resource('roles', RoleController::class);
     Route::post('ajax/get_roles', [RoleController::class, 'get_roles_ajax']);
