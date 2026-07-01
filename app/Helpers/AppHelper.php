@@ -467,6 +467,13 @@ class AppHelper
             $v->user_image_url = self::userImageUrl((string) $v->user_image);
         }
 
+        if (property_exists($v, 'created_at') || isset($v->created_at)) {
+            $v->created_at = \App\Support\ApiTimestamp::format($v->created_at ?? null);
+        }
+        if (property_exists($v, 'updated_at') || isset($v->updated_at)) {
+            $v->updated_at = \App\Support\ApiTimestamp::format($v->updated_at ?? null);
+        }
+
         $useAbsolute = (bool) config('filesystems.disks.s3.api_media_absolute_urls', true);
         if (! $useAbsolute) {
             if (! $isHlsReady && ! $isPhotoPost) {

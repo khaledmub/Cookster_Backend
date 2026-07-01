@@ -26,11 +26,27 @@ class VideoFeedSort
 
     public static function fromRequest(Request $request, ?array $cursor = null): string
     {
-        if (is_array($cursor) && isset($cursor['sort_by'])) {
+        if (
+            is_array($cursor)
+            && ($cursor['created_at'] ?? null) !== null
+            && isset($cursor['sort_by'])
+        ) {
             return self::resolve($cursor['sort_by']);
         }
 
         return self::resolve($request->input('sort_by'));
+    }
+
+    /**
+     * Pure chronological feed (no feed_seed shuffle / sponsored slot injection).
+     */
+    public static function isExplicitChronologicalRequest(Request $request, ?array $cursor = null): bool
+    {
+        if ($request->filled('sort_by')) {
+            return true;
+        }
+
+        return is_array($cursor) && array_key_exists('sort_by', $cursor);
     }
 
     public static function isChronological(string $sort): bool

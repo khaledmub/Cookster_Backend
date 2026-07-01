@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Models\Video;
 use App\Services\CdnService;
 use App\Services\VideoMediaService;
+use App\Support\ApiTimestamp;
 use App\Support\CdnUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -88,6 +89,8 @@ class ReelResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'created_at' => ApiTimestamp::format($this->created_at),
+            'updated_at' => ApiTimestamp::format($this->updated_at),
             'is_image' => $isImage,
             'title' => $this->title,
             'description' => $this->description,

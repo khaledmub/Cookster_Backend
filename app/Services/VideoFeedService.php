@@ -49,7 +49,7 @@ class VideoFeedService
         $queries = $this->buildVideoQueries($context);
         $sort = VideoFeedSort::fromRequest($request);
 
-        if (VideoFeedSort::isChronological($sort)) {
+        if (VideoFeedSort::isExplicitChronologicalRequest($request)) {
             $finalList = $this->fetchVideosChronological($queries['normal'], $sort);
         } else {
             $feedSeed = (int) ($request->input('feed_seed') ?: random_int(1, 999999));
@@ -101,7 +101,7 @@ class VideoFeedService
         $queries = $this->buildVideoQueries($context);
         $sort = VideoFeedSort::fromRequest($request);
 
-        if (VideoFeedSort::isChronological($sort)) {
+        if (VideoFeedSort::isExplicitChronologicalRequest($request)) {
             return $this->paginatedListChronological($request, $user, $context, $queries['normal'], $sort);
         }
 

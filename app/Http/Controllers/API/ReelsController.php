@@ -79,6 +79,7 @@ class ReelsController extends Controller
                 'has_more' => $payload['has_more'],
                 'next_cursor' => $payload['next_cursor'],
                 'geo_fallback' => $payload['geo_fallback'],
+                'sort_by' => $feedContext['sort_by'],
             ],
         ]);
     }
@@ -466,7 +467,6 @@ class ReelsController extends Controller
             'system_id' => null,
             'created_at' => null,
             'id' => null,
-            'sort_by' => VideoFeedSort::NEWEST,
             'geo_fallback' => false,
             'feed' => null,
             'user_id' => null,

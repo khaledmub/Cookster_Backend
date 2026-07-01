@@ -24,6 +24,8 @@ class Video extends Model
         'is_soft_delete' => 'boolean',
         'status' => 'integer',
         'publish_type' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
