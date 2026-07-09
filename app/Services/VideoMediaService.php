@@ -99,11 +99,12 @@ class VideoMediaService
         ?S3Service $s3 = null,
     ): ?string {
         $s3 ??= app(S3Service::class);
-        $posterKey = self::posterKey($videoId);
 
-        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')
-            && $s3->fileExists($posterKey)) {
-            return CdnUrl::forPath($posterKey);
+        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')) {
+            $posterUrl = self::posterUrlIfExists($videoId, $s3);
+            if ($posterUrl !== null) {
+                return $posterUrl;
+            }
         }
 
         if ($imageFilename === null || trim($imageFilename) === '') {
@@ -117,9 +118,9 @@ class VideoMediaService
 
         $basename = basename(str_replace('\\', '/', $image));
         if ($basename !== '') {
-            $legacyThumb = CdnUrl::forPath('videos/thumbnail/'.$basename);
-            if ($legacyThumb !== null) {
-                return $legacyThumb;
+            $legacyKey = 'videos/thumbnail/'.$basename;
+            if (self::legacyPosterExists($legacyKey, $s3)) {
+                return CdnUrl::forPath($legacyKey);
             }
         }
 
@@ -133,14 +134,65 @@ class VideoMediaService
         ?S3Service $s3 = null,
     ): ?string {
         $s3 ??= app(S3Service::class);
-        $blurKey = self::posterBlurKey($videoId);
 
-        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')
-            && $s3->fileExists($blurKey)) {
-            return CdnUrl::forPath($blurKey);
+        if ((($transcodeStatus ?? '') === 'ready' || ($processingStatus ?? '') === 'ready')) {
+            $blurUrl = self::posterBlurUrlIfExists($videoId, $s3);
+            if ($blurUrl !== null) {
+                return $blurUrl;
+            }
         }
 
         return null;
+    }
+
+    private static function posterUrlIfExists(string $videoId, S3Service $s3): ?string
+    {
+        $key = self::posterKey($videoId);
+
+        $exists = CookCache::remember(
+            'video:poster_exists:'.$videoId,
+            [300, 3600],
+            fn () => $s3->fileExists($key)
+        );
+
+        if (! $exists) {
+            return null;
+        }
+
+        return CdnUrl::forPath($key);
+    }
+
+    private static function posterBlurUrlIfExists(string $videoId, S3Service $s3): ?string
+    {
+        $key = self::posterBlurKey($videoId);
+
+        $exists = CookCache::remember(
+            'video:poster_blur_exists:'.$videoId,
+            [300, 3600],
+            fn () => $s3->fileExists($key)
+        );
+
+        if (! $exists) {
+            return null;
+        }
+
+        return CdnUrl::forPath($key);
+    }
+
+    private static function legacyPosterExists(string $legacyKey, S3Service $s3): bool
+    {
+        return CookCache::remember(
+            'video:legacy_poster_exists:'.sha1($legacyKey),
+            [300, 3600],
+            fn () => $s3->fileExists($legacyKey)
+        );
+    }
+
+    /** Bust cached poster existence checks after upload/re-transcode. */
+    public static function forgetPosterExistsCache(string $videoId): void
+    {
+        CookCache::forget('video:poster_exists:'.$videoId);
+        CookCache::forget('video:poster_blur_exists:'.$videoId);
     }
 
     /**

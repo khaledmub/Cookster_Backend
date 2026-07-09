@@ -104,23 +104,46 @@ class ReelsController extends Controller
             ? false
             : (bool) ($geoContext['geo_fallback'] ?? false);
 
+        $isFirstNearMePage = $feed === self::FEED_NEAR_ME
+            && $cursor['created_at'] === null
+            && $cursor['system_id'] === null;
+
+        if (
+            $isFirstNearMePage
+            && ! $geoFallback
+            && (
+                ! empty($geoContext['geo_unresolved'])
+                || ! $this->hasActiveNearMeGeoFilter($geoContext)
+            )
+        ) {
+            $result = $this->executeReelsQuery(
+                $feed,
+                $cursor,
+                $viewer,
+                $this->generalNearMeFallbackGeoContext(),
+                $feedContext
+            );
+            $result['geo_fallback'] = true;
+
+            return $result;
+        }
+
         $result = $this->executeReelsQuery($feed, $cursor, $viewer, $geoContext, $feedContext);
 
         if (
             $feed === self::FEED_NEAR_ME
             && $result['items']->isEmpty()
             && ! $geoFallback
-            && $cursor['created_at'] === null
-            && $cursor['system_id'] === null
+            && $isFirstNearMePage
+            && $this->hasActiveNearMeGeoFilter($geoContext)
         ) {
-            $fallbackGeo = [
-                'cities_ids' => [],
-                'city' => 0,
-                'geo_fallback' => true,
-                'hash' => 'fallback',
-            ];
-
-            $result = $this->executeReelsQuery($feed, $cursor, $viewer, $fallbackGeo, $feedContext);
+            $result = $this->executeReelsQuery(
+                $feed,
+                $cursor,
+                $viewer,
+                $this->generalNearMeFallbackGeoContext(),
+                $feedContext
+            );
             $result['geo_fallback'] = true;
 
             return $result;
@@ -432,32 +455,12 @@ class ReelsController extends Controller
         }
 
         if (! empty($cursor['geo_fallback'])) {
-            return array_merge($empty, [
-                'geo_fallback' => true,
-                'hash' => 'fallback',
-            ]);
+            return $this->generalNearMeFallbackGeoContext();
         }
 
         $lat = $request->filled('latitude') ? (float) $request->input('latitude') : null;
         $lng = $request->filled('longitude') ? (float) $request->input('longitude') : null;
-
-        if ($request->filled('city')) {
-            $manualCity = (int) $request->input('city');
-            $citiesIds = FeedSocialCache::cityGroupIds($manualCity);
-            $countryId = (int) (DB::table('cities')->where('id', $manualCity)->value('country_id') ?? 0);
-
-            return [
-                'cities_ids' => $citiesIds,
-                'city' => $manualCity,
-                'country_id' => $countryId,
-                'geo_scope' => self::GEO_SCOPE_CITY,
-                'geo_radius_km' => null,
-                'geo_fallback' => false,
-                'latitude' => $lat,
-                'longitude' => $lng,
-                'hash' => sha1('city:'.$manualCity.':'.implode(',', $citiesIds)),
-            ];
-        }
+        $manualCity = $request->filled('city') ? (int) $request->input('city') : null;
 
         if ($lat !== null && $lng !== null) {
             $scope = $this->parseGeoScope($request);
@@ -474,6 +477,8 @@ class ReelsController extends Controller
                     'geo_scope' => self::GEO_SCOPE_LOCAL,
                     'geo_radius_km' => $radiusKm,
                     'geo_fallback' => false,
+                    'geo_unresolved' => false,
+                    'geo_expanded' => false,
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'hash' => sha1('local:'.round($lat, 3).':'.round($lng, 3).':'.$radiusKm.':'.implode(',', $citiesIds)),
@@ -488,30 +493,78 @@ class ReelsController extends Controller
                     'geo_scope' => self::GEO_SCOPE_GLOBAL,
                     'geo_radius_km' => null,
                     'geo_fallback' => false,
+                    'geo_unresolved' => false,
+                    'geo_expanded' => false,
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'hash' => sha1('global:'.round($lat, 3).':'.round($lng, 3)),
                 ];
             }
 
-            $countryId = $request->filled('country')
-                ? (int) $request->input('country')
-                : FeedSocialCache::countryIdFromCoords($lat, $lng);
+            if ($scope === self::GEO_SCOPE_COUNTRY) {
+                $countryId = $request->filled('country')
+                    ? (int) $request->input('country')
+                    : FeedSocialCache::countryIdFromCoords($lat, $lng);
+
+                return [
+                    'cities_ids' => [],
+                    'city' => FeedSocialCache::nearestCityId($lat, $lng),
+                    'country_id' => $countryId,
+                    'geo_scope' => self::GEO_SCOPE_COUNTRY,
+                    'geo_radius_km' => null,
+                    'geo_fallback' => false,
+                    'geo_unresolved' => false,
+                    'geo_expanded' => false,
+                    'latitude' => $lat,
+                    'longitude' => $lng,
+                    'hash' => sha1('country:'.$countryId.':'.round($lat, 3).':'.round($lng, 3)),
+                ];
+            }
+
+            $nearMe = FeedSocialCache::nearMeCityIds($lat, $lng, $manualCity);
+
+            return $this->nearMeCityGeoContext($nearMe, $lat, $lng);
+        }
+
+        if ($manualCity !== null) {
+            $cityRow = DB::table('cities')->where('id', $manualCity)->first(['id', 'latitude', 'longitude']);
+
+            if ($cityRow && $cityRow->latitude !== null && $cityRow->longitude !== null) {
+                $nearMe = FeedSocialCache::nearMeCityIds(
+                    (float) $cityRow->latitude,
+                    (float) $cityRow->longitude,
+                    $manualCity
+                );
+
+                return $this->nearMeCityGeoContext(
+                    $nearMe,
+                    (float) $cityRow->latitude,
+                    (float) $cityRow->longitude
+                );
+            }
+
+            $citiesIds = FeedSocialCache::cityGroupIds($manualCity);
+            $countryId = (int) (DB::table('cities')->where('id', $manualCity)->value('country_id') ?? 0);
 
             return [
-                'cities_ids' => [],
-                'city' => FeedSocialCache::nearestCityId($lat, $lng),
+                'cities_ids' => $citiesIds,
+                'city' => $manualCity,
                 'country_id' => $countryId,
-                'geo_scope' => self::GEO_SCOPE_COUNTRY,
+                'geo_scope' => self::GEO_SCOPE_CITY,
                 'geo_radius_km' => null,
                 'geo_fallback' => false,
-                'latitude' => $lat,
-                'longitude' => $lng,
-                'hash' => sha1('country:'.$countryId.':'.round($lat, 3).':'.round($lng, 3)),
+                'geo_unresolved' => false,
+                'geo_expanded' => false,
+                'latitude' => null,
+                'longitude' => null,
+                'hash' => sha1('city:'.$manualCity.':'.implode(',', $citiesIds)),
             ];
         }
 
-        return $empty;
+        return array_merge($empty, [
+            'geo_unresolved' => true,
+            'hash' => 'unresolved',
+        ]);
     }
 
     /**
@@ -536,19 +589,117 @@ class ReelsController extends Controller
             'geo_scope' => self::GEO_SCOPE_NONE,
             'geo_radius_km' => null,
             'geo_fallback' => false,
+            'geo_unresolved' => false,
+            'geo_expanded' => false,
             'latitude' => null,
             'longitude' => null,
             'hash' => 'none',
         ];
     }
 
+    /**
+     * @param  array{city: int, cities_ids: array<int|string>, expanded: bool, hash: string}  $nearMe
+     * @return array{
+     *     cities_ids: array<int|string>,
+     *     city: int,
+     *     country_id: int,
+     *     geo_scope: string,
+     *     geo_radius_km: ?float,
+     *     geo_fallback: bool,
+     *     geo_unresolved: bool,
+     *     geo_expanded: bool,
+     *     latitude: ?float,
+     *     longitude: ?float,
+     *     hash: string
+     * }
+     */
+    private function nearMeCityGeoContext(array $nearMe, float $lat, float $lng): array
+    {
+        return [
+            'cities_ids' => $nearMe['cities_ids'],
+            'city' => $nearMe['city'],
+            'country_id' => FeedSocialCache::countryIdFromCoords($lat, $lng),
+            'geo_scope' => self::GEO_SCOPE_CITY,
+            'geo_radius_km' => $nearMe['expanded'] ? 120.0 : null,
+            'geo_fallback' => false,
+            'geo_unresolved' => false,
+            'geo_expanded' => $nearMe['expanded'],
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'hash' => $nearMe['hash'],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     cities_ids: array<int|string>,
+     *     city: int,
+     *     country_id: int,
+     *     geo_scope: string,
+     *     geo_radius_km: ?float,
+     *     geo_fallback: bool,
+     *     geo_unresolved: bool,
+     *     geo_expanded: bool,
+     *     latitude: ?float,
+     *     longitude: ?float,
+     *     hash: string
+     * }
+     */
+    private function generalNearMeFallbackGeoContext(): array
+    {
+        return array_merge($this->emptyGeoContext(), [
+            'geo_fallback' => true,
+            'hash' => 'fallback',
+        ]);
+    }
+
+    /**
+     * @param  array{
+     *     cities_ids: array<int|string>,
+     *     city: int,
+     *     country_id: int,
+     *     geo_scope: string,
+     *     geo_radius_km: ?float,
+     *     geo_fallback: bool,
+     *     geo_unresolved: bool,
+     *     geo_expanded: bool,
+     *     latitude: ?float,
+     *     longitude: ?float,
+     *     hash: string
+     * }  $geoContext
+     */
+    private function hasActiveNearMeGeoFilter(array $geoContext): bool
+    {
+        if (! empty($geoContext['geo_fallback']) || ! empty($geoContext['geo_unresolved'])) {
+            return false;
+        }
+
+        if ($geoContext['geo_scope'] === self::GEO_SCOPE_GLOBAL) {
+            return false;
+        }
+
+        if ($geoContext['geo_scope'] === self::GEO_SCOPE_CITY || $geoContext['geo_scope'] === self::GEO_SCOPE_LOCAL) {
+            return ! empty($geoContext['cities_ids']);
+        }
+
+        if ($geoContext['geo_scope'] === self::GEO_SCOPE_COUNTRY) {
+            return $geoContext['country_id'] > 0;
+        }
+
+        return false;
+    }
+
     private function parseGeoScope(Request $request): string
     {
-        $scope = strtolower((string) $request->input('scope', self::GEO_SCOPE_COUNTRY));
+        if (! $request->filled('scope')) {
+            return self::GEO_SCOPE_CITY;
+        }
+
+        $scope = strtolower((string) $request->input('scope'));
 
         return in_array($scope, [self::GEO_SCOPE_LOCAL, self::GEO_SCOPE_COUNTRY, self::GEO_SCOPE_GLOBAL], true)
             ? $scope
-            : self::GEO_SCOPE_COUNTRY;
+            : self::GEO_SCOPE_CITY;
     }
 
     private function parseRadiusKm(Request $request): float
@@ -695,10 +846,16 @@ class ReelsController extends Controller
             ];
         }
 
-        return [
+        $meta = [
             'geo_scope' => $geoContext['geo_scope'],
             'geo_radius_km' => $geoContext['geo_radius_km'],
         ];
+
+        if (! empty($geoContext['geo_expanded'])) {
+            $meta['geo_expanded'] = true;
+        }
+
+        return $meta;
     }
 
     /**

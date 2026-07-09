@@ -98,6 +98,8 @@ class SupplementMp4LadderJob implements ShouldQueue
                         ->where('id', $this->videoId)
                         ->update(['processing_status' => 'ready']);
                 }
+
+                VideoMediaService::forgetPosterExistsCache($this->videoId);
             }
 
             Log::info('SupplementMp4LadderJob completed', [

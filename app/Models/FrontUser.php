@@ -36,6 +36,8 @@ class FrontUser extends Authenticatable
         'total_outstanding_balance',
         'is_one_time_discount_given',
         'status',
+        'registration_status',
+        'otp_verified_at',
     ];
 
     protected $hidden = [
@@ -46,6 +48,7 @@ class FrontUser extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'otp_verified_at' => 'datetime',
         ];
     }
 }

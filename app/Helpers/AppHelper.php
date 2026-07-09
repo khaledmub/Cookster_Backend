@@ -145,11 +145,27 @@ class AppHelper
         }
 
         DB::table('verification_codes')->where('medium', $medium)->where('front_user_id', $user->id)->delete();
-        DB::table('verification_codes')->insert([
+
+        $insert = [
             'medium' => $medium,
             'front_user_id' => $user->id,
             'code' => $verfication_code,
-        ]);
+        ];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('verification_codes', 'purpose')) {
+            $insert['purpose'] = $type === 'register' ? 'register' : 'reset';
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('verification_codes', 'expires_at')) {
+            $insert['expires_at'] = now()->addMinutes($type === 'register' ? 30 : 60);
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('verification_codes', 'attempts')) {
+            $insert['attempts'] = 0;
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('verification_codes', 'sent_at')) {
+            $insert['sent_at'] = now();
+        }
+
+        DB::table('verification_codes')->insert($insert);
 
         $result['success'] = true;
         return $result;
@@ -321,12 +337,17 @@ class AppHelper
      */
     public static function normalizeIsImage(object $v): int
     {
+        $image = isset($v->image) ? trim((string) $v->image) : '';
+        $video = isset($v->video) ? trim((string) $v->video) : '';
+
+        // Primary upload is a video file — never treat as photo, even if is_image was mis-set in DB.
+        if ($video !== '' && ! \App\Services\VideoMediaService::isStaticImageFilename($video)) {
+            return 0;
+        }
+
         if (isset($v->is_image) && ($v->is_image === true || $v->is_image === 1 || $v->is_image === '1')) {
             return 1;
         }
-
-        $image = isset($v->image) ? trim((string) $v->image) : '';
-        $video = isset($v->video) ? trim((string) $v->video) : '';
 
         if ($image !== '' && \App\Services\VideoMediaService::isStaticImageFilename($image)) {
             if ($video === '' || \App\Services\VideoMediaService::isStaticImageFilename($video)) {

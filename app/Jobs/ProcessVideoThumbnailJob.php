@@ -73,6 +73,8 @@ class ProcessVideoThumbnailJob implements ShouldQueue
             throw new \RuntimeException('Poster upload missing on object storage: '.$this->videoId);
         }
 
+        VideoMediaService::forgetPosterExistsCache($this->videoId);
+
         foreach ([$posterPath, $blurPath, $legacyJpegPath] as $tempFile) {
             if (file_exists($tempFile)) {
                 unlink($tempFile);

@@ -112,6 +112,7 @@ class ProcessVideoJob implements ShouldQueue
             VideoMediaService::forgetMp4ExistsCache($this->videoId);
 
             $this->maybeExtractPosterFromVideo($video, $sourcePath, $workDir, $posterExtractor, $s3Service);
+            VideoMediaService::forgetPosterExistsCache($this->videoId);
 
             $mediaVerifier->assertTranscodeReady($this->videoId, $s3Service, $mp4LadderHeights);
 

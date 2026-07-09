@@ -28,6 +28,8 @@ use App\Services\ProfanityFilterService;
 use App\Services\VideoFeedService;
 use App\Helpers\FeedPaginationHelper;
 use App\Support\PublicUserProfile;
+use App\Support\RegistrationService;
+use App\Support\RegistrationStatus;
 use App\Support\UsernameService;
 use Mpdf\Mpdf;
 
@@ -40,14 +42,13 @@ class ApiController extends Controller
             $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
         }
 
-        $validator = Validator::make($request->all(), array_merge([
-            'name' => 'required',
-            'email' => 'required|email|unique:front_users,email',
-            'phone' => 'nullable|unique:front_users,phone',
-            'password' => 'required|string|min:8',
-            'entity' => 'required',
-            'uuid' => 'required',
-        ], UsernameService::validationRules()), UsernameService::customMessages());
+        $pendingByEmail = RegistrationService::findPendingByEmail((string) $request->input('email'));
+        $ignoreUserId = $pendingByEmail?->id;
+
+        $validator = Validator::make($request->all(), array_merge(
+            RegistrationService::baseValidationRules($ignoreUserId),
+            UsernameService::validationRules($ignoreUserId)
+        ), UsernameService::customMessages());
         // Add conditional validation based on the value of 'entity'
         $validator->sometimes(['business_type', 'contact_phone', 'contact_email', 'location', 'latitude', 'longitude'], ['required'], function ($input) {
             return $input->entity == 2;
@@ -80,7 +81,7 @@ class ApiController extends Controller
 
         $validator = Validator::make(
             $request->all(),
-            ['user_name' => ['required', 'string', 'min:3', 'max:30', 'regex:/^[a-z0-9_]+$/']],
+            UsernameService::formatRules(),
             UsernameService::customMessages()
         );
 
@@ -90,14 +91,21 @@ class ApiController extends Controller
                 'message' => __('messages.validation_failed'),
                 'errors' => $validator->errors(),
                 'available' => false,
+                'checked' => false,
+                'reason' => 'format',
             ], 422);
         }
 
         $ignoreUserId = Auth::guard('sanctum')->user()?->id;
+        $normalized = (string) $request->input('user_name');
+        $reason = RegistrationService::usernameAvailabilityReason($normalized, $ignoreUserId);
+        $available = in_array($reason, ['available', 'pending_resume_allowed'], true);
 
         return response()->json([
             'status' => true,
-            'available' => UsernameService::isAvailable((string) $request->input('user_name'), $ignoreUserId),
+            'available' => $available,
+            'checked' => true,
+            'reason' => $reason,
         ], 200);
     }
 
@@ -106,14 +114,13 @@ class ApiController extends Controller
             $request->merge(['user_name' => UsernameService::normalize($request->input('user_name'))]);
         }
 
-        $validator = Validator::make($request->all(), array_merge([
-            'name' => 'required',
-            'email' => 'required|email|unique:front_users,email',
-            'phone' => 'nullable|unique:front_users,phone',
-            'password' => 'required|string|min:8',
-            'entity' => 'required',
-            'uuid' => 'required',
-        ], UsernameService::validationRules()), UsernameService::customMessages());
+        $pendingByEmail = RegistrationService::findPendingByEmail((string) $request->input('email'));
+        $ignoreUserId = $pendingByEmail?->id;
+
+        $validator = Validator::make($request->all(), array_merge(
+            RegistrationService::baseValidationRules($ignoreUserId),
+            UsernameService::validationRules($ignoreUserId)
+        ), UsernameService::customMessages());
         // Add conditional validation based on the value of 'entity'
         $validator->sometimes(['business_type', 'contact_phone', 'contact_email', 'location', 'latitude', 'longitude'], ['required'], function ($input) {
             return $input->entity == 2;
@@ -132,79 +139,64 @@ class ApiController extends Controller
                 'errors' => $validator->errors(),
             ], 422);
         }
+
         $input = $request->all();
+        $normalizedUsername = UsernameService::normalize($input['user_name']);
 
-        $front_user_data = [
-            'id' => (string) \Str::uuid(),
-            'name' => $input['name'],
-            'user_name' => UsernameService::normalize($input['user_name']),
-            'email' => $input['email'],
-            'phone' => isset($input['phone'])? $input['phone']: NULL,
-            'password' => Hash::make($input['password']),
-            'dob' => isset($input['dob'])? date('Y-m-d', strtotime($input['dob'])): NULL,
-            'country' => $input['country']? $input['country']: 0,
-            'state' => 0,
-            'city' => $input['city']? $input['city']: 0,
-            'uuid' => $input['uuid'],
-            'entity' => $input['entity'],
-        ];
-
-        $settings = DB::table('settings')->where('id', 1)->first();
-        if($settings && $settings->allow_one_time_qr_reward == 1 && $request->entity == 1){
-            $front_user_data['is_one_time_discount_given'] = 0;
+        if (RegistrationService::findActiveByEmail((string) $input['email']) !== null) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => [
+                    'email' => [__('messages.email_already_registered', ['default' => 'This email is already registered.'])],
+                ],
+            ], 422);
         }
 
-        $user = FrontUser::create($front_user_data);
-        $user = FrontUser::where('email', $request->email)->first();
-
-        if($request->entity == 1){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['website'] = $request->website;
-            DB::table('personal_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 2){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['business_type'] = $request->business_type;
-            $additional_data['contact_phone'] = $request->contact_phone;
-            $additional_data['contact_email'] = $request->contact_email;
-            $additional_data['website'] = $request->website;
-            $additional_data['location'] = $request->location;
-            $additional_data['latitude'] = $request->latitude;
-            $additional_data['longitude'] = $request->longitude;
-            DB::table('business_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 3){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['country'] = 194;
-            $additional_data['state'] = $request->state;
-            $additional_data['city'] = 0;
-            $additional_data['contact_phone'] = $request->contact_phone;
-            $additional_data['contact_email'] = $request->contact_email;
-            DB::table('chef_account_additional_data')->insert($additional_data);
-        }
-        if($request->entity == 8){
-            $additional_data = array();
-            $additional_data['front_user_id'] = $user->id;
-            $additional_data['type_of_account'] = $request->type_of_account;
-            DB::table('sponsored_account_additional_data')->insert($additional_data);
-        }
-        // Send registration OTP
-        $dispatch = AppHelper::send_verification_code(1, $user, 'register');
-
-        $language = App::getLocale();
-
-        if($language == 'ar'){
-            $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
-        }
-        else{
-            $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
+        $pendingByUsername = RegistrationService::findPendingByUsername($normalizedUsername, $ignoreUserId);
+        if (! RegistrationService::isUsernameAvailable($normalizedUsername, $ignoreUserId)) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => [
+                    'user_name' => [__('messages.username_taken')],
+                ],
+            ], 422);
         }
 
-        $user->entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
-        if(isset($input['package_id']) && $input['package_id']!='' && $input['package_id']!=null){
+        if ($pendingByUsername !== null && ($pendingByEmail === null || $pendingByUsername->id !== $pendingByEmail->id)) {
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.validation_failed'),
+                'errors' => [
+                    'user_name' => [__('messages.username_taken')],
+                ],
+            ], 422);
+        }
+
+        $resumed = false;
+        if ($pendingByEmail !== null) {
+            $user = RegistrationService::resumePendingUser($pendingByEmail, $input, $request);
+            $resumed = true;
+        } else {
+            try {
+                $user = RegistrationService::createPendingUser($input, $request);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($this->isDuplicateUsernameException($e)) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => __('messages.validation_failed'),
+                        'errors' => [
+                            'user_name' => [__('messages.username_taken')],
+                        ],
+                    ], 422);
+                }
+
+                throw $e;
+            }
+        }
+
+        if (isset($input['package_id']) && $input['package_id'] != '' && $input['package_id'] != null) {
             $payment_data = array();
             $payment_data['PaymentId'] = $request->PaymentId;
             $payment_data['TranId'] = $request->TranId;
@@ -218,19 +210,25 @@ class ApiController extends Controller
             AppHelper::subscribe_user_to_package($user->id, $input['package_id'], $payment_data);
         }
 
+        $otp = RegistrationService::sendRegistrationOtp($user);
+        $otpMeta = RegistrationService::otpResponseMeta($otp);
+
         $response = [
             'status' => true,
-            'message' => __('messages.user_registered_please_verify', ['default' => 'User registered successfully. Please verify your email.']),
-            'user' => $user,
+            'resumed' => $resumed,
+            'otp_sent' => $otpMeta['otp_sent'],
+            'otp_delivery' => $otpMeta['otp_delivery'],
+            'message' => $otpMeta['message'],
+            'user' => RegistrationService::registrationUserPayload($user),
         ];
 
-        $isStagingLike = !app()->environment('production');
+        $isStagingLike = ! app()->environment('production');
         $testModeRequested = (bool) $request->boolean('test_mode');
         if ($isStagingLike && $testModeRequested) {
-            $response['otp_code'] = $dispatch['verification_code'] ?? null;
+            $response['otp_code'] = $otp['verification_code'] ?? null;
         }
 
-        return response()->json($response, 201);
+        return response()->json($response, $resumed ? 200 : 201);
     }
 
     public function verify_registration_otp(Request $request) {
@@ -247,43 +245,25 @@ class ApiController extends Controller
             ], 422);
         }
 
-        $verify_code = DB::table('verification_codes')
-            ->where('medium', 1)
-            ->where('front_user_id', $request->user_id)
-            ->where('code', $request->code)
-            ->first();
+        $result = RegistrationService::verifyRegistrationOtp(
+            (string) $request->user_id,
+            (string) $request->code
+        );
 
-        if (empty($verify_code)) {
+        if (! $result['ok']) {
             return response()->json([
                 'status' => false,
-                'message' => __('messages.invalid_verification_code'),
-            ], 401);
+                'message' => $result['message'],
+            ], $result['status']);
         }
 
-        // OTP is valid
-        DB::table('verification_codes')
-            ->where('medium', 1)
-            ->where('front_user_id', $request->user_id)
-            ->delete();
-
-        $user = FrontUser::find($request->user_id);
-        if (!$user) {
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.user_not_found'),
-            ], 404);
-        }
-
-        $user->email_verified_at = Carbon::now();
-        $user->save();
-
+        /** @var FrontUser $user */
+        $user = $result['user'];
         $language = App::getLocale();
-        $token = $user->createToken('FrontUserToken')->plainTextToken;
 
-        if($language == 'ar'){
+        if ($language == 'ar') {
             $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
-        }
-        else{
+        } else {
             $e_select = ['id', 'name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
         }
 
@@ -291,9 +271,11 @@ class ApiController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => __('messages.email_verified_successfully', ['default' => 'Email verified successfully.']),
-            'user' => $user,
-            'token' => $token,
+            'message' => $result['message'],
+            'user' => array_merge(RegistrationService::registrationUserPayload($user), [
+                'entity_details' => $user->entity_details,
+            ]),
+            'token' => $result['token'],
         ], 200);
     }
 
@@ -328,31 +310,28 @@ class ApiController extends Controller
             ], 404);
         }
 
-        if ($user->email_verified_at !== null) {
+        $result = RegistrationService::resendRegistrationOtp($user);
+        if (! $result['ok']) {
             return response()->json([
                 'status' => false,
-                'message' => __('messages.email_already_verified', ['default' => 'Email is already verified.']),
-            ], 400);
+                'message' => $result['message'],
+                'otp_sent' => false,
+                'otp_delivery' => 'failed',
+            ], $result['status']);
         }
 
-        $dispatch = AppHelper::send_verification_code(1, $user, 'register');
-
-        if (!$dispatch['success']) {
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.forgot_code_email_failed'),
-            ], 500);
-        }
-
+        $otp = $result['otp'] ?? [];
         $response = [
             'status' => true,
-            'message' => __('messages.verification_code_sent', ['default' => 'Verification code sent successfully.']),
+            'otp_sent' => (bool) ($otp['otp_sent'] ?? true),
+            'otp_delivery' => (string) ($otp['otp_delivery'] ?? 'sent'),
+            'message' => $result['message'],
         ];
 
         $isStagingLike = !app()->environment('production');
         $testModeRequested = (bool) $request->boolean('test_mode');
         if ($isStagingLike && $testModeRequested) {
-            $response['otp_code'] = $dispatch['verification_code'] ?? null;
+            $response['otp_code'] = $otp['verification_code'] ?? null;
         }
 
         return response()->json($response, 200);
@@ -391,6 +370,15 @@ class ApiController extends Controller
                     'status' => false,
                     'message' => __('messages.account_deactivated'),
                 ], 403);
+            }
+
+            if (RegistrationStatus::isPending($user->registration_status ?? RegistrationStatus::ACTIVE)) {
+                return response()->json([
+                    'status' => true,
+                    'otp_required' => true,
+                    'message' => __('messages.registration_otp_required'),
+                    'user' => RegistrationService::registrationUserPayload($user),
+                ], 200);
             }
 
             $language = App::getLocale();
@@ -450,6 +438,15 @@ class ApiController extends Controller
                 'status' => false,
                 'message' => __('messages.account_deactivated'),
             ], 403);
+        }
+
+        if (RegistrationStatus::isPending($user->registration_status ?? RegistrationStatus::ACTIVE)) {
+            return response()->json([
+                'status' => true,
+                'otp_required' => true,
+                'message' => __('messages.registration_otp_required'),
+                'user' => RegistrationService::registrationUserPayload($user),
+            ], 200);
         }
 
         $language = App::getLocale();
@@ -2187,6 +2184,7 @@ class ApiController extends Controller
 
             if ($uploaded) {
                 $data['video'] = $video_name;
+                $data['is_image'] = 0;
                 if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
                     $data['transcode_status'] = 'pending';
                 }
@@ -3950,6 +3948,18 @@ class ApiController extends Controller
             'status' => true,
             'settings' => $settings,
         ], 200);
+    }
+
+    private function isDuplicateUsernameException(\Illuminate\Database\QueryException $e): bool
+    {
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'user_name')
+            && (
+                str_contains($message, 'duplicate')
+                || str_contains($message, 'unique')
+                || (string) $e->getCode() === '23000'
+            );
     }
 }
 

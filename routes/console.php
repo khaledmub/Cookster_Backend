@@ -24,6 +24,11 @@ Schedule::command('queue:heal-transcode --dispatch=50')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/transcode-heal.log'));
 
+Schedule::command('registrations:expire-pending')
+    ->dailyAt('03:30')
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/expire-pending-registrations.log'));
+
 // Use idle transcode capacity for ladder upgrades (1080, fast-start gaps).
 Schedule::command('videos:backfill-media --upgrade-ladder --limit=5')
     ->everyFifteenMinutes()

@@ -22,6 +22,7 @@ class VideosBackfillMediaCommand extends Command
                             {--upgrade-ladder : Encode missing 720.mp4 / thumb_blur without changing transcode_status}
                             {--reencode-faststart : Re-mux existing MP4s with +faststart (keeps transcode_status ready)}
                             {--retag-image-posts : Set is_image=1 on JPG-only rows mis-tagged as video}
+                            {--retag-video-posts : Set is_image=0 on MP4 rows mis-tagged as photo}
                             {--fix-playback-metadata : Set processing_status=ready when transcode ready + poster exists}
                             {--force : Queue every candidate (--reencode-faststart verifies in job; skips if already fast-start)}
                             {--heights=360,720,1080 : MP4 heights for --reencode-faststart}
@@ -56,12 +57,16 @@ class VideosBackfillMediaCommand extends Command
             return $this->retagImagePosts($s3, $limit, $dryRun);
         }
 
+        if ($this->option('retag-video-posts')) {
+            return $this->retagVideoPosts($s3, $limit, $dryRun);
+        }
+
         if ($this->option('fix-playback-metadata')) {
             return $this->fixPlaybackMetadata($s3, $limit, $dryRun);
         }
 
         if (! $this->option('posters') && ! $this->option('transcode')) {
-            $this->error('Specify at least one of --posters, --transcode, --upgrade-ladder, --reencode-faststart, --retag-image-posts, or --fix-playback-metadata');
+            $this->error('Specify at least one of --posters, --transcode, --upgrade-ladder, --reencode-faststart, --retag-image-posts, --retag-video-posts, or --fix-playback-metadata');
 
             return self::FAILURE;
         }
@@ -355,6 +360,58 @@ class VideosBackfillMediaCommand extends Command
         }
 
         $this->info(sprintf('Retag image posts: %d row(s)%s', $count, $dryRun ? ' (dry-run)' : ' updated'));
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Fix rows marked is_image=1 but whose primary upload is an MP4 with a transcode ladder.
+     */
+    private function retagVideoPosts(S3Service $s3, int $limit, bool $dryRun): int
+    {
+        if (! Schema::hasColumn('videos', 'is_image')) {
+            $this->warn('is_image column missing');
+
+            return self::FAILURE;
+        }
+
+        $count = 0;
+
+        foreach ($this->readyVideosCursor() as $video) {
+            if ($count >= $limit) {
+                break;
+            }
+
+            if ((int) ($video->is_image ?? 0) !== 1) {
+                continue;
+            }
+
+            $pathVideo = trim((string) ($video->video ?? ''));
+            if ($pathVideo === '' || VideoMediaService::isStaticImageFilename($pathVideo)) {
+                continue;
+            }
+
+            $id = (string) $video->id;
+            $hasLadder = $s3->fileExists(VideoMediaService::mp4Key($id, 360))
+                || $s3->fileExists(VideoMediaService::mp4Key($id, 720))
+                || $s3->fileExists('videos/'.$id.'/hls/master.m3u8');
+
+            if (! $hasLadder) {
+                continue;
+            }
+
+            $count++;
+
+            if ($dryRun) {
+                $this->line("retag-video: {$id}");
+
+                continue;
+            }
+
+            DB::table('videos')->where('id', $id)->update(['is_image' => 0]);
+        }
+
+        $this->info(sprintf('Retag video posts: %d row(s)%s', $count, $dryRun ? ' (dry-run)' : ' updated'));
 
         return self::SUCCESS;
     }

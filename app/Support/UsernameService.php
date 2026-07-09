@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class UsernameService
@@ -22,10 +21,7 @@ class UsernameService
      */
     public static function validationRules(?string $ignoreUserId = null, bool $required = true): array
     {
-        $unique = Rule::unique('front_users', 'user_name');
-        if ($ignoreUserId !== null) {
-            $unique->ignore($ignoreUserId);
-        }
+        $unique = RegistrationService::activeUniqueRule('user_name', $ignoreUserId);
 
         $rules = [
             'string',
@@ -46,12 +42,29 @@ class UsernameService
     public static function customMessages(): array
     {
         return [
-            'user_name.required' => 'Username is required.',
-            'user_name.regex' => 'Username may only contain lowercase letters, numbers, and underscores.',
-            'user_name.min' => 'Username must be at least 3 characters.',
-            'user_name.max' => 'Username must not exceed 30 characters.',
-            'user_name.unique' => 'This username is already taken.',
+            'user_name.required' => __('messages.username_required'),
+            'user_name.regex' => __('messages.username_format'),
+            'user_name.min' => __('messages.username_min'),
+            'user_name.max' => __('messages.username_max'),
+            'user_name.unique' => __('messages.username_taken'),
         ];
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    public static function formatRules(bool $required = true): array
+    {
+        $rules = [
+            'string',
+            'min:3',
+            'max:30',
+            'regex:/^[a-z0-9_]+$/',
+        ];
+
+        array_unshift($rules, $required ? 'required' : 'sometimes');
+
+        return ['user_name' => $rules];
     }
 
     public static function isAvailable(string $username, ?string $ignoreUserId = null): bool
@@ -61,7 +74,11 @@ class UsernameService
             return false;
         }
 
-        $query = DB::table('front_users')->where('user_name', $normalized);
+        $query = DB::table('front_users')
+            ->where('user_name', $normalized)
+            ->where('registration_status', RegistrationStatus::ACTIVE)
+            ->where('is_soft_delete', 0);
+
         if ($ignoreUserId !== null) {
             $query->where('id', '!=', $ignoreUserId);
         }
