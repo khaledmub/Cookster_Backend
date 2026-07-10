@@ -340,13 +340,15 @@ class AppHelper
         $image = isset($v->image) ? trim((string) $v->image) : '';
         $video = isset($v->video) ? trim((string) $v->video) : '';
 
-        // Primary upload is a video file — never treat as photo, even if is_image was mis-set in DB.
-        if ($video !== '' && ! \App\Services\VideoMediaService::isStaticImageFilename($video)) {
-            return 0;
-        }
-
+        // Explicit DB/API flag wins. Photo uploads must stay photos even if a
+        // stale MP4 ladder key exists from an older transcode path.
         if (isset($v->is_image) && ($v->is_image === true || $v->is_image === 1 || $v->is_image === '1')) {
             return 1;
+        }
+
+        // Primary upload is a video file — treat as video.
+        if ($video !== '' && ! \App\Services\VideoMediaService::isStaticImageFilename($video)) {
+            return 0;
         }
 
         if ($image !== '' && \App\Services\VideoMediaService::isStaticImageFilename($image)) {

@@ -7,10 +7,22 @@ use Tests\TestCase;
 
 class NormalizeIsImageTest extends TestCase
 {
-    public function test_mp4_upload_is_never_classified_as_photo_even_when_db_flag_is_one(): void
+    public function test_explicit_photo_flag_wins_even_when_mp4_filename_exists(): void
     {
         $row = (object) [
             'is_image' => 1,
+            'video' => '175680257160941.mp4',
+            'image' => '17568025717412.jpg',
+            'transcode_status' => 'ready',
+        ];
+
+        $this->assertSame(1, AppHelper::normalizeIsImage($row));
+    }
+
+    public function test_mp4_without_photo_flag_is_video(): void
+    {
+        $row = (object) [
+            'is_image' => 0,
             'video' => '175680257160941.mp4',
             'image' => '17568025717412.jpg',
             'transcode_status' => 'ready',

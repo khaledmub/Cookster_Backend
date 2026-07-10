@@ -1983,14 +1983,10 @@ class ApiController extends Controller
         if (! empty($allTypeIds)) {
             $allVideos = DB::table('videos as v')
                 ->join('front_users as u', 'u.id', '=', 'v.front_user_id')
-                ->leftJoin('subscription_history as sh', 'sh.id', '=', 'u.current_subscription_id')
                 ->where('v.status', 1)
                 ->where('v.is_soft_delete', 0)
                 ->where('v.front_user_id', $user->id)
                 ->whereIn('v.video_type', $allTypeIds)
-                ->where(function ($q) {
-                    $q->whereDate('sh.end_date', '>=', now()->toDateString())->orWhereNull('sh.end_date');
-                })
                 ->orderBy('v.system_id', 'DESC')
                 ->select(['v.*', 'u.name as user_name', 'u.image as user_image'])
                 ->get();
@@ -2101,16 +2097,6 @@ class ApiController extends Controller
         $user_entity_details = DB::table('entities')->select($e_select)->where('id', $user->entity)->first();
         $input = $request->all();
 
-        if($user_entity_details->subscription_required == 1){
-            $isExpired = AppHelper::check_subscription_expired($user->id);
-            if($isExpired){
-                return response()->json([
-                    'status' => false,
-                    'message' => __('messages.subscription_expired_msg')
-                ], 422);
-            }
-        }
-
         $data = array();
         $data['id'] = (string) \Str::uuid();
         $data['front_user_id'] = $user->id;
@@ -2126,10 +2112,12 @@ class ApiController extends Controller
         $data['take_order'] = $request->take_order;
         $data['country'] = $request->country;
         $data['city'] = $request->city;
-        if(isset($request->is_image) && $request->is_image==1){
-            $data['is_image'] = $request->is_image;
-        }
         // $data['location'] = $request->location;
+
+        $isPhotoPost = $request->boolean('is_image')
+            || $request->input('is_image') === 1
+            || $request->input('is_image') === '1';
+
         $stagingPath = null;
         $imageName = null;
         if ($request->file('image')) {
@@ -2159,39 +2147,91 @@ class ApiController extends Controller
             $ext = preg_match('/^[a-z0-9]{1,10}$/', $ext) ? $ext : 'mp4';
             $video_name = time().rand(1000, 9999).'1.'.$ext;
 
-            // Initialize S3 service
-            $s3Service = app(S3Service::class);
-
-            // Stream the uploaded video to S3 to avoid loading large files into RAM.
-            $stream = fopen($video->getRealPath(), 'rb');
-            if ($stream === false) {
-                return response()->json([
-                    'status' => false,
-                    'message' => __('messages.validation_failed'),
-                    'errors' => ['video' => ['Unable to open uploaded video file']],
-                ], 422);
+            // Client sometimes sends a still image on the video field for photo posts.
+            if (\App\Services\VideoMediaService::isStaticImageFilename($video_name)) {
+                $isPhotoPost = true;
             }
 
-            try {
-                $uploaded = $s3Service->storeFile('videos/'.$video_name, $stream, [
-                    'mimetype' => S3Service::resolveMimeType($video, 'video/mp4'),
-                ]);
-            } finally {
-                if (is_resource($stream)) {
-                    fclose($stream);
+            if ($isPhotoPost && \App\Services\VideoMediaService::isStaticImageFilename($video_name)) {
+                // Store the still as the cover image when no separate image was uploaded.
+                if (empty($data['image'])) {
+                    $s3Service = app(S3Service::class);
+                    $stream = fopen($video->getRealPath(), 'rb');
+                    if ($stream === false) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => __('messages.validation_failed'),
+                            'errors' => ['video' => ['Unable to open uploaded image file']],
+                        ], 422);
+                    }
+                    try {
+                        $uploaded = $s3Service->storeFile('videos/'.$video_name, $stream, [
+                            'mimetype' => S3Service::resolveMimeType($video, 'image/jpeg'),
+                        ]);
+                    } finally {
+                        if (is_resource($stream)) {
+                            fclose($stream);
+                        }
+                    }
+                    if ($uploaded) {
+                        $data['image'] = $video_name;
+                        $imageName = $video_name;
+                        $stagingDir = storage_path('app/temp-thumbnails/staging');
+                        if (! file_exists($stagingDir)) {
+                            mkdir($stagingDir, 0755, true);
+                        }
+                        $stagingPath = $stagingDir.'/'.$imageName;
+                        copy($video->getRealPath(), $stagingPath);
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status')) {
+                            $data['processing_status'] = 'processing';
+                        }
+                    }
                 }
-            }
+            } elseif (! $isPhotoPost) {
+                // Initialize S3 service
+                $s3Service = app(S3Service::class);
 
-            if ($uploaded) {
-                $data['video'] = $video_name;
-                $data['is_image'] = 0;
-                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
-                    $data['transcode_status'] = 'pending';
+                // Stream the uploaded video to S3 to avoid loading large files into RAM.
+                $stream = fopen($video->getRealPath(), 'rb');
+                if ($stream === false) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => __('messages.validation_failed'),
+                        'errors' => ['video' => ['Unable to open uploaded video file']],
+                    ], 422);
                 }
-                if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status') && empty($data['processing_status'])) {
-                    $data['processing_status'] = 'processing';
+
+                try {
+                    $uploaded = $s3Service->storeFile('videos/'.$video_name, $stream, [
+                        'mimetype' => S3Service::resolveMimeType($video, 'video/mp4'),
+                    ]);
+                } finally {
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                }
+
+                if ($uploaded) {
+                    $data['video'] = $video_name;
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+                        $data['transcode_status'] = 'pending';
+                    }
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'processing_status') && empty($data['processing_status'])) {
+                        $data['processing_status'] = 'processing';
+                    }
                 }
             }
+        }
+
+        // Image-only uploads are photo posts even if the client omitted is_image.
+        if ($isPhotoPost || (! empty($data['image']) && empty($data['video']))) {
+            $data['is_image'] = 1;
+            // Photo posts must never enter the video transcode pipeline.
+            if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+                $data['transcode_status'] = null;
+            }
+        } else {
+            $data['is_image'] = 0;
         }
 
         if($user_entity_details->is_sponsored == 1){
@@ -2204,7 +2244,11 @@ class ApiController extends Controller
             ProcessVideoThumbnailJob::dispatch($data['id'], $stagingPath, $imageName);
         }
 
-        if (! empty($data['video']) && \Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+        if (
+            (int) ($data['is_image'] ?? 0) !== 1
+            && ! empty($data['video'])
+            && \Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')
+        ) {
             ProcessVideoJob::dispatch($data['id'], $data['video']);
         }
 

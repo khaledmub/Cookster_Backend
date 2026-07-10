@@ -77,6 +77,13 @@ class VideosBackfillMediaCommand extends Command
             ->whereNotNull('video')
             ->where('video', '!=', '');
 
+        if (Schema::hasColumn('videos', 'is_image')) {
+            $query->where(function ($builder) {
+                $builder->where('is_image', 0)
+                    ->orWhereNull('is_image');
+            });
+        }
+
         if ($this->option('transcode') && Schema::hasColumn('videos', 'transcode_status')) {
             $query->where(function ($builder) {
                 $builder->where('transcode_status', 'pending')

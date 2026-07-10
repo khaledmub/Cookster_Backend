@@ -295,17 +295,6 @@ class ReelsController extends Controller
         if ($videoType !== null) {
             $query->where('videos.video_type', $videoType);
         }
-
-        $isOwnProfile = $viewer !== null && (string) $viewer->id === (string) $userId;
-
-        if (! $isOwnProfile) {
-            $query->join('front_users as profile_owner', 'profile_owner.id', '=', 'videos.front_user_id')
-                ->leftJoin('subscription_history as sh', 'sh.id', '=', 'profile_owner.current_subscription_id')
-                ->where(function ($q) {
-                    $q->whereDate('sh.end_date', '>=', now()->toDateString())
-                        ->orWhereNull('sh.end_date');
-                });
-        }
     }
 
     /**

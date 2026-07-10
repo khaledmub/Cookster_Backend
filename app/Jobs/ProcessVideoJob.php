@@ -57,6 +57,14 @@ class ProcessVideoJob implements ShouldQueue
             return;
         }
 
+        if ((int) ($video->is_image ?? 0) === 1) {
+            Log::info('ProcessVideoJob skipped; photo post does not need video transcode', [
+                'video_id' => $this->videoId,
+            ]);
+
+            return;
+        }
+
         if (($video->transcode_status ?? 'pending') === 'ready') {
             return;
         }
