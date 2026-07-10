@@ -57,6 +57,84 @@ class FeedSocialCache
         });
     }
 
+    /**
+     * Resolve country/city filters from request values that may be numeric IDs or names.
+     * GPS nearest-city is used only when the user did not pick country or city.
+     *
+     * @return array{country: int, city: int, cities_ids: array<int|string>}
+     */
+    public static function resolveLocationFilter(
+        mixed $countryInput = null,
+        mixed $cityInput = null,
+        mixed $latitude = null,
+        mixed $longitude = null,
+    ): array {
+        $country = 0;
+        $city = 0;
+        $hasCountryParam = $countryInput !== null && $countryInput !== '';
+        $hasCityParam = $cityInput !== null && $cityInput !== '';
+
+        if ($hasCountryParam) {
+            if (is_numeric($countryInput)) {
+                $exists = DB::table('countries')->where('id', (int) $countryInput)->exists();
+                if ($exists) {
+                    $country = (int) $countryInput;
+                }
+            } else {
+                $countryDetails = DB::table('countries')
+                    ->whereRaw('LOWER(name) = ?', [strtolower((string) $countryInput)])
+                    ->first();
+                if (isset($countryDetails->id)) {
+                    $country = (int) $countryDetails->id;
+                }
+            }
+        }
+
+        if ($hasCityParam) {
+            if (is_numeric($cityInput)) {
+                $cityQuery = DB::table('cities')->where('id', (int) $cityInput);
+                if ($country !== 0) {
+                    $cityQuery->where('country_id', $country);
+                }
+                $cityDetails = $cityQuery->first();
+                if (isset($cityDetails->id)) {
+                    $city = (int) $cityDetails->id;
+                    if ($country === 0) {
+                        $country = (int) ($cityDetails->country_id ?? 0);
+                    }
+                }
+            } else {
+                $cityQuery = DB::table('cities')
+                    ->whereRaw('LOWER(name) = ?', [strtolower((string) $cityInput)]);
+                if ($country !== 0) {
+                    $cityQuery->where('country_id', $country);
+                }
+                $cityDetails = $cityQuery->first();
+                if (isset($cityDetails->id)) {
+                    $city = (int) $cityDetails->id;
+                    if ($country === 0) {
+                        $country = (int) ($cityDetails->country_id ?? 0);
+                    }
+                }
+            }
+        } elseif (
+            ! $hasCountryParam
+            && $latitude !== null && $latitude !== ''
+            && $longitude !== null && $longitude !== ''
+        ) {
+            $city = self::nearestCityId((float) $latitude, (float) $longitude);
+            if ($city !== 0 && $country === 0) {
+                $country = (int) (DB::table('cities')->where('id', $city)->value('country_id') ?? 0);
+            }
+        }
+
+        return [
+            'country' => $country,
+            'city' => $city,
+            'cities_ids' => self::cityGroupIds($city),
+        ];
+    }
+
     public static function countryIdFromCoords(float $lat, float $lng): int
     {
         $cityId = self::nearestCityId($lat, $lng);

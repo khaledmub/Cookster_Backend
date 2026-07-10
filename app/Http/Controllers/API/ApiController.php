@@ -1451,30 +1451,15 @@ class ApiController extends Controller
         $country = 0;
         $city = 0;
 
-        // if(isset($input['country']) && $input['country']!=''){
-        //     $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($input['country'])])->first();
-        //     if(isset($country_details->id)){
-        //         $country = $country_details->id;
-        //     }
-        // }
-        // if(isset($input['city']) && $input['city']!=''){
-        //     $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($input['city'])])->first();
-        //     if(isset($city_details->id)){
-        //         $city = $city_details->id;
-        //     }
-        // }
-
-        if(isset($input['city']) && $input['city']!=''){
-            $city = $input['city'];
-        }
-        else if(isset($input['latitude']) && $input['latitude']!='' && isset($input['longitude']) && $input['longitude']!=''){
-            $city = \App\Support\FeedSocialCache::nearestCityId(
-                (float) $input['latitude'],
-                (float) $input['longitude']
-            );
-        }
-
-        $cities_ids = \App\Support\FeedSocialCache::cityGroupIds((int) $city);
+        $location = \App\Support\FeedSocialCache::resolveLocationFilter(
+            $input['country'] ?? null,
+            $input['city'] ?? null,
+            $input['latitude'] ?? null,
+            $input['longitude'] ?? null,
+        );
+        $country = $location['country'];
+        $city = $location['city'];
+        $cities_ids = $location['cities_ids'];
 
         $pagination = FeedPaginationHelper::resolve($request);
         extract($pagination);
@@ -1821,13 +1806,13 @@ class ApiController extends Controller
                 $query->whereIn('id', $followingIds);
             }
             else{
-                // if($country != 0){
-                //     $query->where('country', $country);
-                // }
+                if($country != 0){
+                    $query->where('country', $country);
+                }
 
-                // if(!empty($cities_ids)){
-                //     $query->whereIn('city', $cities_ids);
-                // }
+                if(!empty($cities_ids)){
+                    $query->whereIn('city', $cities_ids);
+                }
             }
 
             // Exclude those videos which are from blocked user
@@ -3134,31 +3119,15 @@ class ApiController extends Controller
         $query->where('u.status', 1);
         $query->where('u.is_soft_delete', 0);
 
-        // Country and city validation with city group
-        $country = 0;
-        $city = 0;
-        if($request->country && $request->country != ''){
-            $country_details = DB::table('countries')->whereRaw('LOWER(name) = ?', [strtolower($request->country)])->first();
-            if(isset($country_details->id)){
-                $country = $country_details->id;
-            }
-        }
-        if($request->city && $request->city != ''){
-            $city_details = DB::table('cities')->where('country_id', $country)->whereRaw('LOWER(name) = ?', [strtolower($request->city)])->first();
-            if(isset($city_details->id)){
-                $city = $city_details->id;
-            }
-        }
-        $city_group = DB::table('cities_groups')->whereRaw('FIND_IN_SET(?, cities)', [$city])->first();
-        if(!empty($city_group)){
-            $cities_ids = explode(',', $city_group->cities);
-        }
-        else if($city != 0){
-            $cities_ids = array($city);
-        }
-        else{
-            $cities_ids = array();
-        }
+        // Country and city: accept numeric IDs (app) or names (legacy).
+        $location = \App\Support\FeedSocialCache::resolveLocationFilter(
+            $request->input('country'),
+            $request->input('city'),
+            $request->input('latitude'),
+            $request->input('longitude'),
+        );
+        $country = $location['country'];
+        $cities_ids = $location['cities_ids'];
 
         if($country != 0){
             $query->where('u.country', $country);
