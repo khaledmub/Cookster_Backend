@@ -154,21 +154,28 @@ class VideosBackfillMediaCommand extends Command
             }
 
             $id = (string) $video->id;
-            $hlsHas720 = $s3->fileExists('videos/'.$id.'/hls/video_720.m3u8');
+            // Ready contract always needs 360 + 720 MP4 (even when old HLS was 360-only).
+            // 1080 is only required when an HLS 1080 variant already exists (avoids
+            // re-queue loops for short sources that cannot produce 1080).
             $hlsHas1080 = $s3->fileExists('videos/'.$id.'/hls/video_1080.m3u8');
-            $needs720 = $hlsHas720 && ! $s3->fileExists(VideoMediaService::mp4Key($id, 720));
+            $needs360 = ! $s3->fileExists(VideoMediaService::mp4Key($id, 360));
+            $needs720 = ! $s3->fileExists(VideoMediaService::mp4Key($id, 720));
             $needs1080 = $hlsHas1080 && ! $s3->fileExists(VideoMediaService::mp4Key($id, 1080));
             $needsBlur = ! $s3->fileExists(VideoMediaService::posterBlurKey($id));
-            $needs360 = ! $s3->fileExists(VideoMediaService::mp4Key($id, 360));
+            $needsPoster = ! $s3->fileExists(VideoMediaService::posterKey($id));
 
-            if (! $needs720 && ! $needs1080 && ! $needsBlur && ! $needs360) {
+            if (! $needs720 && ! $needs1080 && ! $needsBlur && ! $needs360 && ! $needsPoster) {
                 continue;
             }
 
             $count++;
 
             if ($dryRun) {
-                $this->line("upgrade-ladder: {$id} (720=".($needs720 ? 'missing' : 'ok').', 1080='.($needs1080 ? 'missing' : 'ok').', blur='.($needsBlur ? 'missing' : 'ok').', 360='.($needs360 ? 'missing' : 'ok').')');
+                $this->line('upgrade-ladder: '.$id.' (360='.($needs360 ? 'missing' : 'ok')
+                    .', 720='.($needs720 ? 'missing' : 'ok')
+                    .', 1080='.($needs1080 ? 'missing' : 'ok')
+                    .', poster='.($needsPoster ? 'missing' : 'ok')
+                    .', blur='.($needsBlur ? 'missing' : 'ok').')');
 
                 continue;
             }

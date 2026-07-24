@@ -68,22 +68,43 @@ After every video upload (`POST /api/videos/create`):
    - HLS: `videos/{id}/hls/master.m3u8` + segments
    - MP4: `videos/{id}/360.mp4`, `720.mp4`, `1080.mp4`
    - Poster from cover image (`ProcessVideoThumbnailJob`) **or** first video frame when no cover
-2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + required MP4 ladder (360 + 720 + 1080 when HLS variants exist) + `thumb.webp` + `thumb_blur.webp` exist on object storage.
+2. `transcode_status: "ready"` is set only after `VideoMediaVerifier` confirms HLS master + required MP4 ladder (**360 + 720 always**; 1080 when encoded) + `thumb.webp` + `thumb_blur.webp` exist on object storage.
 3. Until ready: `transcode_status: "pending"`, `processing_status: "processing"`, return `thumbnail_url` / `image_url` where available. **No** raw upload MP4 or phantom ladder URLs.
 
 ### MP4 ladder (mobile preload contract)
 
 | File | Resolution | Encoding |
 |------|------------|----------|
-| `360.mp4` | 360p | H.264 main, `-movflags +faststart`, GOP ~2s (`FFMPEG_GOP_SIZE=48`) |
-| `720.mp4` | 720p | Same (when HLS has 720p variant) |
-| `1080.mp4` | 1080p | Same (when source + HLS support 1080p — **required for HD-first mobile**) |
+| `360.mp4` | even W × 360 | H.264 main, `yuv420p`, `-movflags +faststart`, GOP ~2s |
+| `720.mp4` | even W × 720 | **Required for every ready video** (mild upscale OK) |
+| `1080.mp4` | even W × 1080 | When source height ≥ ~918p |
+
+**Transcoder flags (exact):**
+
+```bash
+ffmpeg -y -i source.mp4 \
+  -vf "scale=-2:720:flags=lanczos,setsar=1,format=yuv420p" \
+  -c:v libx264 -profile:v main -preset fast \
+  -pix_fmt yuv420p -b:v 2500k \
+  -g 48 -keyint_min 48 -sc_threshold 0 \
+  -c:a aac -b:a 128k \
+  -movflags +faststart \
+  720.mp4
+```
+
+- **Fast-start:** `moov` before `mdat` on every ladder MP4 — without this, Range/partial cache almost never paints early.
+- **Even dimensions only:** never ship odd height (e.g. 406×721). Odd axes force a surface resize on Honor/MediaCodec and stall start.
+- **`video_sources`:** when `transcode_status=ready`, `url_360` + `url_720` must be non-null; `url_1080` when the 1080 file exists.
+- **Poster:** `thumb.webp` is a sharp ~720 long-edge frame from the video (not a soft cover), quality ~88.
 
 `video_sources` only includes URLs for files that **exist on CDN** (no phantom tiers).
 
 ### HLS encoding
 
-- Segment duration: **2 s** default (`FFMPEG_HLS_SEGMENT_SECONDS=2`)
+- Segment duration: **2 s** default (`FFMPEG_HLS_SEGMENT_SECONDS=2`) — adaptive start when client enables HLS.
+- Variants: 360p + 720p + 1080p (capped by source), same even-scale filter as MP4.
+- Audio: AAC (Android MediaKit / ExoPlayer compatible)
+- Independent segments (`-hls_flags independent_segments`)
 
 ### API endpoints
 
@@ -107,16 +128,9 @@ After every video upload (`POST /api/videos/create`):
 
 | Asset | Cache-Control |
 |-------|---------------|
+| Ladder MP4s (`360/720/1080.mp4`) + posters | `public, max-age=31536000, immutable` |
 | HLS segments (`.ts`, `.m4s`) | `public, max-age=31536000, immutable` |
 | HLS playlists (`.m3u8`) | `public, max-age=60` |
-| MP4 renditions + posters | `public, max-age=31536000, immutable` |
-
-### HLS encoding
-
-- Segment duration: 2–4 s (`FFMPEG_HLS_SEGMENT_SECONDS`, default **2**)
-- Variants: 360p + 720p + 1080p in master playlist
-- Audio: AAC (Android MediaKit / ExoPlayer compatible)
-- First segment at t=0 (`-ss 0` for frame-based posters; HLS independent segments)
 
 ## Acceptance tests
 

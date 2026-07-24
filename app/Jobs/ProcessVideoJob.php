@@ -119,7 +119,7 @@ class ProcessVideoJob implements ShouldQueue
             $this->uploadMp4Artifacts('videos/'.$this->videoId, $mp4Outputs, $s3Service);
             VideoMediaService::forgetMp4ExistsCache($this->videoId);
 
-            $this->maybeExtractPosterFromVideo($video, $sourcePath, $workDir, $posterExtractor, $s3Service);
+            $this->maybeExtractPosterFromVideo($sourcePath, $workDir, $posterExtractor, $s3Service);
             VideoMediaService::forgetPosterExistsCache($this->videoId);
 
             $mediaVerifier->assertTranscodeReady($this->videoId, $s3Service, $mp4LadderHeights);
@@ -285,13 +285,11 @@ class ProcessVideoJob implements ShouldQueue
     }
 
     /**
-     * Guarantee the poster contract: a "ready" video must always have
-     * thumb.webp + thumb_blur.webp on object storage. The source video is
-     * already on disk here, so extract the poster from a real frame whenever
-     * the assets are missing (regardless of cover image / processing_status).
+     * Guarantee the poster contract: a "ready" video must always have a sharp
+     * ~720w thumb.webp (+ blur) from a real decoded frame. Cover-image thumbs
+     * are often soft; overwrite them once the source is on disk for transcode.
      */
     private function maybeExtractPosterFromVideo(
-        object $video,
         string $sourcePath,
         string $workDir,
         VideoPosterExtractor $posterExtractor,
@@ -300,15 +298,11 @@ class ProcessVideoJob implements ShouldQueue
         $posterKey = VideoMediaService::posterKey($this->videoId);
         $blurKey = VideoMediaService::posterBlurKey($this->videoId);
 
-        $needsPoster = ! $s3Service->fileExists($posterKey) || ! $s3Service->fileExists($blurKey);
+        $posterDir = $workDir.'/poster';
+        $extracted = $posterExtractor->extract($sourcePath, $posterDir);
 
-        if ($needsPoster) {
-            $posterDir = $workDir.'/poster';
-            $extracted = $posterExtractor->extract($sourcePath, $posterDir);
-
-            $s3Service->storeFileFromPath($posterKey, $extracted['poster'], ['mimetype' => 'image/webp']);
-            $s3Service->storeFileFromPath($blurKey, $extracted['blur'], ['mimetype' => 'image/webp']);
-        }
+        $s3Service->storeFileFromPath($posterKey, $extracted['poster'], ['mimetype' => 'image/webp']);
+        $s3Service->storeFileFromPath($blurKey, $extracted['blur'], ['mimetype' => 'image/webp']);
 
         if (Schema::hasColumn('videos', 'processing_status')) {
             DB::table('videos')

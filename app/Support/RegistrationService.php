@@ -40,7 +40,7 @@ class RegistrationService
                 'nullable',
                 self::activeUniqueRule('phone', $ignoreUserId),
             ],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string'],
             'entity' => ['required'],
             'uuid' => ['required'],
         ];

@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use \App\Helpers\AppHelper;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\FrontUser;
+use App\Models\Video;
+use App\Http\Resources\ReelResource;
 use Auth;
 use App;
 use DatePeriod;
@@ -17,6 +19,7 @@ use DateTime;
 use DateInterval;
 use Image;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\File;
@@ -25,6 +28,7 @@ use App\Jobs\ProcessVideoJob;
 use App\Jobs\ProcessVideoThumbnailJob;
 use App\Services\S3Service;
 use App\Services\ProfanityFilterService;
+use App\Support\VideoLocationTags;
 use App\Services\VideoFeedService;
 use App\Helpers\FeedPaginationHelper;
 use App\Support\PublicUserProfile;
@@ -594,7 +598,7 @@ class ApiController extends Controller
     public function forgot_password_update_password(Request $request){
         $validator = Validator::make($request->all(), [
             'user_id' => 'required',
-            'password' => 'required|string|min:8'
+            'password' => 'required|string'
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -849,7 +853,7 @@ class ApiController extends Controller
         $user = Auth::user();
         // $validator = Validator::make($request->all(), [
         //     'name' => 'required',
-        //     'password' => 'nullable|string|min:8', // Makes password validation conditional if it's posted
+        //     'password' => 'nullable|string', // Makes password validation conditional if it's posted
         //     'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
         // ]);
         // Add conditional validation based on the value of 'entity'
@@ -1451,11 +1455,15 @@ class ApiController extends Controller
         $country = 0;
         $city = 0;
 
+        // Keyword search stays global unless the client explicitly sends country/city.
+        // GPS → nearest-city only applies for empty-keyword (Discover) requests.
+        $hasKeywords = trim((string) ($keywords ?? '')) !== '';
+        $locationParams = \App\Support\FeedSocialCache::locationParamsFromRequest($request);
         $location = \App\Support\FeedSocialCache::resolveLocationFilter(
-            $input['country'] ?? null,
-            $input['city'] ?? null,
-            $input['latitude'] ?? null,
-            $input['longitude'] ?? null,
+            $locationParams['country'],
+            $locationParams['city'],
+            $hasKeywords ? null : ($input['latitude'] ?? null),
+            $hasKeywords ? null : ($input['longitude'] ?? null),
         );
         $country = $location['country'];
         $city = $location['city'];
@@ -2072,6 +2080,13 @@ class ApiController extends Controller
         $user = Auth::user();
         $language = App::getLocale();
 
+        $videoLocation = VideoLocationTags::resolveFromRequest($request);
+        if ($locationError = VideoLocationTags::validationErrorResponse(
+            VideoLocationTags::validateMatch($videoLocation['country'], $videoLocation['city'])
+        )) {
+            return $locationError;
+        }
+
         if($language == 'ar'){
             $e_select = ['id', 'name_ar as name', 'sort_order', 'subscription_required', 'is_sponsored', 'status', 'created_at', 'updated_at'];
         }
@@ -2095,8 +2110,8 @@ class ApiController extends Controller
         $data['publish_type'] = $request->publish_type;
         $data['allow_comments'] = $request->allow_comments;
         $data['take_order'] = $request->take_order;
-        $data['country'] = $request->country;
-        $data['city'] = $request->city;
+        $data['country'] = $videoLocation['country'];
+        $data['city'] = $videoLocation['city'];
         // $data['location'] = $request->location;
 
         $isPhotoPost = $request->boolean('is_image')
@@ -2212,8 +2227,10 @@ class ApiController extends Controller
         if ($isPhotoPost || (! empty($data['image']) && empty($data['video']))) {
             $data['is_image'] = 1;
             // Photo posts must never enter the video transcode pipeline.
+            // Column is NOT NULL (default pending) — use ready so clients treat
+            // the still as immediately displayable (no HLS/MP4 ladder needed).
             if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
-                $data['transcode_status'] = null;
+                $data['transcode_status'] = 'ready';
             }
         } else {
             $data['is_image'] = 0;
@@ -2268,6 +2285,15 @@ class ApiController extends Controller
             'media_base_url' => AppHelper::mediaPublicBaseUrl(),
             'video_id' => $data['id'],
             'video' => $created,
+            'feed_hint' => [
+                'reels_query' => array_filter([
+                    'country' => isset($data['country']) ? (int) $data['country'] : null,
+                    'city' => isset($data['city']) ? (int) $data['city'] : null,
+                    'sort_by' => 'newest',
+                    'pin_video_id' => $data['id'],
+                ], fn ($value) => $value !== null && $value !== 0 && $value !== ''),
+                'pin_expires_at' => now()->addHours(24)->toIso8601String(),
+            ],
         ], 201);
     }
 
@@ -2356,6 +2382,13 @@ class ApiController extends Controller
             }
         }
 
+        $videoLocation = VideoLocationTags::resolveFromRequest($request);
+        if ($locationError = VideoLocationTags::validationErrorResponse(
+            VideoLocationTags::validateMatch($videoLocation['country'], $videoLocation['city'])
+        )) {
+            return $locationError;
+        }
+
         $data = array();
         $data['title'] = $request->title;
         $data['video_type'] = $request->video_type;
@@ -2367,8 +2400,8 @@ class ApiController extends Controller
         $data['publish_type'] = $request->publish_type;
         $data['allow_comments'] = $request->allow_comments;
         $data['take_order'] = $request->take_order;
-        $data['country'] = $request->country;
-        $data['city'] = $request->city;
+        $data['country'] = $videoLocation['country'];
+        $data['city'] = $videoLocation['city'];
         DB::table('videos')->where('id',$request->video_id)->update($data);
 
         if($request->tags){
@@ -2884,11 +2917,10 @@ class ApiController extends Controller
         // $query2->orderBy('v.system_id', 'DESC');
         $videos = $query2->select(['v.*', 'video_type_description.name as video_type_name', 'u.name as user_name', 'u.image as user_image', DB::raw('COALESCE(followers.followers_count, 0) as followers_count'),
         DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('sv.system_id', 'DESC')->get();
-        AppHelper::decorateVideoIterable($videos);
 
         $response = [
             'status' => true,
-            'videos' => $videos,
+            'videos' => $this->serializeVideosLikeFeed($videos),
         ];
         if ($paginate) {
             $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
@@ -2959,19 +2991,58 @@ class ApiController extends Controller
             DB::raw('COALESCE(following.following_count, 0) as following_count')])->orderBy('v.system_id', 'DESC')->get();
         }
 
-        if ($videos instanceof \Illuminate\Support\Collection && $videos->isNotEmpty()) {
-            AppHelper::decorateVideoIterable($videos);
-        }
-
         $response = [
             'status' => true,
-            'videos' => $videos,
+            'videos' => $this->serializeVideosLikeFeed(
+                $videos instanceof Collection ? $videos : collect($videos)
+            ),
         ];
         if ($paginate && ! empty($videoIds)) {
             $response['meta'] = FeedPaginationHelper::meta($page, $perPage, $totalData, true);
         }
 
         return response()->json($response, 200);
+    }
+
+    /**
+     * Same media contract as /api/reels (ReelResource): thumbnail_url poster,
+     * transcode_status, playback_ready, blur, cover image_url, ladder/HLS.
+     *
+     * @param  Collection<int, object>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function serializeVideosLikeFeed(Collection $rows): array
+    {
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $models = Video::query()
+            ->whereIn('id', $rows->pluck('id')->all())
+            ->get()
+            ->keyBy('id');
+
+        return $rows->map(function ($row) use ($models) {
+            $model = $models->get($row->id);
+            if ($model === null) {
+                return null;
+            }
+
+            $payload = (new ReelResource($model))->resolve();
+
+            $userImageUrl = AppHelper::userImageUrl(
+                isset($row->user_image) ? (string) $row->user_image : null
+            );
+
+            $payload['video_type_name'] = $row->video_type_name ?? null;
+            $payload['user_name'] = $row->user_name ?? null;
+            $payload['user_image'] = $userImageUrl;
+            $payload['user_image_url'] = $userImageUrl;
+            $payload['followers_count'] = (int) ($row->followers_count ?? 0);
+            $payload['following_count'] = (int) ($row->following_count ?? 0);
+
+            return $payload;
+        })->filter()->values()->all();
     }
 
     /**
@@ -3119,10 +3190,11 @@ class ApiController extends Controller
         $query->where('u.status', 1);
         $query->where('u.is_soft_delete', 0);
 
-        // Country and city: accept numeric IDs (app) or names (legacy).
+        // Country and city: accept numeric IDs (country_id/city_id or country/city) or names (legacy).
+        $locationParams = \App\Support\FeedSocialCache::locationParamsFromRequest($request);
         $location = \App\Support\FeedSocialCache::resolveLocationFilter(
-            $request->input('country'),
-            $request->input('city'),
+            $locationParams['country'],
+            $locationParams['city'],
             $request->input('latitude'),
             $request->input('longitude'),
         );

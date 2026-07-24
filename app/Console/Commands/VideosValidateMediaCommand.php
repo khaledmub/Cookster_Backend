@@ -125,16 +125,22 @@ class VideosValidateMediaCommand extends Command
         $checks = array_merge($checks, $this->checkRange206($url360, '360'));
         $checks = array_merge($checks, $this->checkFastStart($id, 360, $s3, $fastStart));
         $checks = array_merge($checks, $this->checkFfprobe($url360, '360'));
+        $checks = array_merge($checks, $this->checkEvenDimensions($id, 360));
 
-        if ($s3->fileExists('videos/'.$id.'/hls/video_1080.m3u8')) {
-            $key1080 = VideoMediaService::mp4Key($id, 1080);
-            if ($s3->fileExists($key1080)) {
-                $url1080 = CdnUrl::forPath($key1080);
-                $checks = array_merge($checks, $this->checkRange206($url1080, '1080'));
-                $checks = array_merge($checks, $this->checkFastStart($id, 1080, $s3, $fastStart));
-            } else {
-                $checks['1080.mp4'] = 'missing on storage';
+        foreach ([720, 1080] as $height) {
+            $key = VideoMediaService::mp4Key($id, $height);
+            if (! $s3->fileExists($key)) {
+                if ($height === 720) {
+                    $checks['720.mp4'] = 'missing on storage';
+                }
+
+                continue;
             }
+
+            $url = CdnUrl::forPath($key);
+            $checks = array_merge($checks, $this->checkRange206($url, (string) $height));
+            $checks = array_merge($checks, $this->checkFastStart($id, $height, $s3, $fastStart));
+            $checks = array_merge($checks, $this->checkEvenDimensions($id, $height));
         }
 
         if ($this->option('api-check')) {
@@ -320,16 +326,83 @@ class VideosValidateMediaCommand extends Command
             $url = $video->video_sources[$key] ?? null;
             $exists = $s3->fileExists(VideoMediaService::mp4Key($id, $height));
 
-            if ($exists && empty($url)) {
+            if ($height === 720 && ! $exists) {
+                $checks['api_'.$key] = 'missing_file';
+            } elseif ($exists && empty($url)) {
                 $checks['api_'.$key] = 'missing_url_but_file_exists';
             } elseif (! $exists && ! empty($url)) {
                 $checks['api_'.$key] = 'phantom_url';
+            } elseif ($height === 1080 && ! $exists) {
+                $checks['api_'.$key] = 'ok'; // optional when source < ~918p
             } else {
-                $checks['api_'.$key] = 'ok';
+                $checks['api_'.$key] = empty($url) && $height === 720 ? 'null' : 'ok';
             }
         }
 
         return $checks;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function checkEvenDimensions(string $id, int $height): array
+    {
+        $ffprobe = (string) config('ffmpeg.ffprobe.binaries', '/usr/bin/ffprobe');
+        $key = VideoMediaService::mp4Key($id, $height);
+        $tmp = storage_path('app/validate-media/'.$id.'_'.$height.'_dims.mp4');
+        $dir = dirname($tmp);
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        try {
+            // Only need the moov + first frames for stream metadata.
+            $url = CdnUrl::forPath($key);
+            $response = Http::timeout(30)
+                ->withHeaders(['Range' => 'bytes=0-1048575'])
+                ->get($url);
+
+            if (! in_array($response->status(), [200, 206], true)) {
+                return ['even_dims_'.$height => 'download_http_'.$response->status()];
+            }
+
+            file_put_contents($tmp, $response->body());
+
+            $process = new Process([
+                $ffprobe,
+                '-v', 'error',
+                '-select_streams', 'v:0',
+                '-show_entries', 'stream=width,height',
+                '-of', 'csv=p=0:s=x',
+                $tmp,
+            ]);
+            $process->setTimeout(30);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                return ['even_dims_'.$height => 'ffprobe_failed'];
+            }
+
+            $raw = trim($process->getOutput());
+            if (! preg_match('/^(\d+)x(\d+)$/', $raw, $m)) {
+                return ['even_dims_'.$height => 'unparsed:'.$raw];
+            }
+
+            $w = (int) $m[1];
+            $h = (int) $m[2];
+            if (($w % 2) !== 0 || ($h % 2) !== 0) {
+                return ['even_dims_'.$height => "odd:{$w}x{$h}"];
+            }
+
+            return ['even_dims_'.$height => 'ok'];
+        } catch (\Throwable $e) {
+            return ['even_dims_'.$height => 'error: '.$e->getMessage()];
+        } finally {
+            if (is_file($tmp)) {
+                unlink($tmp);
+            }
+        }
     }
 
     /**

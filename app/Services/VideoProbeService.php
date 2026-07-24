@@ -77,12 +77,22 @@ class VideoProbeService
         }
 
         if ($sourceHeight === null || $sourceHeight <= 0) {
+            // Unknown source: emit full configured ladder so ready feeds never
+            // soft-fallback to the raw upload (often odd dimensions).
             return $heights;
         }
 
         return array_values(array_filter(
             $heights,
-            static fn (int $h) => $sourceHeight >= (int) ($h * 0.85)
+            static function (int $h) use ($sourceHeight): bool {
+                // Always ship 360 + 720 (mild upscale OK). Missing 720 forces
+                // clients onto the original MP4 and stalls on Honor/MediaCodec.
+                if ($h <= 720) {
+                    return true;
+                }
+
+                return $sourceHeight >= (int) ($h * 0.85);
+            }
         ));
     }
 

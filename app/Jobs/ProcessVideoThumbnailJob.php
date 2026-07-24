@@ -46,7 +46,15 @@ class ProcessVideoThumbnailJob implements ShouldQueue
 
         $img = Image::read($this->localImagePath);
         $img->scaleDown(width: 720);
-        $img->toWebp(quality: 82)->save($posterPath);
+        // Even axes avoid odd-dimension WebP decode quirks on some Android GPUs.
+        $width = (int) $img->width();
+        $height = (int) $img->height();
+        $evenW = $width - ($width % 2);
+        $evenH = $height - ($height % 2);
+        if ($evenW > 0 && $evenH > 0 && ($evenW !== $width || $evenH !== $height)) {
+            $img->scale(width: $evenW, height: $evenH);
+        }
+        $img->toWebp(quality: 88)->save($posterPath);
 
         $blur = Image::read($this->localImagePath);
         $blur->cover(32, 32);

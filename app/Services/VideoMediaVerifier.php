@@ -51,18 +51,24 @@ class VideoMediaVerifier
         $required = [];
 
         foreach ($heights as $height) {
-            if ($height === 360) {
-                $required[] = 360;
+            $height = (int) $height;
+
+            // Ready contract always includes 360 + 720 so API emits url_720.
+            if ($height <= 720) {
+                $required[] = $height;
 
                 continue;
             }
 
-            if ($s3Service->fileExists('videos/'.$videoId.'/hls/video_'.$height.'.m3u8')) {
+            if ($s3Service->fileExists('videos/'.$videoId.'/hls/video_'.$height.'.m3u8')
+                || $s3Service->fileExists(VideoMediaService::mp4Key($videoId, $height))) {
                 $required[] = $height;
             }
         }
 
-        return $required !== [] ? $required : [360];
+        $required = array_values(array_unique($required));
+
+        return $required !== [] ? $required : [360, 720];
     }
 
     /**

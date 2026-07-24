@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -55,6 +56,21 @@ class FeedSocialCache
 
             return [$city];
         });
+    }
+
+
+    /**
+     * Read country/city filters from a request, accepting legacy names (country, city)
+     * and ID params (country_id, city_id).
+     *
+     * @return array{country: mixed, city: mixed}
+     */
+    public static function locationParamsFromRequest(Request $request): array
+    {
+        return [
+            'country' => $request->input('country') ?? $request->input('country_id'),
+            'city' => $request->input('city') ?? $request->input('city_id'),
+        ];
     }
 
     /**

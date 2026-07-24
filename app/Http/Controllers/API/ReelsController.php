@@ -38,6 +38,8 @@ class ReelsController extends Controller
 
     private const GEO_SCOPE_GLOBAL = 'global';
 
+    private const PIN_MAX_AGE_HOURS = 24;
+
     public function index(Request $request): JsonResponse
     {
         $cursor = $this->normalizeCursor($request->input('cursor'));
@@ -90,7 +92,9 @@ class ReelsController extends Controller
                 'next_cursor' => $payload['next_cursor'],
                 'geo_fallback' => $payload['geo_fallback'],
                 'sort_by' => $feedContext['sort_by'],
-            ], $this->nearMeMetaFields($feed, $geoContext, $payload)),
+            ], $this->nearMeMetaFields($feed, $geoContext, $payload), [
+                'pinned_video_id' => $payload['pinned_video_id'] ?? null,
+            ]),
         ]);
     }
 
@@ -171,9 +175,8 @@ class ReelsController extends Controller
             ])
             ->where('videos.status', 1)
             ->where('videos.is_soft_delete', 0)
-            ->whereNotNull('videos.video')
-            ->where('videos.video', '!=', '')
             ->whereIn('videos.publish_type', [1, 2]);
+        $this->applyReelsPublishableMediaFilter($query);
 
         if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
             if ($feed === self::FEED_USER) {
@@ -192,6 +195,10 @@ class ReelsController extends Controller
                         ->orWhere('videos.is_image', 1);
                 });
             }
+        }
+
+        if (! empty($cursor['consumed_pin_id'])) {
+            $query->where('videos.id', '!=', (string) $cursor['consumed_pin_id']);
         }
 
         if ($viewer) {
@@ -226,7 +233,7 @@ class ReelsController extends Controller
             $this->applyNearMeDistanceJoin($query, (float) $geoContext['latitude'], (float) $geoContext['longitude']);
         }
 
-        if ($feed === self::FEED_NEAR_ME && empty($geoContext['geo_fallback'])) {
+        if ($this->shouldApplyGeoFilters($feed, $geoContext)) {
             $this->applyNearMeGeoFilters($query, $geoContext);
         }
 
@@ -271,17 +278,36 @@ class ReelsController extends Controller
 
         $hasMore = $rows->count() > $perPage;
         $items = $rows->take($perPage)->values();
+        $pinnedVideoId = null;
+        $consumedPinId = ! empty($cursor['consumed_pin_id']) ? (string) $cursor['consumed_pin_id'] : null;
+
+        if (($feedContext['pin_video_id'] ?? null) !== null) {
+            $pinned = $this->resolvePinnedVideo($feedContext['pin_video_id'], $viewer, $feed, $geoContext);
+            if ($pinned !== null) {
+                $items = $items
+                    ->reject(fn (Video $video) => (string) $video->id === (string) $pinned->id)
+                    ->prepend($pinned)
+                    ->take($perPage)
+                    ->values();
+                $pinnedVideoId = (string) $pinned->id;
+                $consumedPinId = $pinnedVideoId;
+                if (! $rows->contains(fn (Video $video) => (string) $video->id === $pinnedVideoId)) {
+                    $hasMore = $hasMore || $rows->count() >= $perPage;
+                }
+            }
+        }
 
         $nextCursor = null;
         if ($hasMore && $items->isNotEmpty()) {
             $last = $items->last();
-            $nextCursor = $this->encodeNextCursor($feed, $feedContext, $geoContext, $last);
+            $nextCursor = $this->encodeNextCursor($feed, $feedContext, $geoContext, $last, $consumedPinId);
         }
 
         return [
             'items' => $items,
             'has_more' => $hasMore,
             'next_cursor' => $nextCursor,
+            'pinned_video_id' => $pinnedVideoId,
         ];
     }
 
@@ -312,9 +338,8 @@ class ReelsController extends Controller
         $anchorQuery = Video::query()
             ->where('id', $feedContext['anchor_id'])
             ->where('status', 1)
-            ->where('is_soft_delete', 0)
-            ->whereNotNull('video')
-            ->where('video', '!=', '');
+            ->where('is_soft_delete', 0);
+        $this->applyReelsPublishableMediaFilter($anchorQuery, '');
 
         if ($feedContext['feed'] === self::FEED_USER && $feedContext['user_id'] !== null) {
             $anchorQuery->where('front_user_id', $feedContext['user_id']);
@@ -353,7 +378,7 @@ class ReelsController extends Controller
     /**
      * @param  array{feed: string, user_id: ?string, video_type: ?int, per_page: int, anchor_id: ?string}  $feedContext
      */
-    private function encodeNextCursor(string $feed, array $feedContext, array $geoContext, Video $last): string
+    private function encodeNextCursor(string $feed, array $feedContext, array $geoContext, Video $last, ?string $consumedPinId = null): string
     {
         $cursorData = [
             'feed' => $feed,
@@ -382,6 +407,10 @@ class ReelsController extends Controller
             $cursorData['near_me_distance'] = (float) $last->near_me_distance;
         }
 
+        if ($consumedPinId !== null && $consumedPinId !== '') {
+            $cursorData['consumed_pin_id'] = $consumedPinId;
+        }
+
         return base64_encode(json_encode($cursorData, JSON_THROW_ON_ERROR));
     }
 
@@ -403,6 +432,12 @@ class ReelsController extends Controller
             ? (string) $request->input('anchor_id')
             : null;
 
+        $isFirstPage = $cursor['created_at'] === null && $cursor['system_id'] === null;
+        $pinVideoId = null;
+        if ($isFirstPage && $request->filled('pin_video_id') && in_array($feed, [self::FEED_GENERAL, self::FEED_NEAR_ME], true)) {
+            $pinVideoId = (string) $request->input('pin_video_id');
+        }
+
         return [
             'feed' => $feed,
             'user_id' => $userId,
@@ -410,6 +445,7 @@ class ReelsController extends Controller
             'per_page' => $perPage,
             'anchor_id' => $anchorId,
             'sort_by' => VideoFeedSort::fromRequest($request, $cursor),
+            'pin_video_id' => $pinVideoId,
         ];
     }
 
@@ -438,6 +474,10 @@ class ReelsController extends Controller
     private function resolveGeoContext(Request $request, array $cursor, string $feed): array
     {
         $empty = $this->emptyGeoContext();
+
+        if ($feed === self::FEED_GENERAL) {
+            return $this->resolveGeneralLocationGeoContext($request);
+        }
 
         if ($feed !== self::FEED_NEAR_ME) {
             return $empty;
@@ -554,6 +594,77 @@ class ReelsController extends Controller
             'geo_unresolved' => true,
             'hash' => 'unresolved',
         ]);
+    }
+
+    private function resolveGeneralLocationGeoContext(Request $request): array
+    {
+        $locationParams = FeedSocialCache::locationParamsFromRequest($request);
+        $hasCountry = $locationParams['country'] !== null && $locationParams['country'] !== '';
+        $hasCity = $locationParams['city'] !== null && $locationParams['city'] !== '';
+
+        if (! $hasCountry && ! $hasCity) {
+            return $this->emptyGeoContext();
+        }
+
+        $location = FeedSocialCache::resolveLocationFilter(
+            $locationParams['country'],
+            $locationParams['city'],
+        );
+
+        $countryId = (int) ($location['country'] ?? 0);
+        $cityId = (int) ($location['city'] ?? 0);
+        $citiesIds = $location['cities_ids'] ?? [];
+
+        if ($cityId > 0 && ! empty($citiesIds)) {
+            return [
+                'cities_ids' => $citiesIds,
+                'city' => $cityId,
+                'country_id' => $countryId,
+                'geo_scope' => self::GEO_SCOPE_CITY,
+                'geo_radius_km' => null,
+                'geo_fallback' => false,
+                'geo_unresolved' => false,
+                'geo_expanded' => false,
+                'latitude' => null,
+                'longitude' => null,
+                'hash' => sha1('general:city:'.$cityId.':'.implode(',', $citiesIds)),
+            ];
+        }
+
+        if ($countryId > 0) {
+            return [
+                'cities_ids' => [],
+                'city' => 0,
+                'country_id' => $countryId,
+                'geo_scope' => self::GEO_SCOPE_COUNTRY,
+                'geo_radius_km' => null,
+                'geo_fallback' => false,
+                'geo_unresolved' => false,
+                'geo_expanded' => false,
+                'latitude' => null,
+                'longitude' => null,
+                'hash' => sha1('general:country:'.$countryId),
+            ];
+        }
+
+        return $this->emptyGeoContext();
+    }
+
+    private function shouldApplyGeoFilters(string $feed, array $geoContext): bool
+    {
+        if (! empty($geoContext['geo_fallback']) || $geoContext['geo_scope'] === self::GEO_SCOPE_NONE) {
+            return false;
+        }
+
+        if ($feed === self::FEED_NEAR_ME) {
+            return true;
+        }
+
+        if ($feed === self::FEED_GENERAL) {
+            return $this->hasActiveNearMeGeoFilter($geoContext);
+        }
+
+        return false;
     }
 
     /**
@@ -872,6 +983,7 @@ class ReelsController extends Controller
             'feed' => null,
             'user_id' => null,
             'video_type' => null,
+            'consumed_pin_id' => null,
         ];
 
         if ($rawCursor === null || $rawCursor === '') {
@@ -911,6 +1023,7 @@ class ReelsController extends Controller
             'feed' => isset($data['feed']) ? (string) $data['feed'] : null,
             'user_id' => isset($data['user_id']) ? (string) $data['user_id'] : null,
             'video_type' => isset($data['video_type']) ? (int) $data['video_type'] : null,
+            'consumed_pin_id' => isset($data['consumed_pin_id']) ? (string) $data['consumed_pin_id'] : null,
         ];
     }
 
@@ -925,7 +1038,9 @@ class ReelsController extends Controller
             ? 'none'
             : sha1(implode(',', FeedSocialCache::blockedUserIds($viewer->id)));
 
-        $geoPart = $feed === self::FEED_NEAR_ME ? '_g_'.$geoContext['hash'] : '';
+        $geoPart = in_array($feed, [self::FEED_NEAR_ME, self::FEED_GENERAL], true) && $geoContext['geo_scope'] !== self::GEO_SCOPE_NONE
+            ? '_g_'.$geoContext['hash']
+            : '';
 
         $followingPart = '';
         if ($feed === self::FEED_FOLLOWING && $viewer !== null) {
@@ -944,7 +1059,12 @@ class ReelsController extends Controller
             }
         }
 
-        return 'reels_feed_'.$feed.'_'.$viewerPart.'_b_'.$blockedHash.$geoPart.$followingPart.$userPart.'_s_'.$feedContext['sort_by'].'_'.$cursorKey;
+        $pinPart = '';
+        if (($feedContext['pin_video_id'] ?? null) !== null && $cursorKey === '_start') {
+            $pinPart = '_pin_'.$feedContext['pin_video_id'];
+        }
+
+        return 'reels_feed_'.$feed.'_'.$viewerPart.'_b_'.$blockedHash.$geoPart.$followingPart.$userPart.'_s_'.$feedContext['sort_by'].$pinPart.'_'.$cursorKey;
     }
 
     /**
@@ -952,6 +1072,68 @@ class ReelsController extends Controller
      * @param  \Closure(): T  $callback
      * @return T
      */
+
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Video>|\Illuminate\Database\Query\Builder  $query
+     */
+    private function applyReelsPublishableMediaFilter($query, string $tableAlias = 'videos'): void
+    {
+        $videoCol = $tableAlias !== '' ? $tableAlias.'.video' : 'video';
+        $imageCol = $tableAlias !== '' ? $tableAlias.'.image' : 'image';
+        $isImageCol = $tableAlias !== '' ? $tableAlias.'.is_image' : 'is_image';
+
+        $query->where(function ($q) use ($videoCol, $imageCol, $isImageCol) {
+            $q->where(function ($q2) use ($videoCol) {
+                $q2->whereNotNull($videoCol)
+                    ->where($videoCol, '!=', '');
+            })->orWhere(function ($q2) use ($imageCol, $isImageCol) {
+                $q2->where($isImageCol, 1)
+                    ->whereNotNull($imageCol)
+                    ->where($imageCol, '!=', '');
+            });
+        });
+    }
+
+    private function resolvePinnedVideo(?string $pinVideoId, mixed $viewer, string $feed, array $geoContext): ?Video
+    {
+        if ($pinVideoId === null || $pinVideoId === '' || $viewer === null) {
+            return null;
+        }
+
+        if (! in_array($feed, [self::FEED_GENERAL, self::FEED_NEAR_ME], true)) {
+            return null;
+        }
+
+        $query = Video::query()
+            ->select('videos.*')
+            ->with(['user:id,name,user_name,image'])
+            ->withCount([
+                'comments as comments_count' => fn ($q) => $q->where('status', 1),
+                'saves as likes_count' => fn ($q) => $q->where('status', 1),
+            ])
+            ->where('videos.id', $pinVideoId)
+            ->where('videos.front_user_id', $viewer->id)
+            ->where('videos.status', 1)
+            ->where('videos.is_soft_delete', 0)
+            ->whereIn('videos.publish_type', [1, 2])
+            ->where('videos.created_at', '>=', now()->subHours(self::PIN_MAX_AGE_HOURS));
+        $this->applyReelsPublishableMediaFilter($query);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('videos', 'transcode_status')) {
+            $query->where(function ($q) {
+                $q->where('videos.transcode_status', 'ready')
+                    ->orWhere('videos.is_image', 1);
+            });
+        }
+
+        if ($this->shouldApplyGeoFilters($feed, $geoContext)) {
+            $this->applyNearMeGeoFilters($query, $geoContext);
+        }
+
+        return $query->first();
+    }
+
     private function rememberFeedPage(string $cacheKey, \Closure $callback): mixed
     {
         try {

@@ -66,9 +66,10 @@ class VideoHlsTranscoder
             $segmentPattern = $workDir.'/'.$variant['segment'];
 
             $extra = [
-                '-vf', 'scale=-2:'.$variant['height'],
+                '-vf', VideoEncodeFilters::ladderScaleFilter((int) $variant['height']),
                 '-profile:v', $profile,
                 '-preset', $preset,
+                '-pix_fmt', 'yuv420p',
                 '-g', (string) $gop,
                 '-keyint_min', (string) $gop,
                 '-sc_threshold', '0',

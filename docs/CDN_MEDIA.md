@@ -28,6 +28,8 @@ Configure on the **bucket** backing `cdn.cookster.org`:
 2. **Range requests** — enabled by default on GCS; ensure CDN/backend does not strip `Range` / `206` responses.
 3. **Cache-Control** — uploads set `public, max-age=31536000, immutable` on posters, MP4 renditions, and HLS **segments**; HLS **playlists** (`.m3u8`) use `public, max-age=60`.
 
+Ladder MP4s must also be **fast-start** (`-movflags +faststart`) with **even** width/height. Odd axes (e.g. 406×721) stall MediaCodec surface setup on Honor and similar devices.
+
 ### Example bucket CORS (JSON)
 
 ```json

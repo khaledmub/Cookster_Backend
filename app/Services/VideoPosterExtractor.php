@@ -8,7 +8,10 @@ use Symfony\Component\Process\Process;
 class VideoPosterExtractor
 {
     /**
-     * Extract a poster and blur placeholder from the first decodable video frame.
+     * Extract a sharp ~720w feed poster and blur placeholder from a video frame.
+     *
+     * Prefer a real decoded frame over a soft cover thumb so cold starts look
+     * instant before the first video frame paints.
      *
      * @return array{poster: string, blur: string} Local file paths
      */
@@ -28,15 +31,16 @@ class VideoPosterExtractor
         $posterPath = $workDir.'/poster.webp';
         $blurPath = $workDir.'/poster_blur.webp';
 
+        // Skip t=0 black frames common on phone captures; snap even dims for WebP.
         $posterProcess = new Process([
             $ffmpeg,
             '-y',
-            '-ss', '0',
+            '-ss', '0.25',
             '-i', $sourcePath,
             '-frames:v', '1',
-            '-vf', 'scale=720:-2',
+            '-vf', VideoEncodeFilters::posterScaleFilter(720),
             '-c:v', 'libwebp',
-            '-quality', '82',
+            '-quality', '88',
             $posterPath,
         ]);
         $posterProcess->setTimeout(min($timeout, 120));
