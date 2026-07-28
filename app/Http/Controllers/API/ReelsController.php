@@ -229,8 +229,13 @@ class ReelsController extends Controller
 
         $useDistanceSort = $this->shouldSortNearMeByDistance($feed, $geoContext);
 
-        if ($useDistanceSort) {
-            $this->applyNearMeDistanceJoin($query, (float) $geoContext['latitude'], (float) $geoContext['longitude']);
+        if ($feed === self::FEED_NEAR_ME && empty($geoContext['geo_fallback'])) {
+            $this->applyNearMeItemGeoJoins(
+                $query,
+                $useDistanceSort,
+                $geoContext['latitude'] !== null ? (float) $geoContext['latitude'] : null,
+                $geoContext['longitude'] !== null ? (float) $geoContext['longitude'] : null,
+            );
         }
 
         if ($this->shouldApplyGeoFilters($feed, $geoContext)) {
@@ -499,7 +504,7 @@ class ReelsController extends Controller
                 $citiesIds = FeedSocialCache::localCityIds($lat, $lng, $radiusKm);
                 $city = FeedSocialCache::nearestCityId($lat, $lng);
 
-                return [
+                return $this->withGeoCityName([
                     'cities_ids' => $citiesIds,
                     'city' => $city,
                     'country_id' => FeedSocialCache::countryIdFromCoords($lat, $lng),
@@ -511,11 +516,11 @@ class ReelsController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'hash' => sha1('local:'.round($lat, 3).':'.round($lng, 3).':'.$radiusKm.':'.implode(',', $citiesIds)),
-                ];
+                ]);
             }
 
             if ($scope === self::GEO_SCOPE_GLOBAL) {
-                return [
+                return $this->withGeoCityName([
                     'cities_ids' => [],
                     'city' => FeedSocialCache::nearestCityId($lat, $lng),
                     'country_id' => 0,
@@ -527,7 +532,7 @@ class ReelsController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'hash' => sha1('global:'.round($lat, 3).':'.round($lng, 3)),
-                ];
+                ]);
             }
 
             if ($scope === self::GEO_SCOPE_COUNTRY) {
@@ -535,7 +540,7 @@ class ReelsController extends Controller
                     ? (int) $request->input('country')
                     : FeedSocialCache::countryIdFromCoords($lat, $lng);
 
-                return [
+                return $this->withGeoCityName([
                     'cities_ids' => [],
                     'city' => FeedSocialCache::nearestCityId($lat, $lng),
                     'country_id' => $countryId,
@@ -547,7 +552,7 @@ class ReelsController extends Controller
                     'latitude' => $lat,
                     'longitude' => $lng,
                     'hash' => sha1('country:'.$countryId.':'.round($lat, 3).':'.round($lng, 3)),
-                ];
+                ]);
             }
 
             $nearMe = FeedSocialCache::nearMeCityIds($lat, $lng, $manualCity);
@@ -575,7 +580,7 @@ class ReelsController extends Controller
             $citiesIds = FeedSocialCache::cityGroupIds($manualCity);
             $countryId = (int) (DB::table('cities')->where('id', $manualCity)->value('country_id') ?? 0);
 
-            return [
+            return $this->withGeoCityName([
                 'cities_ids' => $citiesIds,
                 'city' => $manualCity,
                 'country_id' => $countryId,
@@ -587,7 +592,7 @@ class ReelsController extends Controller
                 'latitude' => null,
                 'longitude' => null,
                 'hash' => sha1('city:'.$manualCity.':'.implode(',', $citiesIds)),
-            ];
+            ]);
         }
 
         return array_merge($empty, [
@@ -715,7 +720,7 @@ class ReelsController extends Controller
      */
     private function nearMeCityGeoContext(array $nearMe, float $lat, float $lng): array
     {
-        return [
+        return $this->withGeoCityName([
             'cities_ids' => $nearMe['cities_ids'],
             'city' => $nearMe['city'],
             'country_id' => FeedSocialCache::countryIdFromCoords($lat, $lng),
@@ -727,7 +732,21 @@ class ReelsController extends Controller
             'latitude' => $lat,
             'longitude' => $lng,
             'hash' => $nearMe['hash'],
-        ];
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function withGeoCityName(array $context): array
+    {
+        $cityId = (int) ($context['city'] ?? 0);
+        if ($cityId > 0) {
+            $context['geo_city_name'] = FeedSocialCache::cityName($cityId);
+        }
+
+        return $context;
     }
 
     /**
@@ -847,22 +866,68 @@ class ReelsController extends Controller
     /**
      * @param  \Illuminate\Database\Eloquent\Builder<Video>  $query
      */
-    private function applyNearMeDistanceJoin($query, float $lat, float $lng): void
+    private function applyNearMeItemGeoJoins($query, bool $withDistance, ?float $lat, ?float $lng): void
     {
-        $query->leftJoin('cities as near_me_city', 'near_me_city.id', '=', 'videos.city');
-        $query->addSelect(DB::raw($this->nearMeDistanceExpression($lat, $lng).' AS near_me_distance'));
+        if (! $this->queryHasJoinAlias($query, 'near_me_city')) {
+            $query->leftJoin('cities as near_me_city', 'near_me_city.id', '=', 'videos.city');
+        }
+
+        if (! $this->queryHasJoinAlias($query, 'ba')) {
+            $query->leftJoin('business_account_additional_data as ba', 'ba.front_user_id', '=', 'videos.front_user_id');
+        }
+
+        $query->addSelect(
+            'near_me_city.name as near_me_city_name',
+            'ba.location as near_me_location',
+            'ba.latitude as near_me_latitude',
+            'ba.longitude as near_me_longitude',
+        );
+
+        if ($withDistance && $lat !== null && $lng !== null) {
+            $query->addSelect(DB::raw($this->nearMeDistanceExpression($lat, $lng).' AS near_me_distance'));
+        }
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Video>|\Illuminate\Database\Query\Builder  $query
+     */
+    private function queryHasJoinAlias($query, string $alias): bool
+    {
+        $joins = $query->getQuery()->joins ?? [];
+
+        foreach ($joins as $join) {
+            if (is_string($join->table) && str_contains($join->table, $alias)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function nearMeDistanceExpression(float $lat, float $lng): string
     {
-        $distanceSql = FeedSocialCache::haversineDistanceSql(
+        $businessDistanceSql = FeedSocialCache::haversineDistanceSql(
+            $lat,
+            $lng,
+            'ba.latitude',
+            'ba.longitude'
+        );
+
+        $cityDistanceSql = FeedSocialCache::haversineDistanceSql(
             $lat,
             $lng,
             'COALESCE(near_me_city.latitude, 0)',
             'COALESCE(near_me_city.longitude, 0)'
         );
 
-        return "CASE WHEN near_me_city.latitude IS NULL THEN 99999 ELSE {$distanceSql} END";
+        return "CASE
+            WHEN ba.latitude IS NOT NULL AND ba.longitude IS NOT NULL
+                 AND ba.latitude != 0 AND ba.longitude != 0
+            THEN {$businessDistanceSql}
+            WHEN near_me_city.latitude IS NOT NULL
+            THEN {$cityDistanceSql}
+            ELSE 99999
+        END";
     }
 
     /**
@@ -953,6 +1018,14 @@ class ReelsController extends Controller
 
         if (! empty($geoContext['geo_expanded'])) {
             $meta['geo_expanded'] = true;
+        }
+
+        if (! empty($geoContext['city'])) {
+            $meta['geo_city_id'] = (int) $geoContext['city'];
+        }
+
+        if (! empty($geoContext['geo_city_name'])) {
+            $meta['geo_city_name'] = (string) $geoContext['geo_city_name'];
         }
 
         return $meta;
@@ -1129,6 +1202,15 @@ class ReelsController extends Controller
 
         if ($this->shouldApplyGeoFilters($feed, $geoContext)) {
             $this->applyNearMeGeoFilters($query, $geoContext);
+        }
+
+        if ($feed === self::FEED_NEAR_ME && empty($geoContext['geo_fallback'])) {
+            $this->applyNearMeItemGeoJoins(
+                $query,
+                $this->shouldSortNearMeByDistance($feed, $geoContext),
+                $geoContext['latitude'] !== null ? (float) $geoContext['latitude'] : null,
+                $geoContext['longitude'] !== null ? (float) $geoContext['longitude'] : null,
+            );
         }
 
         return $query->first();

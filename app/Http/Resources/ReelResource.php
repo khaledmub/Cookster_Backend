@@ -125,6 +125,76 @@ class ReelResource extends JsonResource
                 'user_name' => $this->user->user_name ?? null,
                 'image' => \App\Helpers\AppHelper::userImageUrl($this->user->image ? (string) $this->user->image : null),
             ]),
+            ...$this->geoFields(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function geoFields(): array
+    {
+        $cityId = (int) ($this->city ?? 0);
+
+        return [
+            'city_id' => $cityId > 0 ? $cityId : null,
+            'city_name' => $this->stringAttribute('near_me_city_name'),
+            'distance_km' => $this->resolvedDistanceKm(),
+            'distance_basis' => $this->distanceBasis(),
+            'location' => $this->stringAttribute('near_me_location'),
+            'latitude' => $this->floatAttribute('near_me_latitude'),
+            'longitude' => $this->floatAttribute('near_me_longitude'),
+        ];
+    }
+
+    private function distanceBasis(): ?string
+    {
+        if ($this->resolvedDistanceKm() === null) {
+            return null;
+        }
+
+        $bizLat = $this->floatAttribute('near_me_latitude');
+        $bizLng = $this->floatAttribute('near_me_longitude');
+
+        if ($bizLat !== null && $bizLng !== null && abs($bizLat) > 0.0001 && abs($bizLng) > 0.0001) {
+            return 'business';
+        }
+
+        return 'city';
+    }
+
+    private function resolvedDistanceKm(): ?float
+    {
+        if (! isset($this->near_me_distance) || $this->near_me_distance === null) {
+            return null;
+        }
+
+        $distance = (float) $this->near_me_distance;
+
+        if ($distance >= 99999) {
+            return null;
+        }
+
+        return round($distance, 1);
+    }
+
+    private function stringAttribute(string $key): ?string
+    {
+        if (! isset($this->{$key})) {
+            return null;
+        }
+
+        $value = trim((string) $this->{$key});
+
+        return $value !== '' ? $value : null;
+    }
+
+    private function floatAttribute(string $key): ?float
+    {
+        if (! isset($this->{$key}) || $this->{$key} === null || $this->{$key} === '') {
+            return null;
+        }
+
+        return (float) $this->{$key};
     }
 }

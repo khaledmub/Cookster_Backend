@@ -58,6 +58,19 @@ class FeedSocialCache
         });
     }
 
+    public static function cityName(int $cityId): ?string
+    {
+        if ($cityId <= 0) {
+            return null;
+        }
+
+        return CookCache::remember('feed:city_name:'.$cityId, [900, 86400], function () use ($cityId) {
+            $name = DB::table('cities')->where('id', $cityId)->value('name');
+
+            return $name !== null && $name !== '' ? (string) $name : null;
+        });
+    }
+
 
     /**
      * Read country/city filters from a request, accepting legacy names (country, city)
