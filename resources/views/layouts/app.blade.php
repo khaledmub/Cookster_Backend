@@ -60,6 +60,7 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
     <div id="layout-wrapper">
         <div class="toastify on bg-danger toastify-right toastify-top customtoastifyError" aria-live="polite" style="transform: translate(0px, 0px); top: 15px;"></div>
         <div class="toastify on bg-success toastify-right toastify-top customtoastifySuccess" aria-live="polite" style="transform: translate(0px, 0px); top: 15px;"></div>
+        @auth
         <header id="page-topbar" class="">
             <div class="layout-width">
                 <div class="navbar-header">
@@ -680,6 +681,7 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
         <!-- Left Sidebar End -->
         <!-- Vertical Overlay-->
         <div class="vertical-overlay"></div>
+        @endauth
 
         <!-- ============================================================== -->
         <!-- Start right Content here -->

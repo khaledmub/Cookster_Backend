@@ -35,7 +35,9 @@ Route::get('generate', function (){
     \Illuminate\Support\Facades\Artisan::call('storage:link');
     echo 'ok';
 });
-Auth::routes();
+// Admin accounts are provisioned from inside the panel, so the public
+// self-registration endpoints must stay closed.
+Auth::routes(['register' => false]);
 
 Route::get('change/lang', [LocalizationController::class, 'lang_change'])->name('LangChange');
 Route::get('/', [HomeController::class, 'index'])->name('home');

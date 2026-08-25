@@ -25,17 +25,15 @@ class HealTranscodeQueueCommand extends Command
         $queued = (int) Redis::llen($queueKey);
         $reserved = (int) Redis::zcard($reservedKey);
 
-        if ($reserved > 0 && ($queued === 0 || $reserved > 10)) {
-            Redis::del($reservedKey);
-            $this->info("Cleared {$reserved} zombie reserved transcode jobs");
+        // Reserved entries used to leak because the phpredis serializer broke the queue's
+        // ZREM, and this command deleted them wholesale. That also discarded transcodes
+        // that were still legitimately running, so it now only reports.
+        if ($reserved > 10) {
+            $this->warn("{$reserved} transcode jobs reserved; check they are draining");
         }
 
-        $queued = (int) Redis::llen($queueKey);
-
         if ($queued > 150) {
-            Redis::del($queueKey, $queueKey.':delayed');
-            $this->warn("Purged bloated queue ({$queued} duplicate jobs)");
-            $queued = 0;
+            $this->warn("Queue backlog is large ({$queued} jobs waiting)");
         }
 
         if ($queued < 10) {

@@ -145,11 +145,13 @@ return [
 
         'client' => env('REDIS_CLIENT', 'phpredis'),
 
+        // Do not enable the phpredis 'serializer' or 'compression' options here. The queue
+        // and cache locks write values from Lua scripts (raw bytes) but delete them with
+        // client-side commands (encoded bytes), so the two never match: reserved jobs are
+        // never removed and replay forever, and locks are never released.
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
             'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
-            'serializer' => defined('Redis::SERIALIZER_IGBINARY') ? Redis::SERIALIZER_IGBINARY : Redis::SERIALIZER_PHP,
-            'compression' => defined('Redis::COMPRESSION_LZ4') ? Redis::COMPRESSION_LZ4 : (defined('Redis::COMPRESSION_ZSTD') ? Redis::COMPRESSION_ZSTD : 0),
         ],
 
         'default' => [

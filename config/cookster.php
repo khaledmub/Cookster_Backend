@@ -37,4 +37,13 @@ return [
         'date_time' => env('DATE_TIME_FORMAT', 'd-M-Y h:i A'),
     ],
 
+    'deeplink' => [
+        'android_package' => env('ANDROID_APP_PACKAGE', 'com.cookster.cooksterapp'),
+        'android_sha256' => env('ANDROID_APP_SHA256', '29:EA:D4:28:4B:EB:5A:11:DC:F7:F9:C0:25:CC:F5:36:63:72:4C:C3:85:7D:6A:5A:9E:EB:04:E5:29:2D:80:FF'),
+        'ios_team_id' => env('IOS_TEAM_ID', 'Y3972XUW7F'),
+        'ios_bundle_id' => env('IOS_APP_BUNDLE_ID', 'com.cookster.cooksterapp'),
+        // Custom-scheme host used by app shares (cookster://open.cookster.app/...).
+        'app_scheme_host' => env('APP_SCHEME_HOST', 'open.cookster.app'),
+    ],
+
 ];

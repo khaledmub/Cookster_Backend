@@ -8,8 +8,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-Schedule::command('queue:prune-failed --hours=168')->weekly();
+Schedule::command('queue:prune-failed --hours=168')->daily();
 Schedule::command('queue:restart')->dailyAt('04:00');
+
+// Backlog alarm: a queue that stops draining fires QueueBusy (see AppServiceProvider).
+Schedule::command('queue:monitor redis:thumbnails,redis:notifications,redis:emails,redis:default,redis:video-processing --max=250')
+    ->everyFiveMinutes()
+    ->onOneServer();
 
 Schedule::command('transcode:status-report')
     ->hourly()
@@ -17,7 +22,7 @@ Schedule::command('transcode:status-report')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/transcode-status-report.log'));
 
-// Self-heal zombie reserved jobs, then top up transcode queue.
+// Top up the transcode queue when it runs dry.
 Schedule::command('queue:heal-transcode --dispatch=50')
     ->everyFiveMinutes()
     ->withoutOverlapping(4)

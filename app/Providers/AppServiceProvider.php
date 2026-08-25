@@ -2,10 +2,15 @@
 
 namespace App\Providers;
 
+use App\Queue\Failed\ResilientDatabaseUuidFailedJobProvider;
 use App\Services\CdnService;
 use Aws\CommandInterface;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\QueueBusy;
+use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +35,18 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(CdnService::class);
+
+        $this->app->extend('queue.failer', function ($failer, $app) {
+            if (! $failer instanceof DatabaseUuidFailedJobProvider) {
+                return $failer;
+            }
+
+            return new ResilientDatabaseUuidFailedJobProvider(
+                $app['db'],
+                $app['config']['queue.failed.database'],
+                $app['config']['queue.failed.table'],
+            );
+        });
     }
 
     /**
@@ -43,6 +60,14 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureS3DiskForUniformBucketAccess();
         $this->configureRateLimiting();
+
+        Event::listen(function (QueueBusy $event) {
+            Log::warning('Queue backlog is not draining', [
+                'connection' => $event->connection,
+                'queue' => $event->queue,
+                'size' => $event->size,
+            ]);
+        });
     }
 
     private function configureRateLimiting(): void

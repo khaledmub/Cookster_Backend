@@ -24,6 +24,9 @@ class RegistrationService
 
     public const PENDING_EXPIRY_HOURS = 72;
 
+    /** Matches the `front_users`.`email` column width. */
+    private const EMAIL_COLUMN_LENGTH = 100;
+
     /**
      * @return array<string, array<int, mixed>>
      */
@@ -503,13 +506,31 @@ class RegistrationService
             DB::table('front_users')->where('id', $user->id)->update([
                 'registration_status' => RegistrationStatus::EXPIRED,
                 'is_soft_delete' => 1,
-                'email' => 'expired.'.$user->id.'.'.Str::slug((string) $user->email).'@invalid.cookster.local',
+                'email' => self::expiredEmailFor((string) $user->id, (string) $user->email),
                 'user_name' => 'expired_'.substr((string) $user->id, 0, 8),
                 'updated_at' => Carbon::now(),
             ]);
         }
 
         return $stale->count();
+    }
+
+    /**
+     * Placeholder address for a released registration. The user id already makes
+     * it unique, so the slug of the original address is only kept for traceability
+     * and gets trimmed to whatever room the column has left.
+     */
+    private static function expiredEmailFor(string $userId, string $email): string
+    {
+        $prefix = 'expired.'.$userId.'.';
+        $suffix = '@invalid.cookster.local';
+        $room = self::EMAIL_COLUMN_LENGTH - strlen($prefix) - strlen($suffix);
+
+        if ($room <= 0) {
+            return substr($prefix.$suffix, 0, self::EMAIL_COLUMN_LENGTH);
+        }
+
+        return $prefix.substr(Str::slug($email), 0, $room).$suffix;
     }
 
     private static function resendCooldownKey(string $userId): string

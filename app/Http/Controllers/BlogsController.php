@@ -9,6 +9,7 @@ use DB;
 use Illuminate\Support\Arr;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\File;
 use \App\Helpers\AppHelper;
 use Image;
     
@@ -180,6 +181,9 @@ class BlogsController extends Controller
             $image_input['imagename'] = time().'.'.$image->extension();
             $fileresponse=$request->file('image')->storeAs('public/'.$this->uploads_folder_name,$image_input['imagename']);
             $destinationPath = storage_path('app/public/'.$this->uploads_folder_name.'/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();
@@ -356,6 +360,9 @@ class BlogsController extends Controller
             $image_input['imagename'] = time().'.'.$image->extension();
             $fileresponse=$request->file('image')->storeAs('public/'.$this->uploads_folder_name,$image_input['imagename']);
             $destinationPath = storage_path('app/public/'.$this->uploads_folder_name.'/thumbnail');
+            if (!File::exists($destinationPath)) {
+                File::makeDirectory($destinationPath, 0775, true);
+            }
             $img = Image::read($image->path());
             $img->resize(100, 100, function ($constraint) {
                 $constraint->aspectRatio();

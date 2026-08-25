@@ -123,9 +123,9 @@ class HomeController extends Controller
             ],
             'target' => [
                 'namespace' => 'android_app',
-                'package_name' => env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+                'package_name' => $this->androidPackage(),
                 'sha256_cert_fingerprints' => [
-                    env('ANDROID_APP_SHA256', $this->androidSha256),
+                    $this->androidSha256(),
                 ],
             ],
         ]];
@@ -133,17 +133,18 @@ class HomeController extends Controller
         return response()->json($payload, 200, [
             'Content-Type' => 'application/json',
             'Cache-Control' => 'public, max-age=3600',
-        ]);
+        ], JSON_UNESCAPED_SLASHES);
     }
     public function appleAppSiteAssociation()
     {
-        $teamId = trim((string) env('IOS_TEAM_ID', ''));
-        $bundleId = trim((string) env('IOS_APP_BUNDLE_ID', ''));
+        $teamId = $this->iosTeamId();
+        $bundleId = $this->iosBundleId();
         $details = [];
 
         if ($teamId !== '' && $bundleId !== '') {
+            $appId = $teamId.'.'.$bundleId;
             $details[] = [
-                'appID' => $teamId.'.'.$bundleId,
+                'appID' => $appId,
                 'paths' => [
                     '/web/visitSingleVideo',
                     '/web/visitSingleVideo/*',
@@ -151,6 +152,12 @@ class HomeController extends Controller
                     '/web/visitProfile/*',
                     '/profile',
                     '/profile/*',
+                ],
+                'appIDs' => [$appId],
+                'components' => [
+                    ['/' => '/web/visitSingleVideo*'],
+                    ['/' => '/web/visitProfile*'],
+                    ['/' => '/profile*'],
                 ],
             ];
         }
@@ -165,7 +172,7 @@ class HomeController extends Controller
         return response()->json($payload, 200, [
             'Content-Type' => 'application/json',
             'Cache-Control' => 'public, max-age=3600',
-        ]);
+        ], JSON_UNESCAPED_SLASHES);
     }
     public function visitSingleVideo(Request $request)
     {
@@ -193,10 +200,10 @@ class HomeController extends Controller
 
         return view('frontend.video_deeplink', [
             'video' => $video,
-            'androidPackageName' => env('ANDROID_APP_PACKAGE', $this->androidPackageName),
+            'androidPackageName' => $this->androidPackage(),
             'iosAppStoreUrl' => 'https://apps.apple.com/us/app/cookster-كوكستر/id6746804733',
-            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.env('ANDROID_APP_PACKAGE', $this->androidPackageName),
-            'appSchemeUrl' => 'cookster://api/video_details?id='.$video->id,
+            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.$this->androidPackage(),
+            'appSchemeUrl' => $this->appOpenUrl('/web/visitSingleVideo', ['id' => $video->id]),
         ]);
     }
 
@@ -224,8 +231,8 @@ class HomeController extends Controller
             'metaDescription' => $metaDescription,
             'canonicalUrl' => $request->fullUrl(),
             'iosAppStoreUrl' => 'https://apps.apple.com/us/app/cookster-كوكستر/id6746804733',
-            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.env('ANDROID_APP_PACKAGE', $this->androidPackageName),
-            'appSchemeUrl' => 'cookster://api/profile_details?id='.$user->id,
+            'androidStoreUrl' => 'https://play.google.com/store/apps/details?id='.$this->androidPackage(),
+            'appSchemeUrl' => $this->appOpenUrl('/web/visitProfile', ['id' => $user->id]),
         ]);
     }
 
@@ -252,6 +259,37 @@ class HomeController extends Controller
         }
 
         return $query->first(['id', 'name', 'user_name', 'image']);
+    }
+
+    private function androidPackage(): string
+    {
+        return trim((string) config('cookster.deeplink.android_package', $this->androidPackageName)) ?: $this->androidPackageName;
+    }
+
+    private function androidSha256(): string
+    {
+        return trim((string) config('cookster.deeplink.android_sha256', $this->androidSha256)) ?: $this->androidSha256;
+    }
+
+    private function iosTeamId(): string
+    {
+        return trim((string) config('cookster.deeplink.ios_team_id', ''));
+    }
+
+    private function iosBundleId(): string
+    {
+        return trim((string) config('cookster.deeplink.ios_bundle_id', ''));
+    }
+
+    /**
+     * Custom-scheme URL matching app shares: cookster://open.cookster.app/web/visitProfile?id=...
+     */
+    private function appOpenUrl(string $path, array $query): string
+    {
+        $host = trim((string) config('cookster.deeplink.app_scheme_host', 'open.cookster.app')) ?: 'open.cookster.app';
+        $path = '/'.ltrim($path, '/');
+
+        return 'cookster://'.$host.$path.(empty($query) ? '' : '?'.http_build_query($query));
     }
     public function blog($category = null){
         $data = array();
