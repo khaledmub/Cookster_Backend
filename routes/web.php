@@ -30,6 +30,7 @@ use App\Http\Controllers\CitiesgroupsController;
 use App\Http\Controllers\AudiosController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\CronjobController;
+use App\Http\Controllers\RewardDealsController;
 
 Route::get('generate', function (){
     \Illuminate\Support\Facades\Artisan::call('storage:link');
@@ -101,6 +102,14 @@ Route::group(['middleware' => ['auth'], 'prefix' => 'admin'], function() {
     Route::resource('user_reviews', UserReviewsController::class);
     Route::post('ajax/get_user_reviews', [UserReviewsController::class, 'get_data_ajax']);
     Route::get('user_review_status_update/{id}/{status}', [UserReviewsController::class, 'user_review_status_update']);
+
+    // Partner QR Rewards
+    Route::get('reward-deals', [RewardDealsController::class, 'index'])->name('reward_deals.index');
+    Route::post('ajax/get_reward_deals', [RewardDealsController::class, 'get_data_ajax']);
+    Route::post('reward-deals/partners/{partnerId}/block', [RewardDealsController::class, 'blockPartner'])->name('reward_deals.block');
+    Route::post('reward-deals/partners/{partnerId}/unblock', [RewardDealsController::class, 'unblockPartner'])->name('reward_deals.unblock');
+    Route::get('reward-deals/{id}', [RewardDealsController::class, 'show'])->name('reward_deals.show');
+    Route::post('reward-deals/{id}/pause', [RewardDealsController::class, 'pause'])->name('reward_deals.pause');
 
     // Notifications
     Route::resource('notifications', NotificationsController::class);

@@ -766,6 +766,8 @@ class RecoveryHydrationSeeder extends Seeder
                 'videos-list',
                 'user-reviews-list',
                 'user-payments-list',
+                'reward-deals-list',
+                'reward-deals-edit',
                 'notifications-list',
                 'notifications-create',
             ],

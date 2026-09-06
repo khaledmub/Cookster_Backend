@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\ApiController;
 use App\Http\Controllers\API\PresignController;
 use App\Http\Controllers\API\ReelsController;
+use App\Http\Controllers\API\RewardsController;
 
 use App\Http\Middleware\SetLanguage;
 
@@ -134,5 +135,15 @@ Route::middleware([SetLanguage::class])->group(function () {
         Route::get('/one_time_discount_history', [ApiController::class, 'one_time_discount_history']);
         Route::get('/one_time_discount_history/settings', [ApiController::class, 'one_time_discount_history_settings']);
         Route::post('/one_time_discount_history/add', [ApiController::class, 'add_one_time_discount_history']);
+
+        // Partner QR Rewards (generic item + quantity)
+        Route::get('/rewards/my-code', [RewardsController::class, 'myCode']);
+        Route::get('/rewards/deals/current', [RewardsController::class, 'currentDeal']);
+        Route::get('/rewards/deals/history', [RewardsController::class, 'history']);
+        Route::post('/rewards/deals', [RewardsController::class, 'storeDeal']);
+        Route::post('/rewards/deals/renew', [RewardsController::class, 'renewDeal']);
+        Route::post('/rewards/deals/pause', [RewardsController::class, 'pauseDeal']);
+        Route::post('/rewards/scan', [RewardsController::class, 'scan'])
+            ->middleware('throttle:reward-scan');
     });
 });

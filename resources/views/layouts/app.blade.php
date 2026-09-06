@@ -532,6 +532,13 @@ $notifications=\App\Helpers\AppHelper::get_unread_notifications();
                             </a>
                         </li>
                         @endif
+                        @if(auth()->user()->can('reward-deals-list'))
+                        <li class="nav-item">
+                            <a class="nav-link menu-link {{ request()->is('admin/reward-deals') || request()->is('admin/reward-deals/*') ? 'active' : '' }}" href="{{ route('reward_deals.index') }}">
+                                <i class="fa-regular fa-qrcode"></i> <span data-key="t-dashboards">Reward Deals</span>
+                            </a>
+                        </li>
+                        @endif
                         @if(auth()->user()->can('notifications-list'))
                         <li class="nav-item">
                             <a class="nav-link menu-link {{ request()->is('admin/notifications') ||  request()->is('admin/notifications/*') ? 'active' : '' }}" href="{{ route('notifications.index') }}">

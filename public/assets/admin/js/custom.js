@@ -576,6 +576,26 @@ $(document).ready(function () {
             buttons: []
         });
     }
+
+    if (pageName == 'reward_deals.index') {
+        var DTable = $('.dynamicTable').DataTable({
+            "processing": true,
+            "serverSide": true,
+            "bInfo": true,
+            "ajax": {
+                url: baseurl + "admin/ajax/get_reward_deals",
+                'data': function (data) {
+                    data._token = $('meta[name="csrf-token"]').attr('content');
+                },
+                type: "POST"
+            },
+            "aLengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            dom: 'lBfrtip',
+            'ordering': false,
+            oLanguage: {},
+            buttons: []
+        });
+    }
     
     $('.copyToAll').click(function () {
         const languageId = this.getAttribute('data-language-id'); // The current language ID to copy from

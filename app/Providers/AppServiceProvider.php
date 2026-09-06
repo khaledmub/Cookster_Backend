@@ -75,6 +75,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('reels-presign', function (Request $request) {
             return Limit::perMinute(60)->by((string) ($request->user()?->id ?: $request->ip()));
         });
+
+        RateLimiter::for('reward-scan', function (Request $request) {
+            return Limit::perMinute(10)->by((string) ($request->user()?->id ?: $request->ip()));
+        });
     }
 
     /**
