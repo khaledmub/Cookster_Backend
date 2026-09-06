@@ -196,6 +196,11 @@ class VideoFeedService
         }
 
         if (isset($input['latitude'], $input['longitude']) && $input['latitude'] != '' && $input['longitude'] != '') {
+            $gpsCountryId = FeedSocialCache::countryIdFromCoords(
+                (float) $input['latitude'],
+                (float) $input['longitude']
+            );
+            $manualCity = FeedSocialCache::trustedManualCity($manualCity, $gpsCountryId);
             $nearMe = FeedSocialCache::nearMeCityIds(
                 (float) $input['latitude'],
                 (float) $input['longitude'],

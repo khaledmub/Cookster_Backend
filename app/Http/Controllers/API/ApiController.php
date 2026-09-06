@@ -2122,6 +2122,14 @@ class ApiController extends Controller
         $imageName = null;
         if ($request->file('image')) {
             $image = $request->file('image');
+            $imagePath = (string) $image->getRealPath();
+            if ($imagePath === '' || ! is_readable($imagePath)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => ['image' => ['Unable to open uploaded image file']],
+                ], 422);
+            }
             $imageName = time().rand(1000, 9999).'.'.$image->getClientOriginalExtension();
 
             $this->s3Service->storeFile('videos/'.$imageName, file_get_contents($image), [
@@ -2142,6 +2150,14 @@ class ApiController extends Controller
         }
         if ($request->file('video')) {
             $video = $request->file('video');
+            $videoPath = (string) $video->getRealPath();
+            if ($videoPath === '' || ! is_readable($videoPath)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => __('messages.validation_failed'),
+                    'errors' => ['video' => ['Unable to open uploaded video file']],
+                ], 422);
+            }
             // Prefer client extension so .mp4 stays .mp4 (guessExtension() can mis-detect on some devices).
             $ext = strtolower((string) ($video->getClientOriginalExtension() ?: $video->guessExtension() ?: 'mp4'));
             $ext = preg_match('/^[a-z0-9]{1,10}$/', $ext) ? $ext : 'mp4';

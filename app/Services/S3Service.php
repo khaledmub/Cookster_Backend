@@ -101,9 +101,16 @@ class S3Service
     public static function resolveMimeType($fileOrPath, string $fallback = 'application/octet-stream'): string
     {
         if ($fileOrPath instanceof UploadedFile) {
-            $mime = $fileOrPath->getMimeType();
-            if ($mime && $mime !== 'application/octet-stream') {
-                return $mime;
+            $path = (string) $fileOrPath->getRealPath();
+            if ($path !== '' && is_file($path)) {
+                try {
+                    $mime = $fileOrPath->getMimeType();
+                    if ($mime && $mime !== 'application/octet-stream') {
+                        return $mime;
+                    }
+                } catch (\Throwable $e) {
+                    // Uploaded tmp file can disappear or have an empty pathname.
+                }
             }
 
             return self::mimeFromExtension($fileOrPath->getClientOriginalExtension(), $fallback);

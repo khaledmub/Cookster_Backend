@@ -88,7 +88,8 @@ class FeedSocialCache
 
     /**
      * Resolve country/city filters from request values that may be numeric IDs or names.
-     * GPS nearest-city is used only when the user did not pick country or city.
+     * When GPS is present, client country/city IDs that belong to a different country
+     * are ignored so stale upload prefs (e.g. Saudi/Riyadh) cannot override the pin.
      *
      * @return array{country: int, city: int, cities_ids: array<int|string>}
      */
@@ -146,14 +147,18 @@ class FeedSocialCache
                     }
                 }
             }
-        } elseif (
-            ! $hasCountryParam
-            && $latitude !== null && $latitude !== ''
-            && $longitude !== null && $longitude !== ''
-        ) {
-            $city = self::nearestCityId((float) $latitude, (float) $longitude);
-            if ($city !== 0 && $country === 0) {
-                $country = (int) (DB::table('cities')->where('id', $city)->value('country_id') ?? 0);
+        }
+
+        $hasGps = $latitude !== null && $latitude !== ''
+            && $longitude !== null && $longitude !== '';
+        if ($hasGps) {
+            $gpsCity = self::nearestCityId((float) $latitude, (float) $longitude);
+            $gpsCountry = $gpsCity > 0 ? self::cityCountryId($gpsCity) : 0;
+            $clientMismatched = ($country > 0 && $gpsCountry > 0 && $country !== $gpsCountry)
+                || ($city > 0 && $gpsCountry > 0 && self::cityCountryId($city) !== $gpsCountry);
+            if ($clientMismatched || (! $hasCountryParam && ! $hasCityParam)) {
+                $city = $gpsCity;
+                $country = $gpsCountry;
             }
         }
 
@@ -162,6 +167,59 @@ class FeedSocialCache
             'city' => $city,
             'cities_ids' => self::cityGroupIds($city),
         ];
+    }
+
+    public static function cityCountryId(int $cityId): int
+    {
+        if ($cityId <= 0) {
+            return 0;
+        }
+
+        return (int) (DB::table('cities')->where('id', $cityId)->value('country_id') ?? 0);
+    }
+
+    public static function countryName(int $countryId): ?string
+    {
+        if ($countryId <= 0) {
+            return null;
+        }
+
+        return CookCache::remember('feed:country_name:'.$countryId, [900, 86400], function () use ($countryId) {
+            $name = DB::table('countries')->where('id', $countryId)->value('name');
+
+            return $name !== null && $name !== '' ? (string) $name : null;
+        });
+    }
+
+    public static function publishedVideoCountInCountry(int $countryId): int
+    {
+        if ($countryId <= 0) {
+            return 0;
+        }
+
+        return (int) CookCache::remember('feed:country_video_count:'.$countryId, [60, 300], function () use ($countryId) {
+            return (int) DB::table('videos')
+                ->where('status', 1)
+                ->where('is_soft_delete', 0)
+                ->where('country', $countryId)
+                ->count();
+        });
+    }
+
+    /**
+     * Honor a client city only when it sits in the GPS-resolved country.
+     */
+    public static function trustedManualCity(?int $manualCity, int $gpsCountryId): ?int
+    {
+        if ($manualCity === null || $manualCity <= 0) {
+            return null;
+        }
+
+        if ($gpsCountryId <= 0) {
+            return $manualCity;
+        }
+
+        return self::cityCountryId($manualCity) === $gpsCountryId ? $manualCity : null;
     }
 
     public static function countryIdFromCoords(float $lat, float $lng): int
@@ -182,7 +240,12 @@ class FeedSocialCache
     public static function localCityIds(float $lat, float $lng, float $radiusKm): array
     {
         $radiusKm = max(1.0, $radiusKm);
-        $ids = self::cityIdsWithVideosWithinRadius($lat, $lng, $radiusKm);
+        $ids = self::cityIdsWithVideosWithinRadius(
+            $lat,
+            $lng,
+            $radiusKm,
+            self::countryIdFromCoords($lat, $lng)
+        );
 
         if (! empty($ids)) {
             return $ids;
@@ -222,6 +285,7 @@ class FeedSocialCache
 
         return CookCache::remember($cacheKey, [300, 1800], function () use ($lat, $lng, $manualCity) {
             $city = $manualCity ?? self::nearestCityId($lat, $lng);
+            $countryId = $city > 0 ? self::cityCountryId($city) : self::countryIdFromCoords($lat, $lng);
             $primaryIds = $city > 0 ? self::cityGroupIds($city) : [];
 
             if (! empty($primaryIds) && self::publishedVideoCountInCities($primaryIds) > 0) {
@@ -229,7 +293,7 @@ class FeedSocialCache
             }
 
             foreach ([50, 80, 120] as $radiusKm) {
-                $expandedIds = self::cityIdsWithVideosWithinRadius($lat, $lng, $radiusKm);
+                $expandedIds = self::cityIdsWithVideosWithinRadius($lat, $lng, $radiusKm, $countryId);
 
                 if (! empty($expandedIds)) {
                     return self::nearMeCityPayload($city, $expandedIds, true, $lat, $lng);
@@ -277,12 +341,18 @@ class FeedSocialCache
      *
      * @return list<int|string>
      */
-    private static function cityIdsWithVideosWithinRadius(float $lat, float $lng, float $radiusKm): array
+    private static function cityIdsWithVideosWithinRadius(float $lat, float $lng, float $radiusKm, int $countryId = 0): array
     {
-        return DB::table('cities as c')
+        $query = DB::table('cities as c')
             ->join('videos as v', 'v.city', '=', 'c.id')
             ->where('v.status', 1)
-            ->where('v.is_soft_delete', 0)
+            ->where('v.is_soft_delete', 0);
+
+        if ($countryId > 0) {
+            $query->where('c.country_id', $countryId);
+        }
+
+        return $query
             ->select('c.id', DB::raw("(
                 6371 * acos(
                     cos(radians($lat)) *

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ReelResource;
 use App\Models\Video;
 use App\Support\FeedSocialCache;
+use App\Support\ReelViewTracker;
 use App\Support\VideoFeedSort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,12 +77,7 @@ class ReelsController extends Controller
         }
 
         $geoContext = $this->resolveGeoContext($request, $cursor, $feed);
-        $cacheKey = $this->feedCacheKey($feed, $cursor['cache_key'], $viewer, $geoContext, $feedContext);
-
-        $payload = $this->rememberFeedPage(
-            $cacheKey,
-            fn () => $this->fetchReelsPage($feed, $cursor, $viewer, $geoContext, $feedContext)
-        );
+        $payload = $this->loadReelsPage($feed, $cursor, $viewer, $geoContext, $feedContext);
 
         return response()->json([
             'status' => true,
@@ -92,9 +88,82 @@ class ReelsController extends Controller
                 'next_cursor' => $payload['next_cursor'],
                 'geo_fallback' => $payload['geo_fallback'],
                 'sort_by' => $feedContext['sort_by'],
-            ], $this->nearMeMetaFields($feed, $geoContext, $payload), [
+            ], $this->nearMeMetaFields($feed, $geoContext, $payload), $this->unseenFirstMeta($feedContext, $payload), [
                 'pinned_video_id' => $payload['pinned_video_id'] ?? null,
             ]),
+        ]);
+    }
+
+    public function storeView(Request $request, string $id): JsonResponse
+    {
+        return $this->recordReelViews($request, [$id]);
+    }
+
+    public function storeViews(Request $request): JsonResponse
+    {
+        $ids = $request->input('video_ids', $request->input('ids', []));
+        if (! is_array($ids)) {
+            $ids = [$ids];
+        }
+
+        return $this->recordReelViews($request, $ids);
+    }
+
+    /**
+     * @param  list<mixed>  $videoIds
+     */
+    private function recordReelViews(Request $request, array $videoIds): JsonResponse
+    {
+        $viewer = Auth::guard('sanctum')->user();
+        $userId = $viewer !== null ? (string) $viewer->id : null;
+        $deviceId = ReelViewTracker::normalizeDeviceId($request->input('device_id'));
+
+        if (ReelViewTracker::viewerKey($userId, $deviceId) === null) {
+            return response()->json([
+                'status' => false,
+                'message' => 'device_id is required when not authenticated',
+            ], 422);
+        }
+
+        if (! ReelViewTracker::tableReady()) {
+            return response()->json([
+                'status' => true,
+                'recorded' => 0,
+            ]);
+        }
+
+        $ids = [];
+        foreach ($videoIds as $videoId) {
+            $id = trim((string) $videoId);
+            if ($id !== '') {
+                $ids[$id] = $id;
+            }
+        }
+        $ids = array_values($ids);
+
+        if ($ids === []) {
+            return response()->json([
+                'status' => false,
+                'message' => 'video_id is required',
+            ], 422);
+        }
+
+        if (count($ids) > 20) {
+            $ids = array_slice($ids, 0, 20);
+        }
+
+        $existing = Video::query()
+            ->whereIn('id', $ids)
+            ->where('is_soft_delete', 0)
+            ->pluck('id')
+            ->all();
+
+        $recorded = ReelViewTracker::record($userId, $deviceId, $existing);
+
+        return response()->json([
+            'status' => true,
+            'recorded' => $recorded,
+            'video_ids' => array_values($existing),
         ]);
     }
 
@@ -110,24 +179,39 @@ class ReelsController extends Controller
 
         $isFirstNearMePage = $feed === self::FEED_NEAR_ME
             && $cursor['created_at'] === null
-            && $cursor['system_id'] === null;
+            && $cursor['system_id'] === null
+            && ($cursor['unseen_phase'] ?? ReelViewTracker::PHASE_UNSEEN) !== ReelViewTracker::PHASE_SEEN
+            && empty($cursor['seen_reset']);
+
+        if ($isFirstNearMePage && ! empty($geoContext['geo_empty_country'])) {
+            return [
+                'items' => collect(),
+                'has_more' => false,
+                'next_cursor' => null,
+                'geo_fallback' => false,
+                'geo_empty_country' => true,
+            ];
+        }
 
         if (
             $isFirstNearMePage
             && ! $geoFallback
+            && empty($geoContext['geo_empty_country'])
             && (
                 ! empty($geoContext['geo_unresolved'])
                 || ! $this->hasActiveNearMeGeoFilter($geoContext)
             )
         ) {
+            $fallbackContext = $this->nearMeEmptyResultFallback($geoContext);
             $result = $this->executeReelsQuery(
                 $feed,
                 $cursor,
                 $viewer,
-                $this->generalNearMeFallbackGeoContext(),
+                $fallbackContext,
                 $feedContext
             );
-            $result['geo_fallback'] = true;
+            $result['geo_fallback'] = ! empty($fallbackContext['geo_fallback']);
+            $result['geo_empty_country'] = ! empty($geoContext['geo_empty_country']);
 
             return $result;
         }
@@ -139,16 +223,19 @@ class ReelsController extends Controller
             && $result['items']->isEmpty()
             && ! $geoFallback
             && $isFirstNearMePage
+            && empty($geoContext['geo_empty_country'])
             && $this->hasActiveNearMeGeoFilter($geoContext)
         ) {
+            $fallbackContext = $this->nearMeEmptyResultFallback($geoContext);
             $result = $this->executeReelsQuery(
                 $feed,
                 $cursor,
                 $viewer,
-                $this->generalNearMeFallbackGeoContext(),
+                $fallbackContext,
                 $feedContext
             );
-            $result['geo_fallback'] = true;
+            $result['geo_fallback'] = ! empty($fallbackContext['geo_fallback']);
+            $result['geo_empty_country'] = ! empty($geoContext['geo_empty_country']);
 
             return $result;
         }
@@ -164,8 +251,6 @@ class ReelsController extends Controller
      */
     private function executeReelsQuery(string $feed, array $cursor, mixed $viewer, array $geoContext, array $feedContext): array
     {
-        $perPage = $feedContext['per_page'];
-
         $query = Video::query()
             ->select('videos.*')
             ->with(['user:id,name,user_name,image'])
@@ -217,6 +302,7 @@ class ReelsController extends Controller
                     'items' => collect(),
                     'has_more' => false,
                     'next_cursor' => null,
+                    'unseen_exhausted' => true,
                 ];
             }
 
@@ -242,11 +328,164 @@ class ReelsController extends Controller
             $this->applyNearMeGeoFilters($query, $geoContext);
         }
 
-        $anchorApplied = $this->applyAnchorOrCursor($query, $cursor, $feedContext);
-
         $sort = $feedContext['sort_by'];
 
-        if (! $anchorApplied && $useDistanceSort && $cursor['near_me_distance'] !== null) {
+        return $this->paginateReelsQuery(
+            $query,
+            $feed,
+            $cursor,
+            $viewer,
+            $geoContext,
+            $feedContext,
+            $useDistanceSort,
+            $sort
+        );
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Video>  $query
+     * @param  array<string, mixed>  $cursor
+     * @param  array<string, mixed>  $geoContext
+     * @param  array<string, mixed>  $feedContext
+     * @return array{items: Collection<int, Video>, has_more: bool, next_cursor: ?string, pinned_video_id: ?string, unseen_exhausted: bool}
+     */
+    private function paginateReelsQuery(
+        $query,
+        string $feed,
+        array $cursor,
+        mixed $viewer,
+        array $geoContext,
+        array $feedContext,
+        bool $useDistanceSort,
+        string $sort
+    ): array {
+        $perPage = $feedContext['per_page'];
+        $unseenFirst = ! empty($feedContext['unseen_first']) && ! empty($feedContext['viewer_key']);
+        $phase = $unseenFirst
+            ? (string) ($cursor['unseen_phase'] ?? ReelViewTracker::PHASE_UNSEEN)
+            : null;
+        $unseenExhausted = ! $unseenFirst || $phase === ReelViewTracker::PHASE_SEEN;
+
+        if ($unseenFirst && $phase === ReelViewTracker::PHASE_UNSEEN) {
+            $unseenQuery = clone $query;
+            ReelViewTracker::applyPhaseFilter($unseenQuery, $feedContext['viewer_key'], false);
+            $this->applyReelsPageCursor($unseenQuery, $cursor, $feedContext, $geoContext, $useDistanceSort, $sort, true);
+            $this->applyReelsPageOrder($unseenQuery, $useDistanceSort, $sort, $geoContext);
+
+            $unseenRows = $unseenQuery->limit($perPage + 1)->get();
+            $hasMoreUnseen = $unseenRows->count() > $perPage;
+            $items = $unseenRows->take($perPage)->values();
+
+            if ($hasMoreUnseen) {
+                return $this->finalizeReelsPage(
+                    $items,
+                    true,
+                    $feed,
+                    $cursor,
+                    $viewer,
+                    $geoContext,
+                    $feedContext,
+                    ReelViewTracker::PHASE_UNSEEN,
+                    false,
+                    false
+                );
+            }
+
+            $need = $perPage - $items->count();
+            $seenQuery = clone $query;
+            ReelViewTracker::applyPhaseFilter($seenQuery, $feedContext['viewer_key'], true);
+            if ($items->isNotEmpty()) {
+                $seenQuery->whereNotIn('videos.id', $items->pluck('id')->all());
+            }
+            $this->applyReelsPageOrder($seenQuery, $useDistanceSort, $sort, $geoContext);
+            $seenLimit = ($need > 0 ? $need : 1) + 1;
+            $seenRows = $seenQuery->limit($seenLimit)->get();
+
+            if ($need > 0) {
+                $items = $items->concat($seenRows->take($need))->values();
+                $hasMore = $seenRows->count() > $need;
+            } else {
+                $hasMore = $seenRows->isNotEmpty();
+            }
+
+            return $this->finalizeReelsPage(
+                $items,
+                $hasMore,
+                $feed,
+                $cursor,
+                $viewer,
+                $geoContext,
+                $feedContext,
+                ReelViewTracker::PHASE_SEEN,
+                true,
+                $need === 0 && $hasMore
+            );
+        }
+
+        if ($unseenFirst && $phase === ReelViewTracker::PHASE_SEEN) {
+            ReelViewTracker::applyPhaseFilter($query, $feedContext['viewer_key'], true);
+            $applyKeyset = empty($cursor['seen_reset']);
+            $this->applyReelsPageCursor($query, $cursor, $feedContext, $geoContext, $useDistanceSort, $sort, $applyKeyset);
+            $this->applyReelsPageOrder($query, $useDistanceSort, $sort, $geoContext);
+            $rows = $query->limit($perPage + 1)->get();
+            $hasMore = $rows->count() > $perPage;
+            $items = $rows->take($perPage)->values();
+
+            return $this->finalizeReelsPage(
+                $items,
+                $hasMore,
+                $feed,
+                $cursor,
+                $viewer,
+                $geoContext,
+                $feedContext,
+                ReelViewTracker::PHASE_SEEN,
+                true,
+                false
+            );
+        }
+
+        $this->applyReelsPageCursor($query, $cursor, $feedContext, $geoContext, $useDistanceSort, $sort, true);
+        $this->applyReelsPageOrder($query, $useDistanceSort, $sort, $geoContext);
+        $rows = $query->limit($perPage + 1)->get();
+        $hasMore = $rows->count() > $perPage;
+        $items = $rows->take($perPage)->values();
+
+        return $this->finalizeReelsPage(
+            $items,
+            $hasMore,
+            $feed,
+            $cursor,
+            $viewer,
+            $geoContext,
+            $feedContext,
+            null,
+            $unseenExhausted,
+            false
+        );
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Video>  $query
+     * @param  array<string, mixed>  $cursor
+     * @param  array<string, mixed>  $feedContext
+     * @param  array<string, mixed>  $geoContext
+     */
+    private function applyReelsPageCursor(
+        $query,
+        array $cursor,
+        array $feedContext,
+        array $geoContext,
+        bool $useDistanceSort,
+        string $sort,
+        bool $applyKeyset
+    ): void {
+        $anchorApplied = $this->applyAnchorOrCursor($query, $cursor, $feedContext);
+        if ($anchorApplied || ! $applyKeyset) {
+            return;
+        }
+
+        if ($useDistanceSort && $cursor['near_me_distance'] !== null) {
             $this->applyNearMeDistanceCursor(
                 $query,
                 $cursor,
@@ -254,10 +493,17 @@ class ReelsController extends Controller
                 (float) $geoContext['latitude'],
                 (float) $geoContext['longitude']
             );
-        } elseif (! $anchorApplied && $cursor['created_at'] !== null && $cursor['id'] !== null) {
+
+            return;
+        }
+
+        if ($cursor['created_at'] !== null && $cursor['id'] !== null) {
             VideoFeedSort::applyKeysetCursor($query, $sort, $cursor['created_at'], $cursor['id']);
-        } elseif (! $anchorApplied && $cursor['system_id'] !== null && $cursor['id'] !== null) {
-            // Legacy cursor support (pre-sort_by deploy).
+
+            return;
+        }
+
+        if ($cursor['system_id'] !== null && $cursor['id'] !== null) {
             $query->where(function ($q) use ($cursor) {
                 $q->where('videos.system_id', '<', $cursor['system_id'])
                     ->orWhere(function ($q2) use ($cursor) {
@@ -266,29 +512,55 @@ class ReelsController extends Controller
                     });
             });
         }
+    }
 
-        $rows = $query
-            ->when(
-                $useDistanceSort,
-                fn ($q) => $this->applyNearMeOrder(
-                    $q,
-                    $sort,
-                    (float) $geoContext['latitude'],
-                    (float) $geoContext['longitude']
-                ),
-                fn ($q) => VideoFeedSort::applyOrder($q, $sort)
-            )
-            ->limit($perPage + 1)
-            ->get();
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Video>  $query
+     * @param  array<string, mixed>  $geoContext
+     */
+    private function applyReelsPageOrder($query, bool $useDistanceSort, string $sort, array $geoContext): void
+    {
+        if ($useDistanceSort) {
+            $this->applyNearMeOrder(
+                $query,
+                $sort,
+                (float) $geoContext['latitude'],
+                (float) $geoContext['longitude']
+            );
 
-        $hasMore = $rows->count() > $perPage;
-        $items = $rows->take($perPage)->values();
+            return;
+        }
+
+        VideoFeedSort::applyOrder($query, $sort);
+    }
+
+    /**
+     * @param  Collection<int, Video>  $items
+     * @param  array<string, mixed>  $cursor
+     * @param  array<string, mixed>  $geoContext
+     * @param  array<string, mixed>  $feedContext
+     * @return array{items: Collection<int, Video>, has_more: bool, next_cursor: ?string, pinned_video_id: ?string, unseen_exhausted: bool}
+     */
+    private function finalizeReelsPage(
+        Collection $items,
+        bool $hasMore,
+        string $feed,
+        array $cursor,
+        mixed $viewer,
+        array $geoContext,
+        array $feedContext,
+        ?string $unseenPhase,
+        bool $unseenExhausted,
+        bool $seenReset
+    ): array {
+        $perPage = $feedContext['per_page'];
         $pinnedVideoId = null;
         $consumedPinId = ! empty($cursor['consumed_pin_id']) ? (string) $cursor['consumed_pin_id'] : null;
 
         if (($feedContext['pin_video_id'] ?? null) !== null) {
             $pinned = $this->resolvePinnedVideo($feedContext['pin_video_id'], $viewer, $feed, $geoContext);
             if ($pinned !== null) {
+                $hadPin = $items->contains(fn (Video $video) => (string) $video->id === (string) $pinned->id);
                 $items = $items
                     ->reject(fn (Video $video) => (string) $video->id === (string) $pinned->id)
                     ->prepend($pinned)
@@ -296,8 +568,8 @@ class ReelsController extends Controller
                     ->values();
                 $pinnedVideoId = (string) $pinned->id;
                 $consumedPinId = $pinnedVideoId;
-                if (! $rows->contains(fn (Video $video) => (string) $video->id === $pinnedVideoId)) {
-                    $hasMore = $hasMore || $rows->count() >= $perPage;
+                if (! $hadPin) {
+                    $hasMore = $hasMore || $items->count() >= $perPage;
                 }
             }
         }
@@ -305,7 +577,23 @@ class ReelsController extends Controller
         $nextCursor = null;
         if ($hasMore && $items->isNotEmpty()) {
             $last = $items->last();
-            $nextCursor = $this->encodeNextCursor($feed, $feedContext, $geoContext, $last, $consumedPinId);
+            if (
+                $seenReset
+                && $pinnedVideoId !== null
+                && (string) $last->id === $pinnedVideoId
+                && $items->count() > 1
+            ) {
+                $last = $items[1];
+            }
+            $nextCursor = $this->encodeNextCursor(
+                $feed,
+                $feedContext,
+                $geoContext,
+                $last,
+                $consumedPinId,
+                $unseenPhase,
+                $seenReset
+            );
         }
 
         return [
@@ -313,6 +601,7 @@ class ReelsController extends Controller
             'has_more' => $hasMore,
             'next_cursor' => $nextCursor,
             'pinned_video_id' => $pinnedVideoId,
+            'unseen_exhausted' => $unseenExhausted,
         ];
     }
 
@@ -383,14 +672,28 @@ class ReelsController extends Controller
     /**
      * @param  array{feed: string, user_id: ?string, video_type: ?int, per_page: int, anchor_id: ?string}  $feedContext
      */
-    private function encodeNextCursor(string $feed, array $feedContext, array $geoContext, Video $last, ?string $consumedPinId = null): string
-    {
+    private function encodeNextCursor(
+        string $feed,
+        array $feedContext,
+        array $geoContext,
+        Video $last,
+        ?string $consumedPinId = null,
+        ?string $unseenPhase = null,
+        bool $seenReset = false
+    ): string {
         $cursorData = [
             'feed' => $feed,
             'id' => $last->id,
             'created_at' => $last->created_at?->toDateTimeString() ?? (string) $last->created_at,
             'sort_by' => $feedContext['sort_by'],
         ];
+
+        if ($unseenPhase !== null) {
+            $cursorData['phase'] = $unseenPhase;
+            if ($seenReset) {
+                $cursorData['seen_reset'] = true;
+            }
+        }
 
         if ($feed === self::FEED_USER && $feedContext['user_id'] !== null) {
             $cursorData['user_id'] = $feedContext['user_id'];
@@ -416,6 +719,10 @@ class ReelsController extends Controller
             $cursorData['consumed_pin_id'] = $consumedPinId;
         }
 
+        if (! empty($feedContext['device_id'])) {
+            $cursorData['device_id'] = $feedContext['device_id'];
+        }
+
         return base64_encode(json_encode($cursorData, JSON_THROW_ON_ERROR));
     }
 
@@ -437,11 +744,27 @@ class ReelsController extends Controller
             ? (string) $request->input('anchor_id')
             : null;
 
-        $isFirstPage = $cursor['created_at'] === null && $cursor['system_id'] === null;
+        $isFirstPage = $cursor['created_at'] === null
+            && $cursor['system_id'] === null
+            && ($cursor['unseen_phase'] ?? ReelViewTracker::PHASE_UNSEEN) !== ReelViewTracker::PHASE_SEEN
+            && empty($cursor['seen_reset']);
         $pinVideoId = null;
         if ($isFirstPage && $request->filled('pin_video_id') && in_array($feed, [self::FEED_GENERAL, self::FEED_NEAR_ME], true)) {
             $pinVideoId = (string) $request->input('pin_video_id');
         }
+
+        $deviceId = ReelViewTracker::normalizeDeviceId(
+            $request->input('device_id') ?? ($cursor['device_id'] ?? null)
+        );
+        $authUser = Auth::guard('sanctum')->user();
+        $viewerKey = ReelViewTracker::viewerKey(
+            $authUser !== null ? (string) $authUser->id : null,
+            $deviceId
+        );
+        $homeFeed = in_array($feed, [self::FEED_GENERAL, self::FEED_NEAR_ME, self::FEED_FOLLOWING], true);
+        $wantsUnseen = $request->boolean('unseen_first')
+            || in_array($cursor['unseen_phase'] ?? null, [ReelViewTracker::PHASE_UNSEEN, ReelViewTracker::PHASE_SEEN], true);
+        $unseenFirst = $homeFeed && $wantsUnseen && $viewerKey !== null && ReelViewTracker::tableReady();
 
         return [
             'feed' => $feed,
@@ -451,6 +774,9 @@ class ReelsController extends Controller
             'anchor_id' => $anchorId,
             'sort_by' => VideoFeedSort::fromRequest($request, $cursor),
             'pin_video_id' => $pinVideoId,
+            'unseen_first' => $unseenFirst,
+            'viewer_key' => $unseenFirst ? $viewerKey : null,
+            'device_id' => $deviceId,
         ];
     }
 
@@ -494,9 +820,12 @@ class ReelsController extends Controller
 
         $lat = $request->filled('latitude') ? (float) $request->input('latitude') : null;
         $lng = $request->filled('longitude') ? (float) $request->input('longitude') : null;
-        $manualCity = $request->filled('city') ? (int) $request->input('city') : null;
+        $clientCity = $request->filled('city') ? (int) $request->input('city') : null;
+        $manualCity = $clientCity;
 
         if ($lat !== null && $lng !== null) {
+            $gpsCountryId = FeedSocialCache::countryIdFromCoords($lat, $lng);
+            $manualCity = FeedSocialCache::trustedManualCity($clientCity, $gpsCountryId);
             $scope = $this->parseGeoScope($request);
 
             if ($scope === self::GEO_SCOPE_LOCAL) {
@@ -507,7 +836,7 @@ class ReelsController extends Controller
                 return $this->withGeoCityName([
                     'cities_ids' => $citiesIds,
                     'city' => $city,
-                    'country_id' => FeedSocialCache::countryIdFromCoords($lat, $lng),
+                    'country_id' => $gpsCountryId,
                     'geo_scope' => self::GEO_SCOPE_LOCAL,
                     'geo_radius_km' => $radiusKm,
                     'geo_fallback' => false,
@@ -536,9 +865,10 @@ class ReelsController extends Controller
             }
 
             if ($scope === self::GEO_SCOPE_COUNTRY) {
-                $countryId = $request->filled('country')
-                    ? (int) $request->input('country')
-                    : FeedSocialCache::countryIdFromCoords($lat, $lng);
+                $requestedCountry = $request->filled('country') ? (int) $request->input('country') : 0;
+                $countryId = ($requestedCountry > 0 && $requestedCountry === $gpsCountryId)
+                    ? $requestedCountry
+                    : $gpsCountryId;
 
                 return $this->withGeoCityName([
                     'cities_ids' => [],
@@ -696,6 +1026,7 @@ class ReelsController extends Controller
             'geo_fallback' => false,
             'geo_unresolved' => false,
             'geo_expanded' => false,
+            'geo_empty_country' => false,
             'latitude' => null,
             'longitude' => null,
             'hash' => 'none',
@@ -746,7 +1077,45 @@ class ReelsController extends Controller
             $context['geo_city_name'] = FeedSocialCache::cityName($cityId);
         }
 
+        $countryId = (int) ($context['country_id'] ?? 0);
+        if ($countryId > 0) {
+            $context['geo_country_name'] = FeedSocialCache::countryName($countryId);
+            $context['geo_empty_country'] = FeedSocialCache::publishedVideoCountInCountry($countryId) === 0;
+        } else {
+            $context['geo_empty_country'] = false;
+        }
+
         return $context;
+    }
+
+    /**
+     * Prefer same-country videos over the worldwide general dump when Near Me
+     * has no city matches. An empty country stays empty so the app can offer
+     * "browse another country".
+     *
+     * @param  array<string, mixed>  $geoContext
+     * @return array<string, mixed>
+     */
+    private function nearMeEmptyResultFallback(array $geoContext): array
+    {
+        $countryId = (int) ($geoContext['country_id'] ?? 0);
+        if ($countryId > 0 && empty($geoContext['geo_empty_country'])) {
+            return $this->withGeoCityName([
+                'cities_ids' => [],
+                'city' => 0,
+                'country_id' => $countryId,
+                'geo_scope' => self::GEO_SCOPE_COUNTRY,
+                'geo_radius_km' => null,
+                'geo_fallback' => false,
+                'geo_unresolved' => false,
+                'geo_expanded' => false,
+                'latitude' => $geoContext['latitude'] ?? null,
+                'longitude' => $geoContext['longitude'] ?? null,
+                'hash' => sha1('country-fallback:'.$countryId),
+            ]);
+        }
+
+        return $this->generalNearMeFallbackGeoContext();
     }
 
     /**
@@ -1004,17 +1373,32 @@ class ReelsController extends Controller
             return [];
         }
 
+        $emptyCountry = ! empty($payload['geo_empty_country']) || ! empty($geoContext['geo_empty_country']);
+        $countryId = (int) ($geoContext['country_id'] ?? 0);
+
         if (! empty($payload['geo_fallback'])) {
             return [
                 'geo_scope' => self::GEO_SCOPE_NONE,
                 'geo_radius_km' => null,
+                'geo_empty_country' => $emptyCountry,
+                'geo_country_id' => $countryId > 0 ? $countryId : null,
+                'geo_country_name' => $geoContext['geo_country_name'] ?? null,
             ];
         }
 
         $meta = [
             'geo_scope' => $geoContext['geo_scope'],
             'geo_radius_km' => $geoContext['geo_radius_km'],
+            'geo_empty_country' => $emptyCountry,
         ];
+
+        if ($countryId > 0) {
+            $meta['geo_country_id'] = $countryId;
+        }
+
+        if (! empty($geoContext['geo_country_name'])) {
+            $meta['geo_country_name'] = (string) $geoContext['geo_country_name'];
+        }
 
         if (! empty($geoContext['geo_expanded'])) {
             $meta['geo_expanded'] = true;
@@ -1057,6 +1441,9 @@ class ReelsController extends Controller
             'user_id' => null,
             'video_type' => null,
             'consumed_pin_id' => null,
+            'unseen_phase' => null,
+            'seen_reset' => false,
+            'device_id' => null,
         ];
 
         if ($rawCursor === null || $rawCursor === '') {
@@ -1074,22 +1461,37 @@ class ReelsController extends Controller
             return $empty;
         }
 
-        if (! is_array($data) || ! isset($data['id'])) {
+        if (! is_array($data)) {
+            return $empty;
+        }
+
+        $hasPhase = isset($data['phase']) && in_array($data['phase'], [ReelViewTracker::PHASE_UNSEEN, ReelViewTracker::PHASE_SEEN], true);
+        if (! isset($data['id']) && ! $hasPhase && empty($data['seen_reset'])) {
             return $empty;
         }
 
         $createdAt = isset($data['created_at']) ? (string) $data['created_at'] : null;
         $systemId = isset($data['system_id']) ? (int) $data['system_id'] : null;
+        $phase = isset($data['phase']) && $data['phase'] === ReelViewTracker::PHASE_SEEN
+            ? ReelViewTracker::PHASE_SEEN
+            : (isset($data['phase']) && $data['phase'] === ReelViewTracker::PHASE_UNSEEN
+                ? ReelViewTracker::PHASE_UNSEEN
+                : null);
+        $seenReset = ! empty($data['seen_reset']);
 
-        if ($createdAt === null && $systemId === null) {
+        if ($createdAt === null && $systemId === null && $phase !== ReelViewTracker::PHASE_SEEN && ! $seenReset) {
             return $empty;
+        }
+
+        if ($phase === ReelViewTracker::PHASE_SEEN && $createdAt === null && $systemId === null) {
+            $seenReset = true;
         }
 
         return [
             'cache_key' => sha1((string) $rawCursor),
             'system_id' => $systemId,
             'created_at' => $createdAt,
-            'id' => (string) $data['id'],
+            'id' => isset($data['id']) ? (string) $data['id'] : null,
             'near_me_distance' => isset($data['near_me_distance']) ? (float) $data['near_me_distance'] : null,
             'sort_by' => VideoFeedSort::resolve($data['sort_by'] ?? null),
             'geo_fallback' => ! empty($data['geo_fallback']),
@@ -1097,6 +1499,43 @@ class ReelsController extends Controller
             'user_id' => isset($data['user_id']) ? (string) $data['user_id'] : null,
             'video_type' => isset($data['video_type']) ? (int) $data['video_type'] : null,
             'consumed_pin_id' => isset($data['consumed_pin_id']) ? (string) $data['consumed_pin_id'] : null,
+            'unseen_phase' => $phase,
+            'seen_reset' => $seenReset,
+            'device_id' => isset($data['device_id']) ? (string) $data['device_id'] : null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $geoContext
+     * @param  array<string, mixed>  $feedContext
+     */
+    private function loadReelsPage(string $feed, array $cursor, mixed $viewer, array $geoContext, array $feedContext): array
+    {
+        $fetch = fn () => $this->fetchReelsPage($feed, $cursor, $viewer, $geoContext, $feedContext);
+
+        if (! empty($feedContext['unseen_first'])) {
+            return $fetch();
+        }
+
+        $cacheKey = $this->feedCacheKey($feed, $cursor['cache_key'], $viewer, $geoContext, $feedContext);
+
+        return $this->rememberFeedPage($cacheKey, $fetch);
+    }
+
+    /**
+     * @param  array<string, mixed>  $feedContext
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function unseenFirstMeta(array $feedContext, array $payload): array
+    {
+        if (empty($feedContext['unseen_first'])) {
+            return [];
+        }
+
+        return [
+            'unseen_first' => true,
+            'unseen_exhausted' => ! empty($payload['unseen_exhausted']),
         ];
     }
 

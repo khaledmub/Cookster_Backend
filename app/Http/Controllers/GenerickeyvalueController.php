@@ -185,7 +185,11 @@ class GenerickeyvalueController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id): View{}
+    public function show($id): RedirectResponse
+    {
+        return redirect()->route($this->url_path.'.index');
+    }
+
     
     /**
      * Show the form for editing the specified resource.
@@ -195,6 +199,7 @@ class GenerickeyvalueController extends Controller
      */
     public function edit($id): View{
         $m_data = Generickeyvalue::find($id);
+        abort_if(!$m_data, 404);
         $m_data_descriptions = DB::table($this->description_table_name)->select()->where('value_id',$id)->get()->keyBy('language_id');
         $data = array();
         $data['module_title_singular'] = $this->module_title_singular;
@@ -241,6 +246,7 @@ class GenerickeyvalueController extends Controller
             $input['status']=0;
         }
         $m_data = Generickeyvalue::find($id);
+        abort_if(!$m_data, 404);
         $m_data->update($input);
 
         foreach ($site_languages as $language) {
@@ -268,9 +274,11 @@ class GenerickeyvalueController extends Controller
      */
     public function destroy($id): RedirectResponse
     {
-        $reord = Generickeyvalue::find($id);
-        Generickeyvalue::find($id)->delete();
+        $record = Generickeyvalue::find($id);
+        abort_if(!$record, 404);
+        $keyId = $record->key_id;
+        $record->delete();
         DB::table($this->description_table_name)->where('value_id',$id)->delete();
-        return redirect()->route($this->url_path.'.index', ['key_id' => $reord->key_id])->with('success',$this->module_title_singular.' deleted successfully');
+        return redirect()->route($this->url_path.'.index', ['key_id' => $keyId])->with('success',$this->module_title_singular.' deleted successfully');
     }
 }

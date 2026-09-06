@@ -34,5 +34,8 @@ return Application::configure(basePath: dirname(__DIR__))
         AwsSecretsProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Bad/bot OAuth authorize requests are expected 400s, not app faults.
+        $exceptions->dontReport([
+            \Laravel\Passport\Exceptions\OAuthServerException::class,
+        ]);
     })->create();

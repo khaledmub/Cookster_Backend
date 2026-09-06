@@ -73,7 +73,7 @@ class AwsSecretsProvider extends ServiceProvider
                 }
             } catch (\Exception $e) {
                 // Log or handle error (but don’t crash)
-                logger()->error('Failed to fetch AWS secrets: ' . $e->getMessage());
+                logger()->warning('Failed to fetch AWS secrets: ' . $e->getMessage());
             }
         }
     }

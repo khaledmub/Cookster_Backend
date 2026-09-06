@@ -49,6 +49,10 @@ Route::middleware([SetLanguage::class])->group(function () {
     Route::get('/videos/processing_status', [ApiController::class, 'video_processing_status']);
     Route::get('/videos/debug_url', [ApiController::class, 'debug_video_url']);
     Route::get('/reels', [ReelsController::class, 'index']);
+    Route::post('/reels/views', [ReelsController::class, 'storeViews'])
+        ->middleware('throttle:60,1');
+    Route::post('/reels/{id}/view', [ReelsController::class, 'storeView'])
+        ->middleware('throttle:60,1');
     Route::post('/videos/send_liked_video_notification', [ApiController::class, 'send_liked_video_notification']);
 
     // Nearest Business Accounts/Restaurants

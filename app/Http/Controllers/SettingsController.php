@@ -30,9 +30,9 @@ class SettingsController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        
+        return redirect()->route($this->url_path.'.edit', 1);
     }
     
     /**
@@ -40,7 +40,10 @@ class SettingsController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(): View{}
+    public function create(): RedirectResponse
+    {
+        return redirect()->route($this->url_path.'.edit', 1);
+    }
     
     /**
      * Store a newly created resource in storage.
@@ -56,7 +59,10 @@ class SettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id): View{}
+    public function show($id): RedirectResponse
+    {
+        return redirect()->route($this->url_path.'.edit', $id ?: 1);
+    }
     
     /**
      * Show the form for editing the specified resource.
@@ -122,5 +128,8 @@ class SettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id): RedirectResponse{}
+    public function destroy($id): RedirectResponse
+    {
+        return redirect()->route($this->url_path.'.edit', 1);
+    }
 }
