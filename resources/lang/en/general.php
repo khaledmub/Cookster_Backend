@@ -54,4 +54,5 @@ return [
     'twitter_x' => 'Twitter/X',
     'facebook' => 'Facebook',
     'whatsapp' => 'WhatsApp',
+    'read_more' => 'Read More',
 ];

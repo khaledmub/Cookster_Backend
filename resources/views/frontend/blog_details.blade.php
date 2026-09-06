@@ -12,7 +12,7 @@
     @if($data['blog_details'])
         <div class="inner_banner_parent">
             <div class="container-fluid">
-                <div class="inner_banner inner_banner_blog" style="background-image: url({{asset('storage/blogs/'.$data['blog_details']->image)}});"></div>
+                <div class="inner_banner inner_banner_blog" style="background-image: url({{ \App\Helpers\AppHelper::cmsMediaUrl('blogs', $data['blog_details']->image) }});"></div>
             </div>
         </div>
 
@@ -54,7 +54,7 @@
                         </div>
                     </div>
 
-                    {!! $data['blog_details']->description !!}
+                    {!! \App\Helpers\AppHelper::rewriteCmsHtml($data['blog_details']->description) !!}
                 </div>
 
                 @if(count($data['related_blogs']) > 0)
@@ -75,7 +75,7 @@
                                     : \Illuminate\Support\Str::slug($blog->custom_url))
                             ) }}" class="blog_card">
                                 <div class="blog_card_img">
-                                    <img src="{{ asset('storage/blogs/'.$blog->image) }}" alt="">
+                                    <img src="{{ \App\Helpers\AppHelper::cmsMediaUrl('blogs', $blog->image) }}" alt="">
                                     <div class="blog_date">{{ date('d M, Y', strtotime($blog->date)) }}</div>
                                 </div>
                                 <div class="blog_card_body">

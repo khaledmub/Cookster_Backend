@@ -115,7 +115,7 @@
                                     <div class="form-group">
                                         <label class="form-label">File <span class="text-danger">*</span>
                                         @if($m_data->file != '')
-                                        <span><a target="_blank" href="{{ asset('storage/'.$data['uploads_folder_name'].'/'.$m_data->file) }}">(Uploaded File)</a></span>
+                                        <span><a target="_blank" href="{{ \App\Helpers\AppHelper::cmsMediaUrl($data['uploads_folder_name'], $m_data->file) }}">(Uploaded File)</a></span>
                                         @endif
                                         </label>
                                         <input type="file" name="file" class="form-control">

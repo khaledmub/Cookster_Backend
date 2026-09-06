@@ -54,4 +54,5 @@ return [
     'twitter_x' => 'تويتر/X',
     'facebook' => 'فيسبوك',
     'whatsapp' => 'واتساب',
+    'read_more' => 'اقرأ المزيد',
 ];

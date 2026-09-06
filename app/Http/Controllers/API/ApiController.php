@@ -1277,6 +1277,10 @@ class ApiController extends Controller
         $query->where('site_languages.code', $language);
         $query->where('pages.id', $request->type);
         $page = $query->select(['pages.*', 'pages_description.title', 'pages_description.sub_title', 'pages_description.short_description', 'pages_description.description'])->first();
+        if ($page) {
+            $page->image_url = AppHelper::cmsMediaUrl('pages', $page->image ?? null);
+            $page->description = AppHelper::rewriteCmsHtml($page->description ?? '');
+        }
         return response()->json([
             'status' => true,
             'page' => $page,

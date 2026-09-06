@@ -83,7 +83,7 @@ class AdvertisementsController extends Controller
             // $sub_array[]=$sdata->city_name;
             $sub_array[]=date(env('DATE_FORMAT'), strtotime($sdata->start_date));
             $sub_array[]=date(env('DATE_FORMAT'), strtotime($sdata->end_date));
-            $sub_array[]='<a target="_blank" href="'.asset('storage/'.$this->uploads_folder_name.'/'.$sdata->file).'">File</a>';
+            $sub_array[]='<a target="_blank" href="'.\App\Helpers\AppHelper::cmsMediaUrl($this->uploads_folder_name, $sdata->file).'">File</a>';
             $sub_array[]=$status_label;
 
             $actionshtml="";

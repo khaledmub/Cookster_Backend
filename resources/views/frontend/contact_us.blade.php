@@ -7,11 +7,12 @@
 @section('content')
 @php
 $settings=\App\Helpers\AppHelper::get_site_settings();
+$pageImage = \App\Helpers\AppHelper::cmsMediaUrl('pages', $data['page']->image ?? null);
 @endphp
 <!-- Banner -->
     <div class="inner_banner_parent">
         <div class="container-fluid">
-            <div class="inner_banner">
+            <div class="inner_banner"@if($pageImage) style="background-image: url({{ $pageImage }});"@endif>
                 <div class="banner_overlay"></div>
                 <div class="banner_content">
                     <div class="container">

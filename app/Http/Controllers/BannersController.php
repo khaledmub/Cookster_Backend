@@ -75,7 +75,7 @@ class BannersController extends Controller
             }
             $sub_array=array();
             $sub_array[]=$sdata->title;
-            $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.asset('storage/'.$this->uploads_folder_name.'/'.$sdata->image).'">';
+            $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.\App\Helpers\AppHelper::cmsMediaUrl($this->uploads_folder_name, $sdata->image).'">';
             $sub_array[]=$status_label;
 
             $actionshtml="";

@@ -80,7 +80,7 @@ class BlogsController extends Controller
             $sub_array=array();
             $sub_array[]=$sdata->title;
             $sub_array[]=$sdata->category_title;
-            $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.asset('storage/'.$this->uploads_folder_name.'/'.$sdata->image).'">';
+            $sub_array[]='<img style="max-height: 100px; max-width: 50px;" src="'.\App\Helpers\AppHelper::cmsMediaUrl($this->uploads_folder_name, $sdata->image).'">';
             $sub_array[]=date('d M, Y', strtotime($sdata->date));
             $sub_array[]=$status_label;
 
@@ -574,7 +574,7 @@ class BlogsController extends Controller
             //     $constraint->aspectRatio();
             // })->save($destinationPath.'/'.$input['imagename']);
             $image_name=$input['imagename'];
-            $url=asset('storage/ckeditor/'.$image_name);
+            $url=\App\Helpers\AppHelper::cmsMediaUrl('ckeditor', $image_name);
             $response=array();
             $response['CKEditorFuncNum']=$CKEditorFuncNum;
             $response['url']=$url;

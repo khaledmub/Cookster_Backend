@@ -184,6 +184,7 @@ class AppHelper
         $query->join('works_description', 'works_description.work_id', '=', 'works.id');
         $query->join('site_languages', 'works_description.language_id', '=', 'site_languages.id');
         $query->where('site_languages.code', $language);
+        $query->where('works.status', 1);
         $query->orderBy('works.sort_order', 'ASC');
         $works = $query->select(['works.*', 'works_description.title', 'works_description.number', 'works_description.description'])->get();
         return $works;
@@ -247,6 +248,67 @@ class AppHelper
         }
 
         return rtrim($baseWithSlash, '/').'/'.ltrim($defaultPrefix, '/').$stored;
+    }
+
+    /**
+     * Public URL for CMS uploads (pages, banners, blogs, ckeditor, ads).
+     * Admin storeAs() writes to the default disk under public/{folder}/{file}.
+     * When that disk is S3/GCS, asset('storage/...') 404s because the file is not local.
+     */
+    public static function cmsMediaUrl(?string $folder, ?string $filename): ?string
+    {
+        if ($filename === null || trim($filename) === '') {
+            return null;
+        }
+
+        $filename = trim($filename);
+        if (str_starts_with($filename, 'http://') || str_starts_with($filename, 'https://')) {
+            return $filename;
+        }
+
+        $filename = basename(str_replace('\\', '/', $filename));
+        $folder = trim((string) $folder, '/');
+        if ($folder === '' || $filename === '' || $filename === '.' || $filename === '..') {
+            return null;
+        }
+
+        $relative = $folder.'/'.$filename;
+        $localPath = storage_path('app/public/'.$relative);
+        $objectKey = 'public/'.$relative;
+        $defaultDisk = (string) config('filesystems.default', 'local');
+        $cdn = app(\App\Services\CdnService::class);
+        $remoteUrl = $cdn->urlForPath($objectKey);
+
+        if ($defaultDisk === 's3' && $remoteUrl) {
+            return $remoteUrl;
+        }
+
+        if (is_file($localPath)) {
+            return asset('storage/'.$relative);
+        }
+
+        return $remoteUrl ?: asset('storage/'.$relative);
+    }
+
+    /**
+     * Rewrite locally stored /storage/{folder}/... URLs inside CKEditor HTML
+     * so embedded images resolve on S3/CDN after upload.
+     */
+    public static function rewriteCmsHtml(?string $html): string
+    {
+        if ($html === null || $html === '') {
+            return '';
+        }
+
+        $rewritten = preg_replace_callback(
+            '#(?:https?://[^/]+)?/storage/(pages|banners|blogs|ckeditor|advertisements)/([^"\'\s>]+)#i',
+            function (array $matches): string {
+                return self::cmsMediaUrl($matches[1], rawurldecode($matches[2])) ?? $matches[0];
+            },
+            $html
+        );
+
+        return is_string($rewritten) ? $rewritten : $html;
     }
 
     /**

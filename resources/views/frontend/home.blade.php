@@ -7,6 +7,8 @@
 
 @php
 $settings=\App\Helpers\AppHelper::get_site_settings();
+$about = $data['about'] ?? null;
+$aboutImage = $about ? \App\Helpers\AppHelper::cmsMediaUrl('pages', $about->image ?? null) : null;
 @endphp
 
     <!-- Banner -->
@@ -14,10 +16,11 @@ $settings=\App\Helpers\AppHelper::get_site_settings();
         <div class="swiper banners_swiper">
             <div class="swiper-wrapper">
                 @foreach($data['banners'] as $banner)
+                @php $bannerImage = \App\Helpers\AppHelper::cmsMediaUrl('banners', $banner->image); @endphp
                 <div class="swiper-slide">
                     <div class="container-fluid">
                         <div class="px-5">
-                            <div class="main_banner" style="background-image: url({{asset('storage/banners/'.$banner->image)}});">
+                            <div class="main_banner"@if($bannerImage) style="background-image: url({{ $bannerImage }});"@endif>
                                 <div class="banner_overlay"></div>
                                 <div class="banner_content">
                                     <div class="container">
@@ -116,5 +119,36 @@ $settings=\App\Helpers\AppHelper::get_site_settings();
             </div>
         </div>
     </div>
+
+    @if($about)
+    <!-- About Us -->
+    <div class="about_us home_about">
+        <div class="container">
+            <div class="row align-items-center">
+                @if($aboutImage)
+                <div class="col-sm-6 wow fadeInLeft" data-wow-delay="0.4s">
+                    <div class="os_img">
+                        <img src="{{ $aboutImage }}" alt="{{ $about->title }}">
+                    </div>
+                </div>
+                <div class="col-sm-6 wow fadeInRight" data-wow-delay="0.5s">
+                @else
+                <div class="col-sm-12 wow fadeInLeft" data-wow-delay="0.4s">
+                @endif
+                    <h3>{{ $about->title }}</h3>
+                    @if(!empty($about->sub_title))
+                    <h2>{{ $about->sub_title }}</h2>
+                    @endif
+                    @if(!empty($about->short_description))
+                    <p>{{ $about->short_description }}</p>
+                    @else
+                    {!! \App\Helpers\AppHelper::rewriteCmsHtml($about->description) !!}
+                    @endif
+                    <a href="{{ url('/about_us') }}" class="btn-primary">{{ __('general.read_more') }}</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
     
 @endsection

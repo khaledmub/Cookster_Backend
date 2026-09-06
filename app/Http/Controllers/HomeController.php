@@ -35,6 +35,7 @@ class HomeController extends Controller
         $query->join('banners_description', 'banners_description.banner_id', '=', 'banners.id');
         $query->join('site_languages', 'banners_description.language_id', '=', 'site_languages.id');
         $query->where('site_languages.code', $language);
+        $query->where('banners.status', 1);
         $query->orderBy('banners.id', 'ASC');
         $data['banners'] = $query->select(['banners.*', 'banners_description.title', 'banners_description.sub_title', 'banners_description.short_description'])->get();
 
@@ -44,6 +45,14 @@ class HomeController extends Controller
         $query->where('site_languages.code', $language);
         $query->where('pages.id', 5);
         $data['page'] = $query->select(['pages.*', 'pages_description.title', 'pages_description.sub_title', 'pages_description.short_description', 'pages_description.description', 'pages_description.meta_title', 'pages_description.meta_description', 'pages_description.meta_keywords'])->first();
+
+        $query = DB::table('pages');
+        $query->join('pages_description', 'pages_description.page_id', '=', 'pages.id');
+        $query->join('site_languages', 'pages_description.language_id', '=', 'site_languages.id');
+        $query->where('site_languages.code', $language);
+        $query->where('pages.id', 1);
+        $query->where('pages.status', 1);
+        $data['about'] = $query->select(['pages.*', 'pages_description.title', 'pages_description.sub_title', 'pages_description.short_description', 'pages_description.description'])->first();
 
         return view('frontend.home',compact('data'));
     }

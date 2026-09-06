@@ -5,10 +5,13 @@
 @section('meta_keywords', $data['page']->meta_keywords)
 
 @section('content')
+@php
+$pageImage = \App\Helpers\AppHelper::cmsMediaUrl('pages', $data['page']->image ?? null);
+@endphp
 <!-- Banner -->
     <div class="inner_banner_parent">
         <div class="container-fluid">
-            <div class="inner_banner">
+            <div class="inner_banner"@if($pageImage) style="background-image: url({{ $pageImage }});"@endif>
                 <div class="banner_overlay"></div>
                 <div class="banner_content">
                     <div class="container">
@@ -30,7 +33,7 @@
     <div class="content_main_body mt-4 mb-4">
     <div class="container">
         <h1>{{$data['page']->title}}</h1>
-        {!! $data['page']->description !!}
+        {!! \App\Helpers\AppHelper::rewriteCmsHtml($data['page']->description) !!}
     </div>
     </div>
 @endsection

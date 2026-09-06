@@ -130,7 +130,7 @@
                                     <div class="form-group">
                                         <label class="form-label">Image
                                         @if($m_data->image != '')
-                                        <span><a target="_blank" href="{{ asset('storage/'.$data['uploads_folder_name'].'/'.$m_data->image) }}">(Uploaded Picture)</a></span>
+                                        <span><a target="_blank" href="{{ \App\Helpers\AppHelper::cmsMediaUrl($data['uploads_folder_name'], $m_data->image) }}">(Uploaded Picture)</a></span>
                                         @endif
                                         </label>
                                         <input type="file" name="image" class="form-control">

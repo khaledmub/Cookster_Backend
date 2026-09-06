@@ -61,7 +61,7 @@
                                     : \Illuminate\Support\Str::slug($blog->custom_url))
                             ) }}" class="blog_card">
                                 <div class="blog_card_img">
-                                    <img src="{{ asset('storage/blogs/'.$blog->image) }}" alt="">
+                                    <img src="{{ \App\Helpers\AppHelper::cmsMediaUrl('blogs', $blog->image) }}" alt="">
                                     <div class="blog_date">{{ date('d M, Y', strtotime($blog->date)) }}</div>
                                 </div>
                                 <div class="blog_card_body">

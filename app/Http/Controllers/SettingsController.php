@@ -119,6 +119,7 @@ class SettingsController extends Controller
             $input['allow_one_time_qr_reward'] = 0;
         }
         $setting->update($input);
+        \App\Support\CookCache::forget('app:site_settings');
         return redirect()->route($this->url_path.'.edit', 1)->with('success',$this->module_title_singular.' updated successfully');
     }
     
